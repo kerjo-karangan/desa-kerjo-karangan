@@ -1,6 +1,5 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Sintaks Baru Tailwind CSS Versi 4 */
+@import "tailwindcss";
 
 /* Memaksa web selalu menggunakan mode terang (Light Mode) */
 :root {
