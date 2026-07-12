@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Memaksa web selalu menggunakan mode terang (Light Mode) */
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: #f9fafb; /* Warna abu-abu sangat terang (gray-50) */
+  color: #111827; /* Teks warna gelap (gray-900) */
+}
