@@ -72,7 +72,7 @@ export default function LayananMandiri() {
         formData.append("image", fotoPengaduan);
         
         // --- MASUKKAN KEMBALI API KEY IMGBB ANDA DI SINI ---
-        const apiKeyImgBB = "MASUKKAN_KODE_API_IMGBB_ANDA_DISINI"; 
+        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e"; 
         
         const tanggapan = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
         const hasil = await tanggapan.json();
