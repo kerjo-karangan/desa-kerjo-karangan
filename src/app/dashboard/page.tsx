@@ -17,7 +17,7 @@ export default function DashboardAdmin() {
   const [daftarSurat, setDaftarSurat] = useState<any[]>([]);
   const [daftarPengaduan, setDaftarPengaduan] = useState<any[]>([]);
 
-  // --- STATE KABAR DESA ---
+  // --- STATE KABAR DESA & AGENDA (BARU) ---
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
   const [fotoKabarList, setFotoKabarList] = useState<FileList | null>(null);
@@ -26,6 +26,13 @@ export default function DashboardAdmin() {
   const [riwayatKabar, setRiwayatKabar] = useState<any[]>([]);
   const [editKabarId, setEditKabarId] = useState<string | null>(null);
   const [gambarLama, setGambarLama] = useState<string[]>([]);
+
+  const [namaAgenda, setNamaAgenda] = useState("");
+  const [tanggalAgenda, setTanggalAgenda] = useState("");
+  const [lokasiAgenda, setLokasiAgenda] = useState("");
+  const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
+  const [statusAgenda, setStatusAgenda] = useState("");
+  const [isLoadingAgenda, setIsLoadingAgenda] = useState(false);
 
   // --- STATE PROFIL & APARATUR DESA ---
   const [sejarahDesa, setSejarahDesa] = useState("");
@@ -43,7 +50,7 @@ export default function DashboardAdmin() {
   const [editAparaturId, setEditAparaturId] = useState<string | null>(null);
   const [fotoLamaAparatur, setFotoLamaAparatur] = useState("");
 
-  // --- STATE UMKM / POTENSI DESA (BARU) ---
+  // --- STATE UMKM / POTENSI DESA (DIPERBARUI DGN EDIT) ---
   const [namaProduk, setNamaProduk] = useState("");
   const [pemilikUmkm, setPemilikUmkm] = useState("");
   const [hargaProduk, setHargaProduk] = useState("");
@@ -53,6 +60,8 @@ export default function DashboardAdmin() {
   const [daftarUmkm, setDaftarUmkm] = useState<any[]>([]);
   const [statusUmkm, setStatusUmkm] = useState("");
   const [isLoadingUmkm, setIsLoadingUmkm] = useState(false);
+  const [editUmkmId, setEditUmkmId] = useState<string | null>(null);
+  const [fotoLamaUmkm, setFotoLamaUmkm] = useState("");
 
   // --- STATE TRANSPARANSI (APBDes & REGULASI) ---
   const [danaDesa, setDanaDesa] = useState<number | string>(0);
@@ -95,25 +104,24 @@ export default function DashboardAdmin() {
       const snapKabar = await getDocs(qKabar);
       setRiwayatKabar(snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
+      // Tarik Data Agenda (BARU)
+      const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
+      const snapAgenda = await getDocs(qAgenda);
+      setDaftarAgenda(snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
       const snapProfil = await getDoc(doc(db, "profil_desa", "utama"));
-      if (snapProfil.exists()) {
-        setSejarahDesa(snapProfil.data().sejarah || "");
-        setVisiMisiDesa(snapProfil.data().visi_misi || "");
-      }
+      if (snapProfil.exists()) { setSejarahDesa(snapProfil.data().sejarah || ""); setVisiMisiDesa(snapProfil.data().visi_misi || ""); }
 
       const qAparatur = query(collection(db, "aparatur_desa"), orderBy("urutan", "asc"));
       const snapAparatur = await getDocs(qAparatur);
       setDaftarAparatur(snapAparatur.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      // Data UMKM (BARU)
       const qUmkm = query(collection(db, "potensi_desa"), orderBy("tanggal_input", "desc"));
       const snapUmkm = await getDocs(qUmkm);
       setDaftarUmkm(snapUmkm.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
       const snapApbdes = await getDoc(doc(db, "transparansi", "apbdes"));
-      if (snapApbdes.exists()) {
-        setDanaDesa(snapApbdes.data().dana_desa || 0); setAlokasiDanaDesa(snapApbdes.data().alokasi_dana_desa || 0); setPad(snapApbdes.data().pad || 0); setBanprov(snapApbdes.data().banprov || 0);
-      }
+      if (snapApbdes.exists()) { setDanaDesa(snapApbdes.data().dana_desa || 0); setAlokasiDanaDesa(snapApbdes.data().alokasi_dana_desa || 0); setPad(snapApbdes.data().pad || 0); setBanprov(snapApbdes.data().banprov || 0); }
 
       const qRegulasi = query(collection(db, "regulasi_desa"), orderBy("tahun", "desc"));
       const snapRegulasi = await getDocs(qRegulasi);
@@ -123,9 +131,7 @@ export default function DashboardAdmin() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) { router.push("/login"); } else { setUserEmail(user.email); setIsCheckingAuth(false); ambilDataAwal(); }
-    });
+    const unsubscribe = onAuthStateChanged(auth, (user) => { if (!user) { router.push("/login"); } else { setUserEmail(user.email); setIsCheckingAuth(false); ambilDataAwal(); } });
     return () => unsubscribe();
   }, [router]);
 
@@ -139,7 +145,6 @@ export default function DashboardAdmin() {
     formData.append("image", file);
     // --- API KEY IMGBB DI SINI ---
     const apiKeyImgBB = "6755e61bb042b746d83c71595313674e"; 
-    
     try {
       const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
       const data = await res.json();
@@ -157,24 +162,21 @@ export default function DashboardAdmin() {
   };
 
   // ==========================================
-  // MODUL KABAR DESA
+  // MODUL KABAR DESA & AGENDA (BARU)
   // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
-    e.preventDefault(); setIsLoadingKabar(true); setStatusKabar("Memproses unggahan...");
+    e.preventDefault(); setIsLoadingKabar(true); setStatusKabar("Memproses...");
     try {
       let tautanGambarBaru: string[] = [];
       if (fotoKabarList && fotoKabarList.length > 0) {
-        setStatusKabar(`Mengunggah ${fotoKabarList.length} foto melalui CDN...`);
+        setStatusKabar(`Mengunggah foto...`);
         const uploadPromises = Array.from(fotoKabarList).map(file => uploadFotoKeImgBB(file));
         const hasilUpload = await Promise.all(uploadPromises);
         tautanGambarBaru = hasilUpload.filter(url => url !== null) as string[];
       }
       const gambarFinal = [...gambarLama, ...tautanGambarBaru]; 
-      if (editKabarId) { 
-        await updateDoc(doc(db, "kabar_desa", editKabarId), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal }); setStatusKabar("✅ Berita diperbarui!");
-      } else { 
-        await addDoc(collection(db, "kabar_desa"), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal, tanggal_posting: new Date().toISOString(), penulis: userEmail }); setStatusKabar("✅ Berita dipublikasikan!"); 
-      }
+      if (editKabarId) { await updateDoc(doc(db, "kabar_desa", editKabarId), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal }); setStatusKabar("✅ Berita diperbarui!");
+      } else { await addDoc(collection(db, "kabar_desa"), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal, tanggal_posting: new Date().toISOString(), penulis: userEmail }); setStatusKabar("✅ Berita dipublikasikan!"); }
       batalEditKabar(); ambilDataAwal(); setTimeout(() => setStatusKabar(""), 4000);
     } catch (error) { setStatusKabar("❌ Terjadi kesalahan."); } finally { setIsLoadingKabar(false); }
   };
@@ -183,6 +185,16 @@ export default function DashboardAdmin() {
   const batalEditKabar = () => { setEditKabarId(null); setJudulKabar(""); setIsiKabar(""); setGambarLama([]); setFotoKabarList(null); const input = document.getElementById('inputFotoKabar') as HTMLInputElement; if(input) input.value = '';};
   const hapusKabar = async (id: string) => { if (confirm("Yakin hapus permanen?")) { await deleteDoc(doc(db, "kabar_desa", id)); ambilDataAwal(); } };
 
+  // FUNGSI AGENDA DESA (BARU)
+  const handleSimpanAgenda = async (e: React.FormEvent) => {
+    e.preventDefault(); setIsLoadingAgenda(true); setStatusAgenda("Menyimpan...");
+    try {
+      await addDoc(collection(db, "agenda_desa"), { nama: namaAgenda, tanggal: tanggalAgenda, lokasi: lokasiAgenda });
+      setStatusAgenda("✅ Agenda ditambahkan!"); setNamaAgenda(""); setTanggalAgenda(""); setLokasiAgenda(""); ambilDataAwal(); setTimeout(() => setStatusAgenda(""), 4000);
+    } catch(error) { setStatusAgenda("❌ Gagal."); } finally { setIsLoadingAgenda(false); }
+  };
+  const hapusAgenda = async (id: string) => { if(confirm("Hapus agenda ini?")) { await deleteDoc(doc(db, "agenda_desa", id)); ambilDataAwal(); } };
+
   // ==========================================
   // MODUL LAYANAN WARGA
   // ==========================================
@@ -190,7 +202,7 @@ export default function DashboardAdmin() {
   const hapusPengaduan = async (id: string) => { if (confirm("Yakin hapus laporan?")) { await deleteDoc(doc(db, "pengaduan_warga", id)); ambilDataAwal(); } };
   
   // ==========================================
-  // MODUL PROFIL, APARATUR, DAN UMKM (BARU)
+  // MODUL PROFIL, APARATUR, DAN UMKM (DGN EDIT UMKM)
   // ==========================================
   const handleSimpanProfil = async (e: React.FormEvent) => { e.preventDefault(); setIsLoadingProfil(true); setStatusProfil("Menyimpan..."); try { await setDoc(doc(db, "profil_desa", "utama"), { sejarah: sejarahDesa, visi_misi: visiMisiDesa, terakhir_diperbarui: new Date().toISOString() }); setStatusProfil("✅ Profil diperbarui!"); setTimeout(() => setStatusProfil(""), 4000); } catch (error) { setStatusProfil("❌ Gagal."); } finally { setIsLoadingProfil(false); } };
   
@@ -199,13 +211,8 @@ export default function DashboardAdmin() {
     try {
       let imageUrl = fotoLamaAparatur;
       if (fotoAparatur) { setStatusAparatur("Mengunggah foto..."); imageUrl = await uploadFotoKeImgBB(fotoAparatur) || ""; }
-      if (editAparaturId) {
-        await updateDoc(doc(db, "aparatur_desa", editAparaturId), { nama: namaAparatur, jabatan: jabatanAparatur, urutan: Number(urutanAparatur), foto: imageUrl });
-        setStatusAparatur("✅ Perangkat diperbarui!");
-      } else {
-        await addDoc(collection(db, "aparatur_desa"), { nama: namaAparatur, jabatan: jabatanAparatur, urutan: Number(urutanAparatur), foto: imageUrl });
-        setStatusAparatur("✅ Perangkat ditambahkan!");
-      }
+      if (editAparaturId) { await updateDoc(doc(db, "aparatur_desa", editAparaturId), { nama: namaAparatur, jabatan: jabatanAparatur, urutan: Number(urutanAparatur), foto: imageUrl }); setStatusAparatur("✅ Perangkat diperbarui!");
+      } else { await addDoc(collection(db, "aparatur_desa"), { nama: namaAparatur, jabatan: jabatanAparatur, urutan: Number(urutanAparatur), foto: imageUrl }); setStatusAparatur("✅ Perangkat ditambahkan!"); }
       batalEditAparatur(); ambilDataAwal(); setTimeout(() => setStatusAparatur(""), 4000);
     } catch (error) { setStatusAparatur("❌ Gagal."); } finally { setIsLoadingAparatur(false); }
   };
@@ -213,34 +220,35 @@ export default function DashboardAdmin() {
   const batalEditAparatur = () => { setEditAparaturId(null); setNamaAparatur(""); setJabatanAparatur(""); setUrutanAparatur(daftarAparatur.length + 2); setFotoLamaAparatur(""); setFotoAparatur(null); };
   const hapusAparatur = async (id: string) => { if (confirm("Yakin hapus?")) { await deleteDoc(doc(db, "aparatur_desa", id)); ambilDataAwal(); } };
 
-  // FUNGSI SIMPAN UMKM
+  // FUNGSI UMKM (DIPERBARUI DGN FITUR EDIT)
   const handleSimpanUmkm = async (e: React.FormEvent) => {
     e.preventDefault(); setIsLoadingUmkm(true); setStatusUmkm("Memproses...");
     try {
-      let imageUrl = "";
+      let imageUrl = fotoLamaUmkm;
       if (fotoProduk) { setStatusUmkm("Mengunggah foto produk..."); imageUrl = await uploadFotoKeImgBB(fotoProduk) || ""; }
-      await addDoc(collection(db, "potensi_desa"), { nama_produk: namaProduk, pemilik: pemilikUmkm, harga: Number(hargaProduk), wa: waUmkm, deskripsi: deskripsiProduk, foto: imageUrl, tanggal_input: new Date().toISOString() });
-      setStatusUmkm("✅ UMKM ditambahkan!"); setNamaProduk(""); setPemilikUmkm(""); setHargaProduk(""); setWaUmkm(""); setDeskripsiProduk(""); setFotoProduk(null); ambilDataAwal(); setTimeout(() => setStatusUmkm(""), 4000);
+      
+      if (editUmkmId) {
+        await updateDoc(doc(db, "potensi_desa", editUmkmId), { nama_produk: namaProduk, pemilik: pemilikUmkm, harga: Number(hargaProduk), wa: waUmkm, deskripsi: deskripsiProduk, foto: imageUrl });
+        setStatusUmkm("✅ UMKM diperbarui!");
+      } else {
+        await addDoc(collection(db, "potensi_desa"), { nama_produk: namaProduk, pemilik: pemilikUmkm, harga: Number(hargaProduk), wa: waUmkm, deskripsi: deskripsiProduk, foto: imageUrl, tanggal_input: new Date().toISOString() });
+        setStatusUmkm("✅ UMKM ditambahkan!");
+      }
+      batalEditUmkm(); ambilDataAwal(); setTimeout(() => setStatusUmkm(""), 4000);
     } catch (error) { setStatusUmkm("❌ Gagal."); } finally { setIsLoadingUmkm(false); }
   };
+  const mulaiEditUmkm = (item: any) => { setEditUmkmId(item.id); setNamaProduk(item.nama_produk); setPemilikUmkm(item.pemilik); setHargaProduk(item.harga.toString()); setWaUmkm(item.wa); setDeskripsiProduk(item.deskripsi); setFotoLamaUmkm(item.foto || ""); setFotoProduk(null); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const batalEditUmkm = () => { setEditUmkmId(null); setNamaProduk(""); setPemilikUmkm(""); setHargaProduk(""); setWaUmkm(""); setDeskripsiProduk(""); setFotoLamaUmkm(""); setFotoProduk(null); };
   const hapusUmkm = async (id: string) => { if (confirm("Yakin hapus produk ini?")) { await deleteDoc(doc(db, "potensi_desa", id)); ambilDataAwal(); } };
 
   // ==========================================
   // MODUL TRANSPARANSI & REGULASI
   // ==========================================
   const handleSimpanApbdes = async (e: React.FormEvent) => { e.preventDefault(); setIsLoadingApbdes(true); setStatusApbdes("Menyimpan..."); try { await setDoc(doc(db, "transparansi", "apbdes"), { dana_desa: Number(danaDesa), alokasi_dana_desa: Number(alokasiDanaDesa), pad: Number(pad), banprov: Number(banprov), terakhir_diperbarui: new Date().toISOString() }); setStatusApbdes("✅ APBDes diperbarui!"); setTimeout(() => setStatusApbdes(""), 4000); } catch (error) { setStatusApbdes("❌ Gagal."); } finally { setIsLoadingApbdes(false); } };
-  
-  const handleSimpanRegulasi = async (e: React.FormEvent) => {
-    e.preventDefault(); setIsLoadingRegulasi(true); setStatusRegulasi("Menyimpan dokumen...");
-    try {
-      if (editRegulasiId) { await updateDoc(doc(db, "regulasi_desa", editRegulasiId), { tahun: tahunRegulasi, jenis: jenisRegulasi, judul: judulRegulasi, link: linkRegulasi }); setStatusRegulasi("✅ Dokumen diperbarui!");
-      } else { await addDoc(collection(db, "regulasi_desa"), { tahun: tahunRegulasi, jenis: jenisRegulasi, judul: judulRegulasi, link: linkRegulasi, tanggal_upload: new Date().toISOString() }); setStatusRegulasi("✅ Dokumen ditambahkan!"); }
-      batalEditRegulasi(); ambilDataAwal(); setTimeout(() => setStatusRegulasi(""), 4000);
-    } catch (error) { setStatusRegulasi("❌ Gagal menyimpan."); } finally { setIsLoadingRegulasi(false); }
-  };
+  const handleSimpanRegulasi = async (e: React.FormEvent) => { e.preventDefault(); setIsLoadingRegulasi(true); setStatusRegulasi("Menyimpan..."); try { if (editRegulasiId) { await updateDoc(doc(db, "regulasi_desa", editRegulasiId), { tahun: tahunRegulasi, jenis: jenisRegulasi, judul: judulRegulasi, link: linkRegulasi }); setStatusRegulasi("✅ Diperbarui!"); } else { await addDoc(collection(db, "regulasi_desa"), { tahun: tahunRegulasi, jenis: jenisRegulasi, judul: judulRegulasi, link: linkRegulasi, tanggal_upload: new Date().toISOString() }); setStatusRegulasi("✅ Ditambahkan!"); } batalEditRegulasi(); ambilDataAwal(); setTimeout(() => setStatusRegulasi(""), 4000); } catch (error) { setStatusRegulasi("❌ Gagal."); } finally { setIsLoadingRegulasi(false); } };
   const mulaiEditRegulasi = (item: any) => { setEditRegulasiId(item.id); setTahunRegulasi(item.tahun); setJenisRegulasi(item.jenis); setJudulRegulasi(item.judul); setLinkRegulasi(item.link); };
   const batalEditRegulasi = () => { setEditRegulasiId(null); setTahunRegulasi(""); setJenisRegulasi("Perdes"); setJudulRegulasi(""); setLinkRegulasi(""); };
-  const hapusRegulasi = async (id: string) => { if (confirm("Yakin menghapus dokumen ini?")) { await deleteDoc(doc(db, "regulasi_desa", id)); ambilDataAwal(); } };
+  const hapusRegulasi = async (id: string) => { if (confirm("Yakin hapus dokumen?")) { await deleteDoc(doc(db, "regulasi_desa", id)); ambilDataAwal(); } };
 
   // ==========================================
   // MODUL AKUN
@@ -256,7 +264,7 @@ export default function DashboardAdmin() {
         <nav className="flex-grow p-4 flex flex-col gap-2 overflow-y-auto">
           <button onClick={() => setActiveMenu("welcome")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "welcome" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>🏠 Ringkasan Sistem</button>
           <button onClick={() => setActiveMenu("layanan")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "layanan" ? "bg-yellow-500 text-gray-900 translate-x-2 shadow-md" : "hover:bg-green-800"}`}>✉️ Layanan Warga {daftarSurat.filter(s => s.status_berkas === "Diajukan").length > 0 && <span className="ml-auto bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">Baru</span>}</button>
-          <button onClick={() => setActiveMenu("kabar")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "kabar" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📰 Kabar Desa</button>
+          <button onClick={() => setActiveMenu("kabar")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "kabar" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📰 Kabar & Agenda</button>
           <button onClick={() => setActiveMenu("profil")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "profil" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>🏛️ Profil & UMKM</button>
           <button onClick={() => setActiveMenu("transparansi")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "transparansi" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📊 Transparansi</button>
           <button onClick={() => setActiveMenu("akun")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "akun" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>👥 Manajemen Akun</button>
@@ -299,58 +307,59 @@ export default function DashboardAdmin() {
           </div> 
         )}
 
-        {/* MODUL KABAR DESA */}
+        {/* MODUL KABAR DESA & AGENDA DESA (BARU) */}
         {activeMenu === "kabar" && ( 
-          <div className="space-y-8 animate-fade-in"><div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500"><div className="flex justify-between mb-6 border-b pb-4"><h3 className="text-2xl font-bold flex items-center gap-2">{editKabarId ? "✏️ Edit Berita" : "📰 Publikasi Berita Baru"}</h3>{editKabarId && <button onClick={batalEditKabar} className="bg-gray-200 px-4 py-2 rounded-lg font-bold">Batal Edit</button>}</div><form onSubmit={handleSimpanKabar} className="space-y-5"><div><label className="block text-sm font-bold mb-2">Judul</label><input type="text" required value={judulKabar} onChange={(e) => setJudulKabar(e.target.value)} className="w-full p-3 border rounded-xl outline-none focus:ring-2" /></div>{editKabarId && gambarLama.length > 0 && (<div className="bg-orange-50 p-4 rounded-xl border border-orange-200"><p className="text-sm font-bold text-orange-800 mb-3">Foto tersimpan (Klik 'X' hapus):</p><div className="flex flex-wrap gap-3">{gambarLama.map((url, idx) => (<div key={idx} className="relative w-24 h-24 border rounded-lg overflow-hidden group shadow-sm"><img src={`https://wsrv.nl/?url=${url}`} alt="lama" className="w-full h-full object-cover" /><button type="button" onClick={() => hapusGambarDariDaftarLama(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button></div>))}</div></div>)}<div><label className="block text-sm font-bold mb-2">Tambahkan Foto Baru</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-100 transition-all"><span className="text-3xl mb-2">📸</span><span className="font-bold text-gray-600">Pilih foto</span><input id="inputFotoKabar" type="file" accept="image/*" multiple onChange={(e) => setFotoKabarList(e.target.files)} className="hidden" /></label>{fotoKabarList && <p className="text-sm font-bold text-blue-600 mt-2">✅ {fotoKabarList.length} foto siap.</p>}</div><div><label className="block text-sm font-bold mb-2">Isi Berita</label><textarea required rows={6} value={isiKabar} onChange={(e) => setIsiKabar(e.target.value)} className="w-full p-3 border rounded-xl outline-none focus:ring-2"></textarea></div>{statusKabar && <div className={`p-3 rounded-lg text-sm font-bold text-center border ${statusKabar.includes("❌") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>{statusKabar}</div>}<button type="submit" disabled={isLoadingKabar} className={`w-full text-white font-bold px-6 py-4 rounded-xl shadow-md ${isLoadingKabar ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}>{isLoadingKabar ? "Memproses..." : (editKabarId ? "Simpan Perubahan" : "Publikasikan")}</button></form></div><div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto"><h4 className="text-xl font-bold mb-4">Riwayat Berita</h4><table className="min-w-full text-sm text-left"><thead className="bg-gray-50 border-b"><tr><th className="py-4 px-4">Tanggal</th><th className="py-4 px-4">Judul</th><th className="py-4 px-4 text-center">Aksi</th></tr></thead><tbody>{riwayatKabar.map((item) => (<tr key={item.id} className="border-b"><td className="py-4 px-4 font-medium text-gray-500">{new Date(item.tanggal_posting).toLocaleDateString('id-ID')}</td><td className="py-4 px-4 font-bold">{item.judul}</td><td className="py-4 px-4 text-center"><button onClick={() => mulaiEditKabar(item)} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-2 font-bold">Edit</button><button onClick={() => hapusKabar(item.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded-lg font-bold">Hapus</button></td></tr>))}</tbody></table></div></div>
-        )}
-        
-        {/* MODUL PROFIL, APARATUR, & UMKM DESA */}
-        {activeMenu === "profil" && ( 
           <div className="space-y-8 animate-fade-in">
-            {/* Teks Profil */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600"><h3 className="text-2xl font-bold mb-6">🏛️ Pengaturan Teks Profil</h3><form onSubmit={handleSimpanProfil} className="space-y-5"><textarea required rows={4} value={sejarahDesa} onChange={(e) => setSejarahDesa(e.target.value)} placeholder="Sejarah Desa" className="w-full px-4 py-3 rounded-xl border focus:ring-2 outline-none"></textarea><textarea required rows={4} value={visiMisiDesa} onChange={(e) => setVisiMisiDesa(e.target.value)} placeholder="Visi & Misi" className="w-full px-4 py-3 rounded-xl border focus:ring-2 outline-none"></textarea>{statusProfil && <div className="p-3 rounded-lg font-bold text-center bg-green-50 text-green-700">{statusProfil}</div>}<button type="submit" disabled={isLoadingProfil} className="bg-green-600 text-white font-bold py-3 px-8 rounded-xl shadow-md">{isLoadingProfil ? "Menyimpan..." : "Simpan Profil Utama"}</button></form></div>
+            {/* Berita Desa */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500"><div className="flex justify-between mb-6 border-b pb-4"><h3 className="text-2xl font-bold flex items-center gap-2">{editKabarId ? "✏️ Edit Berita" : "📰 Publikasi Berita Baru"}</h3>{editKabarId && <button onClick={batalEditKabar} className="bg-gray-200 px-4 py-2 rounded-lg font-bold">Batal Edit</button>}</div><form onSubmit={handleSimpanKabar} className="space-y-5"><div><label className="block text-sm font-bold mb-2">Judul</label><input type="text" required value={judulKabar} onChange={(e) => setJudulKabar(e.target.value)} className="w-full p-3 border rounded-xl outline-none focus:ring-2" /></div>{editKabarId && gambarLama.length > 0 && (<div className="bg-orange-50 p-4 rounded-xl border border-orange-200"><p className="text-sm font-bold text-orange-800 mb-3">Foto tersimpan (Klik 'X' hapus):</p><div className="flex flex-wrap gap-3">{gambarLama.map((url, idx) => (<div key={idx} className="relative w-24 h-24 border rounded-lg overflow-hidden group shadow-sm"><img src={`https://wsrv.nl/?url=${url}`} alt="lama" className="w-full h-full object-cover" /><button type="button" onClick={() => hapusGambarDariDaftarLama(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button></div>))}</div></div>)}<div><label className="block text-sm font-bold mb-2">Tambahkan Foto Baru</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-gray-100 transition-all"><span className="text-3xl mb-2">📸</span><span className="font-bold text-gray-600">Pilih foto</span><input id="inputFotoKabar" type="file" accept="image/*" multiple onChange={(e) => setFotoKabarList(e.target.files)} className="hidden" /></label>{fotoKabarList && <p className="text-sm font-bold text-blue-600 mt-2">✅ {fotoKabarList.length} foto siap.</p>}</div><div><label className="block text-sm font-bold mb-2">Isi Berita</label><textarea required rows={6} value={isiKabar} onChange={(e) => setIsiKabar(e.target.value)} className="w-full p-3 border rounded-xl outline-none focus:ring-2"></textarea></div>{statusKabar && <div className={`p-3 rounded-lg text-sm font-bold text-center border ${statusKabar.includes("❌") ? "bg-red-50 text-red-600" : "bg-green-50 text-green-700"}`}>{statusKabar}</div>}<button type="submit" disabled={isLoadingKabar} className={`w-full text-white font-bold px-6 py-4 rounded-xl shadow-md ${isLoadingKabar ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"}`}>{isLoadingKabar ? "Memproses..." : (editKabarId ? "Simpan Perubahan" : "Publikasikan")}</button></form></div><div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto"><h4 className="text-xl font-bold mb-4">Riwayat Berita</h4><table className="min-w-full text-sm text-left"><thead className="bg-gray-50 border-b"><tr><th className="py-4 px-4">Tanggal</th><th className="py-4 px-4">Judul</th><th className="py-4 px-4 text-center">Aksi</th></tr></thead><tbody>{riwayatKabar.map((item) => (<tr key={item.id} className="border-b"><td className="py-4 px-4 font-medium text-gray-500">{new Date(item.tanggal_posting).toLocaleDateString('id-ID')}</td><td className="py-4 px-4 font-bold">{item.judul}</td><td className="py-4 px-4 text-center"><button onClick={() => mulaiEditKabar(item)} className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-2 font-bold">Edit</button><button onClick={() => hapusKabar(item.id)} className="bg-red-100 text-red-700 px-3 py-1 rounded-lg font-bold">Hapus</button></td></tr>))}</tbody></table></div>
             
-            {/* MANAJEMEN APARATUR */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-2xl font-bold mb-6">👔 Susunan Perangkat Desa</h3>
+            {/* MANAJEMEN AGENDA DESA (BARU) */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 mt-8">
+              <h3 className="text-2xl font-bold mb-6">📅 Agenda & Kalender Kegiatan Desa</h3>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                  <div className="flex justify-between items-center mb-4"><h4 className="font-bold text-gray-800">{editAparaturId ? "✏️ Edit SOTK" : "Tambah SOTK"}</h4>{editAparaturId && <button onClick={batalEditAparatur} className="text-xs bg-gray-300 px-2 py-1 rounded-md font-bold">Batal</button>}</div>
-                  <form onSubmit={handleSimpanAparatur} className="space-y-4">
-                    <div><label className="block text-xs font-bold mb-1">Nama & Gelar</label><input type="text" required value={namaAparatur} onChange={(e) => setNamaAparatur(e.target.value)} placeholder="Misal: Rebo, S.E." className="w-full p-3 rounded-lg border outline-none" /></div>
-                    <div><label className="block text-xs font-bold mb-1">Jabatan</label><input type="text" required value={jabatanAparatur} onChange={(e) => setJabatanAparatur(e.target.value)} placeholder="Misal: Kepala Desa" className="w-full p-3 rounded-lg border outline-none" /></div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><label className="block text-xs font-bold mb-1">No. Urut</label><input type="number" required value={urutanAparatur} onChange={(e) => setUrutanAparatur(Number(e.target.value))} className="w-full p-3 rounded-lg border text-center font-bold" /></div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1">Foto Baru</label>
-                        <label className="cursor-pointer flex flex-col items-center justify-center py-2 h-[46px] bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all overflow-hidden"><span className="font-bold text-gray-600 text-xs flex items-center gap-1">📸 {fotoAparatur ? 'Siap' : 'Pilih File'}</span><input type="file" accept="image/*" onChange={(e) => { if(e.target.files) setFotoAparatur(e.target.files[0])}} className="hidden" /></label>
-                      </div>
-                    </div>
-                    {editAparaturId && fotoLamaAparatur && (<div className="flex items-center gap-3 p-2 bg-white rounded-lg border"><img src={`https://wsrv.nl/?url=${fotoLamaAparatur}`} className="w-8 h-8 rounded-full object-cover" /><span className="text-xs text-gray-500">Foto tersimpan</span></div>)}
-                    {statusAparatur && <div className="text-xs font-bold text-green-700 bg-green-50 p-2 rounded text-center">{statusAparatur}</div>}
-                    <button type="submit" disabled={isLoadingAparatur} className="w-full bg-gray-900 text-white font-bold py-3 rounded-lg hover:bg-black">{isLoadingAparatur ? "Memproses..." : (editAparaturId ? "Simpan Perubahan" : "Tambahkan")}</button>
+                  <h4 className="font-bold text-gray-800 mb-4">Tambah Agenda Terdekat</h4>
+                  <form onSubmit={handleSimpanAgenda} className="space-y-4">
+                    <div><label className="block text-xs font-bold mb-1">Nama Kegiatan</label><input type="text" required value={namaAgenda} onChange={(e)=>setNamaAgenda(e.target.value)} placeholder="Misal: Posyandu Balita" className="w-full p-3 rounded-lg border outline-none" /></div>
+                    <div><label className="block text-xs font-bold mb-1">Tanggal & Waktu</label><input type="datetime-local" required value={tanggalAgenda} onChange={(e)=>setTanggalAgenda(e.target.value)} className="w-full p-3 rounded-lg border outline-none text-gray-600 font-bold" /></div>
+                    <div><label className="block text-xs font-bold mb-1">Lokasi Pelaksanaan</label><input type="text" required value={lokasiAgenda} onChange={(e)=>setLokasiAgenda(e.target.value)} placeholder="Misal: Balai Desa" className="w-full p-3 rounded-lg border outline-none" /></div>
+                    {statusAgenda && <div className="text-xs font-bold text-green-700 bg-green-50 p-2 rounded text-center">{statusAgenda}</div>}
+                    <button type="submit" disabled={isLoadingAgenda} className="w-full bg-gray-900 text-white font-bold py-3 rounded-lg hover:bg-black">{isLoadingAgenda ? "Menyimpan..." : "Tambahkan Jadwal"}</button>
                   </form>
                 </div>
                 <div className="lg:col-span-2 overflow-x-auto">
-                  <table className="min-w-full text-sm text-left"><thead className="bg-gray-100 border-b"><tr><th className="py-3 px-4">No</th><th className="py-3 px-4">Identitas</th><th className="py-3 px-4 text-center">Aksi</th></tr></thead>
-                    <tbody>{daftarAparatur.map((org) => (
-                      <tr key={org.id} className="border-b hover:bg-gray-50">
-                        <td className="py-3 px-4 font-black text-gray-400 text-lg text-center">{org.urutan}</td>
-                        <td className="py-3 px-4 flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">{org.foto ? <img src={`https://wsrv.nl/?url=${org.foto}`} alt="profil" className="w-full h-full object-cover"/> : <span className="flex items-center justify-center w-full h-full text-lg">👤</span>}</div><div><div className="font-bold text-gray-900">{org.nama}</div><div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{org.jabatan}</div></div></td>
-                        <td className="py-3 px-4 text-center"><button onClick={() => mulaiEditAparatur(org)} className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-md mr-2">Edit</button><button onClick={() => hapusAparatur(org.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button></td>
+                  <table className="min-w-full text-sm text-left"><thead className="bg-gray-100 border-b"><tr><th className="py-3 px-4">Tgl/Waktu</th><th className="py-3 px-4">Nama Kegiatan & Lokasi</th><th className="py-3 px-4 text-center">Aksi</th></tr></thead>
+                    <tbody>{daftarAgenda.map((agenda) => (
+                      <tr key={agenda.id} className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-4 font-bold text-gray-600">{new Date(agenda.tanggal).toLocaleString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit'})}</td>
+                        <td className="py-3 px-4"><div className="font-bold text-gray-900">{agenda.nama}</div><div className="text-xs text-gray-500 mt-1">📍 {agenda.lokasi}</div></td>
+                        <td className="py-3 px-4 text-center"><button onClick={() => hapusAgenda(agenda.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button></td>
                       </tr>))}
+                      {daftarAgenda.length === 0 && <tr><td colSpan={3} className="text-center py-6 text-gray-500">Belum ada agenda desa.</td></tr>}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
+          </div> 
+        )}
+        
+        {/* MODUL PROFIL, APARATUR, & UMKM DESA (DIPERBARUI DENGAN EDIT UMKM) */}
+        {activeMenu === "profil" && ( 
+          <div className="space-y-8 animate-fade-in">
+            {/* Teks Profil & Aparatur */}
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600"><h3 className="text-2xl font-bold mb-6">🏛️ Pengaturan Teks Profil</h3><form onSubmit={handleSimpanProfil} className="space-y-5"><textarea required rows={4} value={sejarahDesa} onChange={(e) => setSejarahDesa(e.target.value)} placeholder="Sejarah Desa" className="w-full px-4 py-3 rounded-xl border focus:ring-2 outline-none"></textarea><textarea required rows={4} value={visiMisiDesa} onChange={(e) => setVisiMisiDesa(e.target.value)} placeholder="Visi & Misi" className="w-full px-4 py-3 rounded-xl border focus:ring-2 outline-none"></textarea>{statusProfil && <div className="p-3 rounded-lg font-bold text-center bg-green-50 text-green-700">{statusProfil}</div>}<button type="submit" disabled={isLoadingProfil} className="bg-green-600 text-white font-bold py-3 px-8 rounded-xl shadow-md">{isLoadingProfil ? "Menyimpan..." : "Simpan Profil Utama"}</button></form></div>
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100"><h3 className="text-2xl font-bold mb-6">👔 Susunan Perangkat Desa</h3><div className="grid grid-cols-1 lg:grid-cols-3 gap-8"><div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200"><div className="flex justify-between items-center mb-4"><h4 className="font-bold text-gray-800">{editAparaturId ? "✏️ Edit SOTK" : "Tambah SOTK"}</h4>{editAparaturId && <button onClick={batalEditAparatur} className="text-xs bg-gray-300 px-2 py-1 rounded-md font-bold">Batal</button>}</div><form onSubmit={handleSimpanAparatur} className="space-y-4"><div><label className="block text-xs font-bold mb-1">Nama & Gelar</label><input type="text" required value={namaAparatur} onChange={(e) => setNamaAparatur(e.target.value)} placeholder="Misal: Rebo, S.E." className="w-full p-3 rounded-lg border outline-none" /></div><div><label className="block text-xs font-bold mb-1">Jabatan</label><input type="text" required value={jabatanAparatur} onChange={(e) => setJabatanAparatur(e.target.value)} placeholder="Misal: Kepala Desa" className="w-full p-3 rounded-lg border outline-none" /></div><div className="grid grid-cols-2 gap-2"><div><label className="block text-xs font-bold mb-1">No. Urut</label><input type="number" required value={urutanAparatur} onChange={(e) => setUrutanAparatur(Number(e.target.value))} className="w-full p-3 rounded-lg border text-center font-bold" /></div><div><label className="block text-xs font-bold mb-1">Foto Baru</label><label className="cursor-pointer flex flex-col items-center justify-center py-2 h-[46px] bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all overflow-hidden"><span className="font-bold text-gray-600 text-xs flex items-center gap-1">📸 {fotoAparatur ? 'Siap' : 'Pilih File'}</span><input type="file" accept="image/*" onChange={(e) => { if(e.target.files) setFotoAparatur(e.target.files[0])}} className="hidden" /></label></div></div>{editAparaturId && fotoLamaAparatur && (<div className="flex items-center gap-3 p-2 bg-white rounded-lg border"><img src={`https://wsrv.nl/?url=${fotoLamaAparatur}`} className="w-8 h-8 rounded-full object-cover" /><span className="text-xs text-gray-500">Foto tersimpan</span></div>)}{statusAparatur && <div className="text-xs font-bold text-green-700 bg-green-50 p-2 rounded text-center">{statusAparatur}</div>}<button type="submit" disabled={isLoadingAparatur} className="w-full bg-gray-900 text-white font-bold py-3 rounded-lg hover:bg-black">{isLoadingAparatur ? "Memproses..." : (editAparaturId ? "Simpan Perubahan" : "Tambahkan")}</button></form></div><div className="lg:col-span-2 overflow-x-auto"><table className="min-w-full text-sm text-left"><thead className="bg-gray-100 border-b"><tr><th className="py-3 px-4">No</th><th className="py-3 px-4">Identitas</th><th className="py-3 px-4 text-center">Aksi</th></tr></thead><tbody>{daftarAparatur.map((org) => (<tr key={org.id} className="border-b hover:bg-gray-50"><td className="py-3 px-4 font-black text-gray-400 text-lg text-center">{org.urutan}</td><td className="py-3 px-4 flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">{org.foto ? <img src={`https://wsrv.nl/?url=${org.foto}`} alt="profil" className="w-full h-full object-cover"/> : <span className="flex items-center justify-center w-full h-full text-lg">👤</span>}</div><div><div className="font-bold text-gray-900">{org.nama}</div><div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{org.jabatan}</div></div></td><td className="py-3 px-4 text-center"><button onClick={() => mulaiEditAparatur(org)} className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-md mr-2">Edit</button><button onClick={() => hapusAparatur(org.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button></td></tr>))}</tbody></table></div></div></div>
 
-            {/* MANAJEMEN UMKM (BARU) */}
+            {/* MANAJEMEN UMKM (DENGAN FITUR EDIT) */}
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100">
               <h3 className="text-2xl font-bold mb-6">🛍️ Katalog Potensi / UMKM Desa</h3>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                  <h4 className="font-bold text-gray-800 mb-4">Daftarkan Produk UMKM</h4>
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="font-bold text-gray-800">{editUmkmId ? "✏️ Edit Produk UMKM" : "Daftarkan UMKM Baru"}</h4>
+                    {editUmkmId && <button onClick={batalEditUmkm} className="text-xs bg-gray-300 px-2 py-1 rounded-md font-bold">Batal</button>}
+                  </div>
                   <form onSubmit={handleSimpanUmkm} className="space-y-4">
                     <div><label className="block text-xs font-bold mb-1">Nama Produk/Usaha</label><input type="text" required value={namaProduk} onChange={(e)=>setNamaProduk(e.target.value)} placeholder="Misal: Kripik Singkong" className="w-full p-3 rounded-lg border outline-none" /></div>
                     <div><label className="block text-xs font-bold mb-1">Pemilik</label><input type="text" required value={pemilikUmkm} onChange={(e)=>setPemilikUmkm(e.target.value)} placeholder="Misal: Bu Tejo" className="w-full p-3 rounded-lg border outline-none" /></div>
@@ -360,11 +369,18 @@ export default function DashboardAdmin() {
                     </div>
                     <div><label className="block text-xs font-bold mb-1">Deskripsi Singkat</label><textarea required rows={2} value={deskripsiProduk} onChange={(e)=>setDeskripsiProduk(e.target.value)} className="w-full p-3 rounded-lg border outline-none"></textarea></div>
                     <div>
-                      <label className="block text-xs font-bold mb-1">Foto Produk</label>
-                      <label className="cursor-pointer flex flex-col items-center justify-center py-2 h-[46px] bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all overflow-hidden"><span className="font-bold text-gray-600 text-xs flex items-center gap-1">📸 {fotoProduk ? 'Siap' : 'Pilih File'}</span><input type="file" required accept="image/*" onChange={(e) => { if(e.target.files) setFotoProduk(e.target.files[0])}} className="hidden" /></label>
+                      <label className="block text-xs font-bold mb-1">{editUmkmId ? "Ubah Foto (Opsional)" : "Foto Produk"}</label>
+                      <label className="cursor-pointer flex flex-col items-center justify-center py-2 h-[46px] bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all overflow-hidden"><span className="font-bold text-gray-600 text-xs flex items-center gap-1">📸 {fotoProduk ? 'Siap' : 'Pilih File'}</span><input type="file" accept="image/*" onChange={(e) => { if(e.target.files) setFotoProduk(e.target.files[0])}} className="hidden" /></label>
                     </div>
+                    {/* Preview Gambar Lama Jika Sedang Edit */}
+                    {editUmkmId && fotoLamaUmkm && (
+                      <div className="flex items-center gap-3 p-2 bg-white rounded-lg border">
+                        <img src={`https://wsrv.nl/?url=${fotoLamaUmkm}`} className="w-8 h-8 rounded-md object-cover" />
+                        <span className="text-xs text-gray-500">Foto tersimpan</span>
+                      </div>
+                    )}
                     {statusUmkm && <div className="text-xs font-bold text-green-700 bg-green-50 p-2 rounded text-center">{statusUmkm}</div>}
-                    <button type="submit" disabled={isLoadingUmkm} className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">{isLoadingUmkm ? "Memproses..." : "Tambahkan UMKM"}</button>
+                    <button type="submit" disabled={isLoadingUmkm} className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">{isLoadingUmkm ? "Memproses..." : (editUmkmId ? "Simpan Perubahan" : "Tambahkan UMKM")}</button>
                   </form>
                 </div>
                 <div className="lg:col-span-2 overflow-x-auto">
@@ -373,7 +389,10 @@ export default function DashboardAdmin() {
                       <tr key={umkm.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4 flex items-center gap-3"><div className="w-12 h-12 rounded-lg bg-gray-200 overflow-hidden flex-shrink-0">{umkm.foto ? <img src={`https://wsrv.nl/?url=${umkm.foto}`} className="w-full h-full object-cover"/> : <span className="flex items-center justify-center h-full">📦</span>}</div><div><div className="font-bold text-gray-900">{umkm.nama_produk}</div><div className="text-xs text-green-600 font-bold">Rp {umkm.harga}</div></div></td>
                         <td className="py-3 px-4"><div className="font-bold">{umkm.pemilik}</div><div className="text-xs text-gray-500">WA: {umkm.wa}</div></td>
-                        <td className="py-3 px-4 text-center"><button onClick={() => hapusUmkm(umkm.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button></td>
+                        <td className="py-3 px-4 text-center">
+                          <button onClick={() => mulaiEditUmkm(umkm)} className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-md mr-2">Edit</button>
+                          <button onClick={() => hapusUmkm(umkm.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button>
+                        </td>
                       </tr>))}
                     </tbody>
                   </table>
