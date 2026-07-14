@@ -85,15 +85,19 @@ export default function KabarDesa() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 py-12">
-      <div className="container mx-auto px-4 lg:px-8 max-w-4xl">
-        
-        <div className="text-center mb-12">
-          <span className="text-green-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">Pusat Informasi Terkini</span>
-          <h1 className="text-4xl md:text-5xl font-black text-gray-900 tracking-tight mb-4">Kabar Desa Kerjo</h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto">Pantau terus perkembangan pembangunan, kegiatan gotong royong, dan informasi publikasi resmi dari aparat desa.</p>
+    <main className="min-h-screen bg-gray-50 flex flex-col">
+      
+      {/* PENAMBAHAN HEADER HIJAU AGAR SERAGAM DENGAN HALAMAN LAIN */}
+      <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black opacity-10"></div>
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <span className="text-green-300 font-extrabold tracking-widest uppercase text-sm mb-2 block">Pusat Informasi Terkini</span>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">Kabar Desa Kerjo</h1>
+          <p className="text-lg md:text-xl text-green-100 max-w-2xl mx-auto font-light">Pantau terus perkembangan pembangunan, kegiatan gotong royong, dan informasi publikasi resmi dari aparat desa.</p>
         </div>
+      </div>
 
+      <div className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
         {loading ? (
           <div className="flex justify-center my-20">
             <div className="w-12 h-12 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin"></div>

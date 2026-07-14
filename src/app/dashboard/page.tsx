@@ -268,7 +268,7 @@ export default function DashboardAdmin() {
                   <div key={lap.id} className="border p-5 rounded-2xl flex justify-between bg-gray-50 relative">
                     <button onClick={() => hapusPengaduan(lap.id)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500">✖</button>
                     <div className="flex gap-4">
-                      {lap.foto_bukti && (<a href={lap.foto_bukti} target="_blank" rel="noreferrer" className="w-20 h-20 rounded-xl overflow-hidden border border-gray-300 block hover:opacity-80"><img src={lap.foto_bukti} alt="Bukti" className="w-full h-full object-cover" /></a>)}
+                      {lap.foto_bukti && (<a href={lap.foto_bukti} target="_blank" rel="noreferrer" className="w-20 h-20 rounded-xl overflow-hidden border border-gray-300 block hover:opacity-80"><img src={`https://wsrv.nl/?url=${lap.foto_bukti}`} alt="Bukti" className="w-full h-full object-cover" /></a>)}
                       <div>
                         <h4 className="font-bold text-gray-900 leading-tight">{lap.judul}</h4>
                         <span className="text-xs text-gray-500">{new Date(lap.tanggal_laporan).toLocaleDateString('id-ID')} • {lap.anonim ? "👤 Anonim" : "Terverifikasi"}</span>
@@ -297,7 +297,7 @@ export default function DashboardAdmin() {
                     <div className="flex flex-wrap gap-3">
                       {gambarLama.map((url, idx) => (
                         <div key={idx} className="relative w-24 h-24 border rounded-lg overflow-hidden group shadow-sm">
-                          <img src={url} alt="lama" className="w-full h-full object-cover" />
+                          <img src={`https://wsrv.nl/?url=${url}`} alt="lama" className="w-full h-full object-cover" />
                           <button type="button" onClick={() => hapusGambarDariDaftarLama(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button>
                         </div>
                       ))}
@@ -369,7 +369,7 @@ export default function DashboardAdmin() {
                     <tbody>{daftarAparatur.map((org) => (
                       <tr key={org.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4 font-black text-gray-400 text-lg text-center">{org.urutan}</td>
-                        <td className="py-3 px-4 flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">{org.foto ? <img src={org.foto} alt="profil" className="w-full h-full object-cover"/> : <span className="flex items-center justify-center w-full h-full text-lg">👤</span>}</div><div><div className="font-bold text-gray-900">{org.nama}</div><div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{org.jabatan}</div></div></td>
+                        <td className="py-3 px-4 flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">{org.foto ? <img src={`https://wsrv.nl/?url=${org.foto}`} alt="profil" className="w-full h-full object-cover"/> : <span className="flex items-center justify-center w-full h-full text-lg">👤</span>}</div><div><div className="font-bold text-gray-900">{org.nama}</div><div className="text-xs text-gray-500 uppercase font-bold tracking-wider">{org.jabatan}</div></div></td>
                         <td className="py-3 px-4 text-center"><button onClick={() => hapusAparatur(org.id)} className="bg-red-100 text-red-700 text-xs font-bold px-3 py-1 rounded-md">Hapus</button></td>
                       </tr>))}
                     </tbody>
