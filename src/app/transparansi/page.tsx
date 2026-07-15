@@ -11,13 +11,12 @@ ChartJS.register(ArcElement, Tooltip, Legend);
 export default function TransparansiData() {
   const [apbdesData, setApbdesData] = useState([0, 0, 0, 0]);
   const [daftarRegulasi, setDaftarRegulasi] = useState<any[]>([]);
+  const [daftarRealisasi, setDaftarRealisasi] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Mengambil data APBDes dan Regulasi dari Firestore
   useEffect(() => {
     const ambilData = async () => {
       try {
-        // 1. Ambil Angka APBDes
         const docRef = doc(db, "transparansi", "apbdes");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -25,18 +24,15 @@ export default function TransparansiData() {
           setApbdesData([ data.dana_desa || 0, data.alokasi_dana_desa || 0, data.pad || 0, data.banprov || 0 ]);
         }
 
-        // 2. Ambil Daftar Dokumen Regulasi
         const qRegulasi = query(collection(db, "regulasi_desa"), orderBy("tahun", "desc"));
-        const snapRegulasi = await getDocs(qRegulasi);
-        const dataReg: any[] = [];
-        snapRegulasi.forEach(doc => dataReg.push({ id: doc.id, ...doc.data() }));
-        setDaftarRegulasi(dataReg);
+        setDaftarRegulasi((await getDocs(qRegulasi)).docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      } catch (error) {
-        console.error("Gagal mengambil data transparansi:", error);
-      } finally {
-        setLoading(false);
-      }
+        // Tarik Data Realisasi Proyek
+        const qRealisasi = query(collection(db, "realisasi_desa"), orderBy("tanggal_input", "desc"));
+        setDaftarRealisasi((await getDocs(qRealisasi)).docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      } catch (error) { console.error("Gagal mengambil data transparansi:", error);
+      } finally { setLoading(false); }
     };
     ambilData();
   }, []);
@@ -53,10 +49,7 @@ export default function TransparansiData() {
     }],
   };
 
-  const formatRupiah = (angka: number) => {
-    return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
-  };
-
+  const formatRupiah = (angka: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
   const formatMiliar = (angka: number) => {
     if (angka >= 1000000000) return `Rp ${(angka / 1000000000).toFixed(2)} M`;
     if (angka >= 1000000) return `Rp ${(angka / 1000000).toFixed(0)} Jt`;
@@ -76,7 +69,7 @@ export default function TransparansiData() {
 
       <div className="container mx-auto px-4 py-12 max-w-5xl space-y-16">
         
-        {/* BAGIAN GRAFIK APBDES UTUH */}
+        {/* BAGIAN GRAFIK APBDES */}
         <section>
           <div className="text-center mb-10"><h2 className="text-3xl font-extrabold text-gray-900 mb-3">Postur APBDes Tahun Berjalan</h2></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
@@ -110,40 +103,65 @@ export default function TransparansiData() {
           </div>
         </section>
 
-        {/* BAGIAN REGULASI (SUDAH DINAMIS) */}
+        {/* BAGIAN REALISASI ANGGARAN (BARU) */}
+        <section>
+          <div className="mb-8 border-b-2 border-green-600 pb-4">
+            <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Realisasi Dana Desa</h2>
+            <p className="text-gray-500 text-sm">Laporan tingkat penyerapan anggaran untuk proyek dan program yang sedang berjalan.</p>
+          </div>
+          
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 space-y-8">
+            {loading ? (
+              <p className="text-center text-gray-400">Memuat data realisasi...</p>
+            ) : daftarRealisasi.length === 0 ? (
+              <p className="text-center text-gray-500">Belum ada data penyerapan anggaran.</p>
+            ) : (
+              daftarRealisasi.map((item) => {
+                const persen = Math.round((item.terealisasi / item.pagu) * 100);
+                return (
+                  <div key={item.id} className="space-y-2">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <h4 className="font-bold text-gray-900">{item.nama_proyek}</h4>
+                        <p className="text-xs text-gray-500">Pagu: {formatRupiah(item.pagu)}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-lg font-black text-green-700">{persen}%</span>
+                        <p className="text-xs text-gray-500">Terealisasi: {formatRupiah(item.terealisasi)}</p>
+                      </div>
+                    </div>
+                    {/* Progress Bar UI */}
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div className="bg-green-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${persen}%` }}></div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        {/* BAGIAN REGULASI (TETAP SAMA) */}
         <section>
           <div className="mb-8 border-b-2 border-green-600 pb-4">
             <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Produk Hukum & Dokumen</h2>
-            <p className="text-gray-500 text-sm">Arsip peraturan desa (Perdes), laporan penyelenggaraan, dan SK Kades yang dapat diunduh bebas oleh publik.</p>
+            <p className="text-gray-500 text-sm">Arsip peraturan desa (Perdes), laporan penyelenggaraan, dan SK Kades yang dapat diunduh bebas[cite: 38].</p>
           </div>
           
           <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-green-50">
-                  <tr>
-                    <th className="py-4 px-6 font-bold">Tahun</th>
-                    <th className="py-4 px-6 font-bold">Jenis</th>
-                    <th className="py-4 px-6 font-bold">Judul Dokumen</th>
-                    <th className="py-4 px-6 font-bold text-center">Tautan</th>
-                  </tr>
+                  <tr><th className="py-4 px-6 font-bold">Tahun</th><th className="py-4 px-6 font-bold">Jenis</th><th className="py-4 px-6 font-bold">Judul Dokumen</th><th className="py-4 px-6 font-bold text-center">Tautan</th></tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan={4} className="text-center py-10"><div className="inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></td></tr>
-                  ) : daftarRegulasi.length === 0 ? (
-                    <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada dokumen yang dipublikasikan.</td></tr>
-                  ) : (
+                  {loading ? ( <tr><td colSpan={4} className="text-center py-10"><div className="inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></td></tr> ) : daftarRegulasi.length === 0 ? ( <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada dokumen yang dipublikasikan.</td></tr> ) : (
                     daftarRegulasi.map((dok) => (
                       <tr key={dok.id} className="border-b hover:bg-gray-50">
                         <td className="py-4 px-6 font-black text-gray-800 text-lg">{dok.tahun}</td>
                         <td className="py-4 px-6"><span className="bg-gray-200 px-3 py-1 rounded-md text-xs font-bold">{dok.jenis}</span></td>
                         <td className="py-4 px-6 font-bold text-gray-700">{dok.judul}</td>
-                        <td className="py-4 px-6 text-center">
-                          <a href={dok.link} target="_blank" rel="noreferrer" className="inline-block bg-green-100 hover:bg-green-600 hover:text-white text-green-700 px-4 py-2 rounded-xl font-bold transition-colors">
-                            📥 Unduh Berkas
-                          </a>
-                        </td>
+                        <td className="py-4 px-6 text-center"><a href={dok.link} target="_blank" rel="noreferrer" className="inline-block bg-green-100 hover:bg-green-600 hover:text-white text-green-700 px-4 py-2 rounded-xl font-bold transition-colors">📥 Unduh Berkas</a></td>
                       </tr>
                     ))
                   )}
