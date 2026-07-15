@@ -12,7 +12,7 @@ export default function Navbar() {
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleDropdownMobile = (name: string) => setOpenDropdownMobile(openDropdownMobile === name ? null : name);
 
-  // Struktur Menu & Sub-Menu DENGAN ROUTING SPESIFIK
+  // Struktur Menu & Sub-Menu DENGAN ROUTING SPESIFIK TAB
   const navItems = [
     { name: "Beranda", path: "/", sub: [] },
     { 
@@ -26,29 +26,29 @@ export default function Navbar() {
     { 
       name: "Kabar Desa", path: "/kabar", 
       sub: [
-        { title: "Berita & Kegiatan", link: "/kabar#berita" },
-        { title: "Agenda Desa", link: "/kabar#agenda" }
+        { title: "Berita & Kegiatan", link: "/kabar?tab=berita" },
+        { title: "Agenda Desa", link: "/kabar?tab=agenda" }
       ] 
     },
     { 
       name: "Transparansi", path: "/transparansi", 
       sub: [
-        { title: "Anggaran & APBDes", link: "/transparansi#apbdes" },
-        { title: "Realisasi Dana Desa", link: "/transparansi#realisasi" },
-        { title: "Regulasi & Perdes", link: "/transparansi#regulasi" }
+        { title: "Anggaran & APBDes", link: "/transparansi?tab=apbdes" },
+        { title: "Realisasi Dana Desa", link: "/transparansi?tab=realisasi" },
+        { title: "Regulasi & Perdes", link: "/transparansi?tab=regulasi" }
       ] 
     },
     { 
       name: "Profil & Lembaga", path: "/profil", 
       sub: [
-        { title: "Sejarah & Visi Misi", link: "/profil#sejarah" },
-        { title: "Pemerintah Desa", link: "/profil#sotk" },
-        { title: "Lembaga Masyarakat", link: "/profil#lembaga" },
-        { title: "Potensi & UMKM", link: "/profil#umkm" }
+        { title: "Sejarah & Visi Misi", link: "/profil?tab=sejarah" },
+        { title: "Pemerintah Desa", link: "/profil?tab=sotk" },
+        { title: "Lembaga Masyarakat", link: "/profil?tab=lembaga" },
+        { title: "Potensi & UMKM", link: "/profil?tab=umkm" }
       ] 
     },
   ];
-  
+
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 lg:px-8">
