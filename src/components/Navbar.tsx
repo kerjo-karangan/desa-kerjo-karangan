@@ -12,40 +12,43 @@ export default function Navbar() {
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleDropdownMobile = (name: string) => setOpenDropdownMobile(openDropdownMobile === name ? null : name);
 
+  // Struktur Menu & Sub-Menu DENGAN ROUTING SPESIFIK
   const navItems = [
     { name: "Beranda", path: "/", sub: [] },
     { 
       name: "Layanan Mandiri", path: "/layanan", 
       sub: [
-        { title: "Permohonan Surat", link: "/layanan" },
-        { title: "Cek Status Pengajuan", link: "/layanan" },
-        { title: "Kotak Pengaduan", link: "/layanan" }
+        { title: "Permohonan Surat", link: "/layanan?tab=surat" },
+        { title: "Cek Status Pengajuan", link: "/layanan?tab=status" },
+        { title: "Kotak Pengaduan", link: "/layanan?tab=pengaduan" }
       ] 
     },
     { 
       name: "Kabar Desa", path: "/kabar", 
       sub: [
-        { title: "Berita & Kegiatan", link: "/kabar" },
-        { title: "Agenda Desa", link: "/kabar" }
+        { title: "Berita & Kegiatan", link: "/kabar#berita" },
+        { title: "Agenda Desa", link: "/kabar#agenda" }
       ] 
     },
     { 
       name: "Transparansi", path: "/transparansi", 
       sub: [
-        { title: "Anggaran & APBDes", link: "/transparansi" },
-        { title: "Regulasi & Perdes", link: "/transparansi" }
+        { title: "Anggaran & APBDes", link: "/transparansi#apbdes" },
+        { title: "Realisasi Dana Desa", link: "/transparansi#realisasi" },
+        { title: "Regulasi & Perdes", link: "/transparansi#regulasi" }
       ] 
     },
     { 
       name: "Profil & Lembaga", path: "/profil", 
       sub: [
-        { title: "Pemerintah Desa", link: "/profil" },
-        { title: "Lembaga Masyarakat", link: "/profil" },
-        { title: "Potensi & BUMDes", link: "/profil" }
+        { title: "Sejarah & Visi Misi", link: "/profil#sejarah" },
+        { title: "Pemerintah Desa", link: "/profil#sotk" },
+        { title: "Lembaga Masyarakat", link: "/profil#lembaga" },
+        { title: "Potensi & UMKM", link: "/profil#umkm" }
       ] 
     },
   ];
-
+  
   return (
     <nav className="bg-white shadow-md sticky top-0 z-50">
       <div className="container mx-auto px-4 lg:px-8">
