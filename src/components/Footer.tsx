@@ -54,7 +54,7 @@ export default function Footer() {
 
             {/* Ikon Sosial Media */}
             <div className="flex gap-4 mt-6">
-              <a href="#" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">📘</a>
+              <a href="https://www.facebook.com/profile.php?id=61591678422864" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">📘</a>
               <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">📸</a>
               <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">▶️</a>
             </div>
