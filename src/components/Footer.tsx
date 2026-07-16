@@ -15,7 +15,7 @@ export default function Footer() {
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden bg-white rounded-full p-1">
                 {/* Ganti dengan link logo desa jika ada */}
-                <img src="https://cdn-icons-png.flaticon.com/512/2633/2633804.png" alt="Logo Desa" className="w-full h-full object-contain" />
+                <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
               </div>
               <h3 className="font-black text-2xl text-white tracking-tighter">Desa Kerjo</h3>
             </div>
