@@ -14,7 +14,7 @@ export default function Footer() {
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden bg-white rounded-full p-1">
                 {/* Ganti dengan link logo desa jika ada */}
-                <img src="https://cdn-icons-png.flaticon.com/512/2633/2633804.png" alt="Logo Desa" className="w-full h-full object-contain" />
+                <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
               </div>
               <h3 className="font-black text-2xl text-white tracking-tighter">Desa Kerjo</h3>
             </div>
@@ -55,8 +55,8 @@ export default function Footer() {
             {/* Ikon Sosial Media */}
             <div className="flex gap-4 mt-6">
               <a href="#" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">📘</a>
-              <a href="#" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">📸</a>
-              <a href="#" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">▶️</a>
+              <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">📸</a>
+              <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">▶️</a>
             </div>
           </div>
         </div>
