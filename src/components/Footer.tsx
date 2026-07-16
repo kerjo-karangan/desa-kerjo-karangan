@@ -1,7 +1,8 @@
-// src/components/Footer.tsx
 "use client";
 
 import Link from "next/link";
+// IMPORT LOGO ASLI DARI REACT ICONS
+import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 
 export default function Footer() {
   return (
@@ -14,7 +15,7 @@ export default function Footer() {
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden bg-white rounded-full p-1">
                 {/* Ganti dengan link logo desa jika ada */}
-                <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
+                <img src="https://cdn-icons-png.flaticon.com/512/2633/2633804.png" alt="Logo Desa" className="w-full h-full object-contain" />
               </div>
               <h3 className="font-black text-2xl text-white tracking-tighter">Desa Kerjo</h3>
             </div>
@@ -29,8 +30,8 @@ export default function Footer() {
             <ul className="space-y-3 text-sm font-medium">
               <li><Link href="/layanan?tab=surat" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Permohonan Surat</Link></li>
               <li><Link href="/layanan?tab=pengaduan" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Kotak Pengaduan</Link></li>
-              <li><Link href="/transparansi#apbdes" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Transparansi APBDes</Link></li>
-              <li><Link href="/profil#umkm" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Katalog UMKM Desa</Link></li>
+              <li><Link href="/transparansi?tab=apbdes" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Transparansi APBDes</Link></li>
+              <li><Link href="/profil?tab=umkm" className="hover:text-yellow-400 transition-colors flex items-center gap-2"><span>→</span> Katalog UMKM Desa</Link></li>
             </ul>
           </div>
 
@@ -52,11 +53,17 @@ export default function Footer() {
               </li>
             </ul>
 
-            {/* Ikon Sosial Media */}
+            {/* Ikon Sosial Media (Logo Asli & Buka Tab Baru) */}
             <div className="flex gap-4 mt-6">
-              <a href="https://www.facebook.com/profile.php?id=61591678422864" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">📘</a>
-              <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">📸</a>
-              <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">▶️</a>
+              <a href="https://www.facebook.com/profile.php?id=61591678422864" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">
+                <FaFacebook />
+              </a>
+              <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">
+                <FaInstagram />
+              </a>
+              <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">
+                <FaYoutube />
+              </a>
             </div>
           </div>
         </div>

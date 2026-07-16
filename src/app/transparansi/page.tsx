@@ -55,6 +55,11 @@ function TransparansiContent() {
   };
 
   const formatRupiah = (angka: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
+  const formatMiliar = (angka: number) => {
+    if (angka >= 1000000000) return `Rp ${(angka / 1000000000).toFixed(2)} M`;
+    if (angka >= 1000000) return `Rp ${(angka / 1000000).toFixed(0)} Jt`;
+    return "Rp 0";
+  };
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -85,6 +90,12 @@ function TransparansiContent() {
                 <div className="w-64 h-64 md:w-80 md:h-80">
                   {loading ? <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div> : <Doughnut data={dataPendapatan} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} />}
                 </div>
+                {!loading && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xs font-bold text-gray-400 uppercase">Total Pendapatan</span>
+                    <span className="text-xl font-black text-gray-800">{formatMiliar(totalAnggaran)}</span>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 <h3 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Rincian Sumber Dana</h3>
@@ -105,13 +116,18 @@ function TransparansiContent() {
             <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 space-y-8">
               {loading ? <p>Memuat...</p> : daftarRealisasi.map((item) => {
                   const persen = Math.round((item.terealisasi / item.pagu) * 100);
+                  // PERBAIKAN BUG: Mencegah bar hijau tembus/melebihi box jika persentase > 100%
+                  const persenVisual = persen > 100 ? 100 : persen;
+
                   return (
                     <div key={item.id} className="space-y-2">
                       <div className="flex justify-between items-end">
                         <div><h4 className="font-bold text-gray-900">{item.nama_proyek}</h4><p className="text-xs text-gray-500">Pagu: {formatRupiah(item.pagu)}</p></div>
                         <div className="text-right"><span className="text-lg font-black text-green-700">{persen}%</span><p className="text-xs text-gray-500">Terealisasi: {formatRupiah(item.terealisasi)}</p></div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3"><div className="bg-green-500 h-3 rounded-full" style={{ width: `${persen}%` }}></div></div>
+                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div className="bg-green-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${persenVisual}%` }}></div>
+                      </div>
                     </div>
                   );
                 })}
@@ -125,11 +141,11 @@ function TransparansiContent() {
             <div className="bg-white rounded-3xl shadow-sm border overflow-hidden">
               <table className="min-w-full text-left text-sm"><thead className="bg-green-50"><tr><th className="py-4 px-6">Tahun/Jenis</th><th className="py-4 px-6">Judul Dokumen</th><th className="py-4 px-6 text-center">Tautan</th></tr></thead>
                 <tbody>
-                  {loading ? <tr><td colSpan={3}>Memuat...</td></tr> : daftarRegulasi.map((dok) => (
+                  {loading ? <tr><td colSpan={3} className="text-center py-10"><div className="inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></td></tr> : daftarRegulasi.map((dok) => (
                     <tr key={dok.id} className="border-b">
                       <td className="py-4 px-6"><span className="font-black text-gray-800 block">{dok.tahun}</span><span className="text-xs bg-gray-200 px-2 rounded font-bold">{dok.jenis}</span></td>
                       <td className="py-4 px-6 font-bold text-gray-700">{dok.judul}</td>
-                      <td className="py-4 px-6 text-center"><a href={dok.link} target="_blank" className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold">Unduh</a></td>
+                      <td className="py-4 px-6 text-center"><a href={dok.link} target="_blank" rel="noopener noreferrer" className="bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold">Unduh</a></td>
                     </tr>
                   ))}
                 </tbody>
