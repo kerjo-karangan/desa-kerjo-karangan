@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-// IMPORT LOGO ASLI DARI REACT ICONS
-import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaYoutube, FaTiktok } from "react-icons/fa";
 
 export default function Footer() {
   return (
@@ -14,8 +13,8 @@ export default function Footer() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 flex items-center justify-center overflow-hidden bg-white rounded-full p-1">
-                {/* Ganti dengan link logo desa jika ada */}
-                <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
+                {/* Logo Desa Terpasang */}
+                <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa Kerjo" className="w-full h-full object-contain" />
               </div>
               <h3 className="font-black text-2xl text-white tracking-tighter">Desa Kerjo</h3>
             </div>
@@ -53,16 +52,19 @@ export default function Footer() {
               </li>
             </ul>
 
-            {/* Ikon Sosial Media (Logo Asli & Buka Tab Baru) */}
-            <div className="flex gap-4 mt-6">
-              <a href="https://www.facebook.com/profile.php?id=61591678422864" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Facebook">
-                <FaFacebook />
+            {/* Ikon Sosial Media Berwarna & Tab Baru */}
+            <div className="flex gap-3 mt-6">
+              <a href="https://www.facebook.com/profile.php?id=61591678422864" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-110 transition-transform shadow-md" title="Facebook">
+                <FaFacebook className="text-[#1877F2] text-2xl" />
               </a>
-              <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="Instagram">
-                <FaInstagram />
+              <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-110 transition-transform shadow-md" title="Instagram">
+                <FaInstagram className="text-[#E4405F] text-2xl" />
               </a>
-              <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-green-800 flex items-center justify-center hover:bg-yellow-500 hover:text-green-950 transition-all text-xl" title="YouTube">
-                <FaYoutube />
+              <a href="https://www.youtube.com/channel/UCI-pW_tl0MKZDkR4whv6iSw" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-110 transition-transform shadow-md" title="YouTube">
+                <FaYoutube className="text-[#FF0000] text-2xl" />
+              </a>
+              <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-110 transition-transform shadow-md" title="TikTok">
+                <FaTiktok className="text-[#000000] text-xl" />
               </a>
             </div>
           </div>
