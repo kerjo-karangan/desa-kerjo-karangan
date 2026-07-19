@@ -62,7 +62,7 @@ export default function Home() {
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop" 
+            src="https://i.ibb.co.com/WNMqY32d/2239715431.webp" 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
