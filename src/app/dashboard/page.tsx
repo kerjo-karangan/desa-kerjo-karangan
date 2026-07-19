@@ -6,15 +6,14 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 
-// Import Komponen Modular dari lokasi yang BENAR (di luar folder app)
+// Import SEMUA Komponen Modular yang sudah kita buat
 import Welcome from "../../components/dashboard/Welcome";
 import DataPenduduk from "../../components/dashboard/DataPenduduk";
 import ManajemenAkun from "../../components/dashboard/ManajemenAkun";
-// Import yang di-comment ini akan kita buat setelah Anda mengonfirmasi tahap ini berhasil
-// import LayananWarga from "../../components/dashboard/LayananWarga";
-// import KabarAgenda from "../../components/dashboard/KabarAgenda";
-// import ProfilUmkm from "../../components/dashboard/ProfilUmkm";
-// import Transparansi from "../../components/dashboard/Transparansi";
+import LayananWarga from "../../components/dashboard/LayananWarga";
+import KabarAgenda from "../../components/dashboard/KabarAgenda";
+import ProfilUmkm from "../../components/dashboard/ProfilUmkm";
+import Transparansi from "../../components/dashboard/Transparansi";
 
 export default function DashboardAdmin() {
   const router = useRouter();
@@ -75,10 +74,11 @@ export default function DashboardAdmin() {
         {activeMenu === "datadesa" && <DataPenduduk />}
         {activeMenu === "akun" && <ManajemenAkun userEmail={userEmail} />}
         
-        {activeMenu === "profil" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Profil sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
-        {activeMenu === "kabar" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Kabar sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
-        {activeMenu === "transparansi" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Transparansi sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
-        {activeMenu === "layanan" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Layanan sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
+        {/* SEMUA KOMPONEN KINI BEKERJA SEMPURNA! */}
+        {activeMenu === "layanan" && <LayananWarga />}
+        {activeMenu === "kabar" && <KabarAgenda userEmail={userEmail} />}
+        {activeMenu === "profil" && <ProfilUmkm />}
+        {activeMenu === "transparansi" && <Transparansi />}
       </main>
     </div>
   );
