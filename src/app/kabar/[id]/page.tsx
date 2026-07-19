@@ -7,7 +7,9 @@ import { db } from "../../../lib/firebase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-// Komponen Slider Gambar (Di-reuse dari halaman daftar berita)
+// ==========================================
+// KOMPONEN SLIDER GAMBAR UNTUK ARTIKEL
+// ==========================================
 const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -25,26 +27,26 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   if (gambarArray.length === 0) return null;
 
   return (
-    <div className="relative w-full h-[400px] md:h-[600px] mb-8 group overflow-hidden rounded-3xl shadow-md bg-gray-100 border border-gray-200">
+    <div className="relative w-full h-[300px] md:h-[500px] lg:h-[600px] mb-10 group overflow-hidden rounded-3xl shadow-lg bg-gray-100 border border-gray-200">
       <img 
         src={`https://wsrv.nl/?url=${gambarArray[currentIndex]}`} 
-        alt="Dokumentasi Kabar Desa" 
-        className="w-full h-full object-cover transition-opacity duration-500"
+        alt="Dokumentasi Artikel" 
+        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
       />
       {gambarArray.length > 1 && (
         <>
-          <button onClick={prevSlide} className="absolute top-1/2 left-4 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-3 md:p-4 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold text-xl">
+          <button onClick={prevSlide} className="absolute top-1/2 left-4 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-3 md:p-4 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold text-xl z-10">
             &#10094;
           </button>
-          <button onClick={nextSlide} className="absolute top-1/2 right-4 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-3 md:p-4 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold text-xl">
+          <button onClick={nextSlide} className="absolute top-1/2 right-4 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-3 md:p-4 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold text-xl z-10">
             &#10095;
           </button>
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2">
+          <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-2 z-10">
             {gambarArray.map((_, idx) => (
-              <span key={idx} className={`block w-3 h-3 rounded-full transition-all duration-300 ${idx === currentIndex ? "bg-yellow-400 w-8" : "bg-white/60"}`}></span>
+              <span key={idx} className={`block w-3 h-3 rounded-full transition-all duration-300 shadow-sm ${idx === currentIndex ? "bg-yellow-400 w-10" : "bg-white/60"}`}></span>
             ))}
           </div>
-          <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white text-xs font-bold px-4 py-1.5 rounded-lg backdrop-blur-sm shadow-md">
+          <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white text-xs font-bold px-4 py-1.5 rounded-lg backdrop-blur-sm shadow-md z-10">
             {currentIndex + 1} / {gambarArray.length}
           </div>
         </>
@@ -53,12 +55,17 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   );
 };
 
+// ==========================================
+// HALAMAN UTAMA DETAIL BERITA
+// ==========================================
 export default function DetailBerita({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [berita, setBerita] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [errorStatus, setErrorStatus] = useState(false);
 
   useEffect(() => {
+    // Fungsi dipanggil untuk menarik data 1 dokumen berdasarkan ID dari URL
     const ambilDetailBerita = async () => {
       try {
         const docRef = doc(db, "kabar_desa", params.id);
@@ -67,78 +74,99 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
         if (docSnap.exists()) {
           setBerita({ id: docSnap.id, ...docSnap.data() });
         } else {
-          // Jika ID salah, kembali ke halaman daftar berita
-          router.push("/kabar");
+          setErrorStatus(true);
         }
       } catch (error) {
         console.error("Gagal mengambil detail berita", error);
+        setErrorStatus(true);
       } finally {
         setLoading(false);
       }
     };
-    ambilDetailBerita();
-  }, [params.id, router]);
 
+    if (params.id) {
+      ambilDetailBerita();
+    }
+  }, [params.id]);
+
+  // Tampilan Proses Loading
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-        <div className="w-16 h-16 border-4 border-green-200 border-t-green-600 rounded-full animate-spin mb-4"></div>
-        <p className="text-gray-500 font-bold animate-pulse">Menyiapkan artikel...</p>
+        <div className="w-16 h-16 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin mb-6 shadow-md"></div>
+        <p className="text-gray-500 font-bold text-lg animate-pulse tracking-wide">Sedang membuka artikel...</p>
       </div>
     );
   }
 
-  if (!berita) return null;
+  // Tampilan Jika ID Salah / Dihapus
+  if (errorStatus || !berita) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
+        <span className="text-7xl mb-6 drop-shadow-md">⚠️</span>
+        <h1 className="text-3xl font-black text-gray-800 mb-2">Artikel Tidak Ditemukan</h1>
+        <p className="text-gray-500 mb-8 max-w-md">Mohon maaf, berita atau pengumuman yang Anda cari mungkin sudah dihapus oleh Admin atau tautannya salah.</p>
+        <Link href="/kabar" className="bg-green-600 hover:bg-green-700 text-white font-bold px-8 py-3 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1">
+          Kembali ke Daftar Berita
+        </Link>
+      </div>
+    );
+  }
 
   const gambarArray = Array.isArray(berita.gambar) ? berita.gambar : berita.gambar ? [berita.gambar] : [];
 
   return (
-    <main className="min-h-screen bg-gray-50 pb-20">
-      {/* Header Bar untuk Kembali */}
-      <div className="bg-green-900 py-6 sticky top-20 z-40 shadow-md">
-        <div className="container mx-auto px-4 max-w-4xl flex items-center">
-          <Link href="/kabar" className="flex items-center gap-2 text-green-100 hover:text-white font-bold bg-green-800 hover:bg-green-700 px-4 py-2 rounded-xl transition-colors text-sm">
-            <span className="text-xl">←</span> Kembali ke Daftar Kabar
-          </Link>
+    <main className="min-h-screen bg-gray-50 pb-20 font-sans">
+      
+      {/* Header Bar Lengket untuk Tombol Kembali */}
+      <div className="bg-white/80 backdrop-blur-md py-4 border-b border-gray-200 sticky top-20 z-40 shadow-sm">
+        <div className="container mx-auto px-4 lg:px-8 max-w-4xl flex items-center">
+          <button onClick={() => router.back()} className="flex items-center gap-2 text-green-700 hover:text-white font-bold hover:bg-green-600 px-5 py-2 rounded-xl transition-colors text-sm border border-green-200 hover:border-green-600 bg-white">
+            <span className="text-xl">←</span> Kembali
+          </button>
         </div>
       </div>
 
-      <article className="container mx-auto px-4 py-10 max-w-4xl">
-        <div className="bg-white p-8 md:p-12 rounded-3xl shadow-lg border border-gray-100">
+      {/* Konten Artikel */}
+      <article className="container mx-auto px-4 lg:px-8 py-10 max-w-4xl animate-fade-in">
+        <div className="bg-white p-8 md:p-14 rounded-[40px] shadow-sm border border-gray-100">
           
-          <div className="mb-8">
-            <span className="bg-yellow-100 text-yellow-800 text-xs font-black uppercase tracking-widest px-3 py-1.5 rounded-md mb-4 inline-block border border-yellow-200">
-              Kabar Desa
+          <div className="mb-10">
+            <span className="bg-green-50 text-green-800 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg mb-6 inline-block border border-green-200 shadow-sm">
+              Berita & Informasi Publik
             </span>
-            <h1 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight mb-6">
+            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-gray-900 leading-tight mb-8">
               {berita.judul}
             </h1>
             
-            <div className="flex flex-wrap items-center gap-6 text-sm font-medium text-gray-500 border-b border-gray-100 pb-6">
+            <div className="flex flex-wrap items-center gap-6 text-sm font-medium text-gray-500 border-t border-b border-gray-100 py-4 bg-gray-50 px-6 rounded-2xl">
               <div className="flex items-center gap-2">
-                <span className="text-xl">📅</span>
+                <span className="text-xl opacity-70">📅</span>
                 {new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { weekday: 'long', day:'numeric', month:'long', year:'numeric'})}
               </div>
+              <div className="w-px h-6 bg-gray-300 hidden md:block"></div>
               <div className="flex items-center gap-2">
-                <span className="text-xl">👤</span>
-                Ditulis oleh: <span className="text-gray-800 font-bold">{berita.penulis || "Admin Desa"}</span>
+                <span className="text-xl opacity-70">👤</span>
+                Ditulis oleh: <span className="text-gray-900 font-bold bg-white px-2 py-0.5 rounded border border-gray-200">{berita.penulis || "Admin Desa"}</span>
               </div>
             </div>
           </div>
 
           <ImageCarousel gambarArray={gambarArray} />
 
-          <div className="prose prose-lg max-w-none text-gray-700">
-            <p className="leading-loose whitespace-pre-wrap text-justify text-[17px]">
+          <div className="prose prose-lg max-w-none text-gray-800">
+            <p className="leading-loose whitespace-pre-wrap text-justify text-[17px] md:text-[19px] font-medium font-serif">
               {berita.isi}
             </p>
           </div>
           
-          <div className="mt-16 pt-8 border-t-2 border-dashed border-gray-200 flex justify-between items-center">
-            <p className="text-sm font-bold text-gray-400">Akhir dari artikel.</p>
-            <Link href="/kabar" className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 py-3 rounded-xl transition-colors">
-              Baca Berita Lainnya
-            </Link>
+          <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-200 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">Akhir dari artikel berita.</p>
+            <div className="flex gap-4 w-full md:w-auto">
+              <Link href="/kabar" className="flex-1 md:flex-none text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-8 py-4 rounded-2xl transition-colors shadow-sm border border-gray-200">
+                Baca Berita Lainnya
+              </Link>
+            </div>
           </div>
 
         </div>

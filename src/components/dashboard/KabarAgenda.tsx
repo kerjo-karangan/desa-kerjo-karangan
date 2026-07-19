@@ -35,12 +35,10 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     try {
       const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
       const snapKabar = await getDocs(qKabar);
-      // PERBAIKAN TS2339: Menambahkan as any
       setRiwayatKabar(snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
 
       const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
       const snapAgenda = await getDocs(qAgenda);
-      // PERBAIKAN TS2339: Menambahkan as any
       setDaftarAgenda(snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
     } catch (error) {
       console.error("Gagal mengambil data", error);
@@ -75,6 +73,35 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   };
 
   // ==========================================
+  // LOGIKA OTOMATIS: MATIKAN BERITA LAMA (MAX 10)
+  // ==========================================
+  const pastikanSepuluhTerbaru = async () => {
+    try {
+      const q = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
+      const snap = await getDocs(q);
+      const semuaBerita = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      // Ambil yang sedang "Play"
+      const beritaDimainkan = semuaBerita.filter(b => b.is_featured !== false);
+
+      if (beritaDimainkan.length > 10) {
+        // Ambil berita urutan ke-11 dan seterusnya untuk dimatikan (Pause)
+        const beritaUntukDiOff = beritaDimainkan.slice(10);
+        
+        // Eksekusi update ke database
+        const updatePromises = beritaUntukDiOff.map(b => 
+          updateDoc(doc(db, "kabar_desa", b.id), { is_featured: false })
+        );
+        
+        await Promise.all(updatePromises);
+        ambilData(); // Refresh tabel agar Admin melihat perubahannya
+      }
+    } catch (error) {
+      console.error("Gagal melakukan otomatisasi slider", error);
+    }
+  };
+
+  // ==========================================
   // MANAJEMEN KABAR BERITA
   // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
@@ -105,10 +132,14 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
           gambar: gambarFinal, 
           tanggal_posting: new Date().toISOString(), 
           penulis: userEmail,
-          is_featured: true // Secara default berita baru akan tampil di Beranda
+          is_featured: true // Berita baru langsung di-Play
         });
         setStatusKabar("✅ Dipublikasikan!");
       }
+      
+      // Panggil fungsi otomatisasi setelah menyimpan
+      await pastikanSepuluhTerbaru();
+      
       batalEditKabar();
       ambilData();
       setTimeout(() => setStatusKabar(""), 4000);
@@ -124,7 +155,7 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     setJudulKabar(item.judul); 
     setIsiKabar(item.isi);
     setGambarLama(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Dihapus fungsi scroll to top agar nyaman
   };
 
   const hapusGambarDariDaftarLama = (indexGambar: number) => {
@@ -148,10 +179,10 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     }
   };
 
-  // FITUR PLAY/PAUSE (TAMPILKAN/SEMBUNYIKAN DI BERANDA) UNTUK BERITA
   const toggleTampilBerita = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "kabar_desa", id), { is_featured: !currentStatus });
+      await pastikanSepuluhTerbaru(); // Cek lagi setelah mengubah
       ambilData();
     } catch (error) {
       alert("Gagal merubah status tampil berita.");
@@ -170,7 +201,7 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
         nama: namaAgenda, 
         tanggal: tanggalAgenda, 
         lokasi: lokasiAgenda,
-        is_featured: true // Secara default agenda baru akan tampil di Beranda
+        is_featured: true // Secara default agenda baru akan tampil
       });
       setStatusAgenda("✅ Ditambahkan!");
       setNamaAgenda(""); 
@@ -192,7 +223,6 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     }
   };
 
-  // FITUR PLAY/PAUSE (TAMPILKAN/SEMBUNYIKAN DI BERANDA) UNTUK AGENDA
   const toggleTampilAgenda = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "agenda_desa", id), { is_featured: !currentStatus });
@@ -276,9 +306,12 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
         </form>
       </div>
 
-      {/* TABEL MANAJEMEN BERITA (DENGAN TOMBOL PLAY/PAUSE) */}
+      {/* TABEL MANAJEMEN BERITA */}
       <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100">
-        <h4 className="text-xl font-bold mb-6 text-gray-800">Riwayat Publikasi Berita</h4>
+        <div className="flex justify-between items-center mb-6">
+          <h4 className="text-xl font-bold text-gray-800">Riwayat Publikasi Berita</h4>
+          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Auto-Pause if &gt; 10 Aktif</span>
+        </div>
         <table className="min-w-full text-sm text-left">
           <thead className="bg-gray-50 border-b">
             <tr>
