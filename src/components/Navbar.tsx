@@ -12,15 +12,16 @@ export default function Navbar() {
   const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleDropdownMobile = (name: string) => setOpenDropdownMobile(openDropdownMobile === name ? null : name);
 
-  // Struktur Menu & Sub-Menu DENGAN ROUTING SPESIFIK TAB
+  // Struktur Menu & Sub-Menu (URUTAN BARU)
   const navItems = [
     { name: "Beranda", path: "/", sub: [] },
     { 
-      name: "Layanan Mandiri", path: "/layanan", 
+      name: "Profil & Lembaga", path: "/profil", 
       sub: [
-        { title: "Permohonan Surat", link: "/layanan?tab=surat" },
-        { title: "Cek Status Pengajuan", link: "/layanan?tab=status" },
-        { title: "Kotak Pengaduan", link: "/layanan?tab=pengaduan" }
+        { title: "Sejarah & Visi Misi", link: "/profil?tab=sejarah" },
+        { title: "Pemerintah Desa", link: "/profil?tab=sotk" },
+        { title: "Lembaga Masyarakat", link: "/profil?tab=lembaga" },
+        { title: "Potensi & UMKM", link: "/profil?tab=umkm" }
       ] 
     },
     { 
@@ -39,12 +40,11 @@ export default function Navbar() {
       ] 
     },
     { 
-      name: "Profil & Lembaga", path: "/profil", 
+      name: "Layanan Mandiri", path: "/layanan", 
       sub: [
-        { title: "Sejarah & Visi Misi", link: "/profil?tab=sejarah" },
-        { title: "Pemerintah Desa", link: "/profil?tab=sotk" },
-        { title: "Lembaga Masyarakat", link: "/profil?tab=lembaga" },
-        { title: "Potensi & UMKM", link: "/profil?tab=umkm" }
+        { title: "Permohonan Surat", link: "/layanan?tab=surat" },
+        { title: "Cek Status Pengajuan", link: "/layanan?tab=status" },
+        { title: "Kotak Pengaduan", link: "/layanan?tab=pengaduan" }
       ] 
     },
   ];

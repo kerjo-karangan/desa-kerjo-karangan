@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../lib/firebase";
 
-// Import Komponen Modular yang akan kita buat
+// Import Komponen Modular dari lokasi yang BENAR (di luar folder app)
 import Welcome from "../../components/dashboard/Welcome";
 import DataPenduduk from "../../components/dashboard/DataPenduduk";
 import ManajemenAkun from "../../components/dashboard/ManajemenAkun";
-// Import yang di-comment ini akan kita buat di Sesi 2
+// Import yang di-comment ini akan kita buat setelah Anda mengonfirmasi tahap ini berhasil
 // import LayananWarga from "../../components/dashboard/LayananWarga";
 // import KabarAgenda from "../../components/dashboard/KabarAgenda";
 // import ProfilUmkm from "../../components/dashboard/ProfilUmkm";
@@ -49,7 +49,6 @@ export default function DashboardAdmin() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row font-sans">
-      {/* SIDEBAR NAVIGATION */}
       <aside className="w-full md:w-72 bg-green-900 text-white flex flex-col shadow-2xl z-20">
         <div className="p-6 border-b border-green-800">
           <h2 className="text-2xl font-black mb-1">Ruang Kendali</h2>
@@ -59,10 +58,10 @@ export default function DashboardAdmin() {
           <button onClick={() => setActiveMenu("welcome")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "welcome" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>🏠 Ringkasan Sistem</button>
           <button onClick={() => setActiveMenu("datadesa")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "datadesa" ? "bg-purple-600 text-white translate-x-2 shadow-md" : "hover:bg-green-800"}`}>👥 Data Penduduk (Excel)</button>
           
-          <button onClick={() => setActiveMenu("layanan")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "layanan" ? "bg-yellow-500 text-gray-900 translate-x-2 shadow-md" : "hover:bg-green-800"}`}>✉️ Layanan Warga</button>
-          <button onClick={() => setActiveMenu("kabar")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "kabar" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📰 Kabar & Agenda</button>
           <button onClick={() => setActiveMenu("profil")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "profil" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>🏛️ Profil & UMKM</button>
+          <button onClick={() => setActiveMenu("kabar")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "kabar" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📰 Kabar & Agenda</button>
           <button onClick={() => setActiveMenu("transparansi")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "transparansi" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>📊 Transparansi</button>
+          <button onClick={() => setActiveMenu("layanan")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "layanan" ? "bg-yellow-500 text-gray-900 translate-x-2 shadow-md" : "hover:bg-green-800"}`}>✉️ Layanan Warga</button>
           
           <button onClick={() => setActiveMenu("akun")} className={`text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all ${activeMenu === "akun" ? "bg-green-700 text-white translate-x-2" : "hover:bg-green-800"}`}>👥 Manajemen Akun</button>
         </nav>
@@ -71,17 +70,15 @@ export default function DashboardAdmin() {
         </div>
       </aside>
 
-      {/* CONTENT AREA (Memanggil komponen modular) */}
       <main className="flex-1 p-6 md:p-10 overflow-y-auto">
         {activeMenu === "welcome" && <Welcome />}
         {activeMenu === "datadesa" && <DataPenduduk />}
         {activeMenu === "akun" && <ManajemenAkun userEmail={userEmail} />}
         
-        {/* Fitur Sesi 2 yang sedang dikerjakan... */}
-        {activeMenu === "layanan" && <div className="text-gray-500 font-bold">Modul Layanan sedang di-refactor... (Tunggu Sesi 2)</div>}
-        {activeMenu === "kabar" && <div className="text-gray-500 font-bold">Modul Kabar sedang di-refactor... (Tunggu Sesi 2)</div>}
-        {activeMenu === "profil" && <div className="text-gray-500 font-bold">Modul Profil sedang di-refactor... (Tunggu Sesi 2)</div>}
-        {activeMenu === "transparansi" && <div className="text-gray-500 font-bold">Modul Transparansi sedang di-refactor... (Tunggu Sesi 2)</div>}
+        {activeMenu === "profil" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Profil sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
+        {activeMenu === "kabar" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Kabar sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
+        {activeMenu === "transparansi" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Transparansi sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
+        {activeMenu === "layanan" && <div className="text-gray-500 font-bold p-10 bg-white rounded-2xl shadow-sm border border-dashed border-gray-300">Modul Layanan sedang disiapkan (Menunggu Sesi Berikutnya)...</div>}
       </main>
     </div>
   );
