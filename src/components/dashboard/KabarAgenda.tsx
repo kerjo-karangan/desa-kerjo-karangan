@@ -73,7 +73,7 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   };
 
   // ==========================================
-  // LOGIKA OTOMATIS: MATIKAN BERITA LAMA (MAX 10)
+  // LOGIKA OTOMATIS: MATIKAN BERITA LAMA (MAX 10) KECUALI YANG DI GEMBOK
   // ==========================================
   const pastikanSepuluhTerbaru = async () => {
     try {
@@ -81,20 +81,30 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
       const snap = await getDocs(q);
       const semuaBerita = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       
-      // Ambil yang sedang "Play"
+      // Hitung semua berita yang berstatus Play
       const beritaDimainkan = semuaBerita.filter(b => b.is_featured !== false);
 
+      // Jika yang Play lebih dari 10, kita harus Pause (matikan) sisanya
       if (beritaDimainkan.length > 10) {
-        // Ambil berita urutan ke-11 dan seterusnya untuk dimatikan (Pause)
-        const beritaUntukDiOff = beritaDimainkan.slice(10);
         
-        // Eksekusi update ke database
-        const updatePromises = beritaUntukDiOff.map(b => 
-          updateDoc(doc(db, "kabar_desa", b.id), { is_featured: false })
-        );
+        // Kita HANYA BOLEH mematikan berita yang TIDAK DI-GEMBOK (is_pinned !== true)
+        const unpinnedBeritaDimainkan = beritaDimainkan.filter(b => b.is_pinned !== true);
         
-        await Promise.all(updatePromises);
-        ambilData(); // Refresh tabel agar Admin melihat perubahannya
+        // Hitung berapa jumlah yang kelebihan (harus dimatikan)
+        const jumlahHarusOff = beritaDimainkan.length - 10;
+        
+        if (jumlahHarusOff > 0) {
+          // Ambil dari array terbawah (yang paling lama umurnya)
+          const beritaUntukDiOff = unpinnedBeritaDimainkan.slice(-jumlahHarusOff);
+          
+          // Eksekusi update ke database menjadi Pause (is_featured = false)
+          const updatePromises = beritaUntukDiOff.map(b => 
+            updateDoc(doc(db, "kabar_desa", b.id), { is_featured: false })
+          );
+          
+          await Promise.all(updatePromises);
+          ambilData(); // Refresh UI tabel Admin
+        }
       }
     } catch (error) {
       console.error("Gagal melakukan otomatisasi slider", error);
@@ -132,14 +142,13 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
           gambar: gambarFinal, 
           tanggal_posting: new Date().toISOString(), 
           penulis: userEmail,
-          is_featured: true // Berita baru langsung di-Play
+          is_featured: true, // Berita baru otomatis Play
+          is_pinned: false // Default tidak digembok
         });
         setStatusKabar("✅ Dipublikasikan!");
       }
       
-      // Panggil fungsi otomatisasi setelah menyimpan
-      await pastikanSepuluhTerbaru();
-      
+      await pastikanSepuluhTerbaru(); // Cek jika kelebihan > 10
       batalEditKabar();
       ambilData();
       setTimeout(() => setStatusKabar(""), 4000);
@@ -155,7 +164,6 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     setJudulKabar(item.judul); 
     setIsiKabar(item.isi);
     setGambarLama(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
-    // Dihapus fungsi scroll to top agar nyaman
   };
 
   const hapusGambarDariDaftarLama = (indexGambar: number) => {
@@ -182,10 +190,24 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   const toggleTampilBerita = async (id: string, currentStatus: boolean) => {
     try {
       await updateDoc(doc(db, "kabar_desa", id), { is_featured: !currentStatus });
-      await pastikanSepuluhTerbaru(); // Cek lagi setelah mengubah
+      await pastikanSepuluhTerbaru();
       ambilData();
     } catch (error) {
       alert("Gagal merubah status tampil berita.");
+    }
+  };
+
+  const togglePinBerita = async (id: string, currentPinStatus: boolean) => {
+    try {
+      // Jika digembok, maka dia HARUS berstatus Play
+      await updateDoc(doc(db, "kabar_desa", id), { 
+        is_pinned: !currentPinStatus,
+        is_featured: true 
+      });
+      await pastikanSepuluhTerbaru();
+      ambilData();
+    } catch (error) {
+      alert("Gagal mengunci (Pin) berita.");
     }
   };
 
@@ -201,7 +223,7 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
         nama: namaAgenda, 
         tanggal: tanggalAgenda, 
         lokasi: lokasiAgenda,
-        is_featured: true // Secara default agenda baru akan tampil
+        is_featured: true 
       });
       setStatusAgenda("✅ Ditambahkan!");
       setNamaAgenda(""); 
@@ -306,11 +328,13 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
         </form>
       </div>
 
-      {/* TABEL MANAJEMEN BERITA */}
+      {/* TABEL MANAJEMEN BERITA (DENGAN TOMBOL PLAY/PAUSE & GEMBOK) */}
       <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <h4 className="text-xl font-bold text-gray-800">Riwayat Publikasi Berita</h4>
-          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-bold shadow-sm">Auto-Pause if &gt; 10 Aktif</span>
+          <span className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-xs font-bold shadow-sm border border-green-200">
+            Sistem Otomatis (Max 10 Berita di Beranda)
+          </span>
         </div>
         <table className="min-w-full text-sm text-left">
           <thead className="bg-gray-50 border-b">
@@ -324,23 +348,38 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
           <tbody>
             {riwayatKabar.map((item) => {
               const isTampil = item.is_featured !== false; 
+              const isPinned = item.is_pinned === true;
+              
               return (
-                <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-4 font-medium text-gray-500">
-                    {new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'long', year: 'numeric'})}
+                <tr key={item.id} className={`border-b transition-colors ${isPinned ? 'bg-yellow-50/50 hover:bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                  <td className="py-4 px-4 font-medium text-gray-500 whitespace-nowrap">
+                    {new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric'})}
                   </td>
                   <td className="py-4 px-4">
-                    <div className="font-bold text-gray-900 text-base mb-1">{item.judul}</div>
+                    <div className="font-bold text-gray-900 text-base mb-1">
+                      {isPinned && <span className="text-yellow-600 mr-2" title="Selalu Tampil">🔒</span>}
+                      {item.judul}
+                    </div>
                     <div className="text-xs text-gray-400">Oleh: {item.penulis}</div>
                   </td>
                   <td className="py-4 px-4 text-center">
-                    <button 
-                      onClick={() => toggleTampilBerita(item.id, isTampil)} 
-                      className={`px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1 mx-auto w-32 ${isTampil ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300"}`}
-                      title="Klik untuk mengubah status tampil di Slide Beranda"
-                    >
-                      {isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}
-                    </button>
+                    <div className="flex flex-col gap-2 items-center">
+                      <button 
+                        onClick={() => toggleTampilBerita(item.id, isTampil)} 
+                        className={`px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1 w-32 ${isTampil ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300"}`}
+                        title="Klik untuk mengubah status tampil di Slide Beranda"
+                      >
+                        {isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}
+                      </button>
+                      
+                      <button 
+                        onClick={() => togglePinBerita(item.id, isPinned)} 
+                        className={`px-4 py-1.5 rounded-lg font-bold text-[10px] shadow-sm transition-all w-32 border ${isPinned ? "bg-yellow-500 text-white border-yellow-600 hover:bg-yellow-600" : "bg-white text-gray-500 border-gray-300 hover:bg-gray-100"}`}
+                        title="Gembok agar tidak terkena Pause otomatis"
+                      >
+                        {isPinned ? "🔒 Tergembok" : "🔓 Gembok Normal"}
+                      </button>
+                    </div>
                   </td>
                   <td className="py-4 px-4 text-center">
                     <div className="flex flex-col gap-2 items-center">
@@ -406,8 +445,8 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
                   const tgl = new Date(agenda.tanggal);
                   return (
                     <tr key={agenda.id} className="border-b hover:bg-yellow-50 transition-colors">
-                      <td className="py-4 px-4 font-bold text-gray-700">
-                        {tgl.toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                      <td className="py-4 px-4 font-bold text-gray-700 whitespace-nowrap">
+                        {tgl.toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
                       </td>
                       <td className="py-4 px-4">
                         <div className="font-bold text-gray-900 text-base">{agenda.nama}</div>

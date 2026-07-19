@@ -21,6 +21,7 @@ export default function Home() {
         const snapKabar = await getDocs(qKabar);
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
+        // Filter: Hanya yang is_featured = true (baik karena baru atau karena di-Pin)
         const kabarTampil = allKabar.filter(item => item.is_featured !== false).slice(0, 10);
         setDaftarBerita(kabarTampil);
 
@@ -80,7 +81,6 @@ export default function Home() {
           <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md">
             Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.
           </p>
-          {/* Tombol Akses Layanan Dihapus sesuai permintaan */}
         </div>
       </section>
 
@@ -150,9 +150,16 @@ export default function Home() {
                         <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
                         
                         <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 text-white">
-                          <span className="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-md mb-3 inline-block shadow-sm">
-                            Berita Terbaru
-                          </span>
+                          <div className="flex items-center gap-2 mb-3">
+                            {berita.is_pinned && (
+                              <span className="bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded-md shadow-sm">
+                                🔒 PINNED
+                              </span>
+                            )}
+                            <span className="bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-md shadow-sm">
+                              Berita Terbaru
+                            </span>
+                          </div>
                           <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight drop-shadow-md line-clamp-2">
                             {berita.judul}
                           </h3>
@@ -161,7 +168,6 @@ export default function Home() {
                             <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
                           </div>
                           
-                          {/* MENGARAH KE ARTIKEL DETAIL DI TAHAP 32 */}
                           <Link href={`/kabar/${berita.id}`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
                             Baca Selengkapnya
                           </Link>
@@ -226,6 +232,7 @@ export default function Home() {
                 Lihat Kalender Lengkap
               </Link>
             </div>
+
           </div>
 
           <div className="mt-8 text-center md:hidden">

@@ -65,7 +65,6 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
   const [errorStatus, setErrorStatus] = useState(false);
 
   useEffect(() => {
-    // Fungsi dipanggil untuk menarik data 1 dokumen berdasarkan ID dari URL
     const ambilDetailBerita = async () => {
       try {
         const docRef = doc(db, "kabar_desa", params.id);
@@ -89,7 +88,6 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
     }
   }, [params.id]);
 
-  // Tampilan Proses Loading
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -99,7 +97,6 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
     );
   }
 
-  // Tampilan Jika ID Salah / Dihapus
   if (errorStatus || !berita) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">
@@ -118,7 +115,6 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
   return (
     <main className="min-h-screen bg-gray-50 pb-20 font-sans">
       
-      {/* Header Bar Lengket untuk Tombol Kembali */}
       <div className="bg-white/80 backdrop-blur-md py-4 border-b border-gray-200 sticky top-20 z-40 shadow-sm">
         <div className="container mx-auto px-4 lg:px-8 max-w-4xl flex items-center">
           <button onClick={() => router.back()} className="flex items-center gap-2 text-green-700 hover:text-white font-bold hover:bg-green-600 px-5 py-2 rounded-xl transition-colors text-sm border border-green-200 hover:border-green-600 bg-white">
@@ -127,7 +123,6 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Konten Artikel */}
       <article className="container mx-auto px-4 lg:px-8 py-10 max-w-4xl animate-fade-in">
         <div className="bg-white p-8 md:p-14 rounded-[40px] shadow-sm border border-gray-100">
           
@@ -136,6 +131,7 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
               Berita & Informasi Publik
             </span>
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-black text-gray-900 leading-tight mb-8">
+              {berita.is_pinned && <span className="text-yellow-500 mr-3" title="Berita Disematkan">🔒</span>}
               {berita.judul}
             </h1>
             
