@@ -6,7 +6,9 @@ import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/fires
 import { db } from "../../lib/firebase";
 import { useSearchParams } from "next/navigation";
 
-// KOMPONEN PEMBUNGKUS UTAMA MENGHINDARI ERROR LAYOUT
+// ==========================================
+// KOMPONEN PEMBUNGKUS UTAMA (MENCEGAH ERROR LAYOUT)
+// ==========================================
 export default function ProfilDesa() {
   return (
     <Suspense
@@ -21,7 +23,65 @@ export default function ProfilDesa() {
   );
 }
 
-// KOMPONEN ISI HALAMAN
+// ==========================================
+// KOMPONEN SLIDER GAMBAR UNTUK UMKM/WISATA
+// ==========================================
+const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  // Auto-slide setiap 4 detik
+  useEffect(() => {
+    if (gambarArray.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex === gambarArray.length - 1 ? 0 : prevIndex + 1));
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [gambarArray.length]);
+
+  const prevSlide = () => setCurrentIndex(currentIndex === 0 ? gambarArray.length - 1 : currentIndex - 1);
+  const nextSlide = () => setCurrentIndex(currentIndex === gambarArray.length - 1 ? 0 : currentIndex + 1);
+
+  if (gambarArray.length === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-200 text-5xl">
+        📦
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-full group overflow-hidden bg-gray-100">
+      <img
+        src={`https://wsrv.nl/?url=${gambarArray[currentIndex]}`}
+        alt="Galeri"
+        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+      />
+      
+      {gambarArray.length > 1 && (
+        <>
+          <button onClick={prevSlide} className="absolute top-1/2 left-2 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10">
+            &#10094;
+          </button>
+          <button onClick={nextSlide} className="absolute top-1/2 right-2 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10">
+            &#10095;
+          </button>
+          <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-1.5 z-10">
+            {gambarArray.map((_, idx) => (
+              <span key={idx} className={`block h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? "bg-yellow-400 w-4" : "bg-white/60 w-1.5"}`}></span>
+            ))}
+          </div>
+          <div className="absolute top-2 left-2 bg-black bg-opacity-60 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm z-10">
+            {currentIndex + 1} / {gambarArray.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// KOMPONEN ISI HALAMAN UTAMA
+// ==========================================
 function ProfilContent() {
   const searchParams = useSearchParams();
   const tabQuery = searchParams.get("tab");
@@ -34,7 +94,7 @@ function ProfilContent() {
   const [daftarLembaga, setDaftarLembaga] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Menerima perintah perubahan tab dari URL Navbar
+  // Sinkronisasi Tab dari URL
   useEffect(() => {
     if (
       tabQuery === "sejarah" ||
@@ -46,6 +106,7 @@ function ProfilContent() {
     }
   }, [tabQuery]);
 
+  // Penarikan Data Firestore
   useEffect(() => {
     const ambilData = async () => {
       try {
@@ -90,7 +151,6 @@ function ProfilContent() {
   // KOMPONEN REKURSIF UNTUK MENGGAMBAR BAGAN SOTK
   // ==========================================
   const RenderPohonSOTK = ({ parentId }: { parentId: string }) => {
-    // Cari siapa saja yang 'jalurAtas'-nya adalah 'parentId'
     const bawahan = aparaturDesa.filter((org) => (org.jalurAtas || "") === parentId);
 
     if (bawahan.length === 0) return null;
@@ -99,19 +159,16 @@ function ProfilContent() {
       <div className="flex flex-wrap justify-center gap-6 mt-4 relative">
         {bawahan.map((child) => (
           <div key={child.id} className="flex flex-col items-center relative">
-            
-            {/* Garis Vertikal dari Atasan ke Bawahan */}
             {parentId !== "" && (
               <div
                 className={`w-0 h-8 border-l-4 ${
                   child.jenisGaris === "Koordinasi"
-                    ? "border-dashed border-blue-400" // Garis Koordinasi (Putus-putus)
-                    : "border-solid border-green-600" // Garis Instruksi (Tegas)
+                    ? "border-dashed border-blue-400"
+                    : "border-solid border-green-600"
                 }`}
               ></div>
             )}
 
-            {/* Kotak Profil Jabatan */}
             <div className="bg-white border-b-4 border-green-600 p-5 rounded-2xl shadow-md w-48 text-center z-10 hover:-translate-y-2 transition-transform duration-300">
               <div className="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3 overflow-hidden shadow-inner border border-gray-200">
                 {child.foto ? (
@@ -128,7 +185,6 @@ function ProfilContent() {
               </p>
             </div>
 
-            {/* Panggil fungsi ini lagi untuk menggambar bawahan dari orang ini */}
             <RenderPohonSOTK parentId={child.id} />
           </div>
         ))}
@@ -149,8 +205,7 @@ function ProfilContent() {
             Profil & Kelembagaan
           </h1>
           <p className="text-lg md:text-xl text-green-100 max-w-2xl mx-auto font-light">
-            Sejarah, susunan aparatur, pilar masyarakat, serta produk unggulan
-            Desa Kerjo.
+            Sejarah, susunan aparatur, pilar masyarakat, serta produk dan potensi unggulan Desa Kerjo.
           </p>
         </div>
       </div>
@@ -255,7 +310,6 @@ function ProfilContent() {
               <h2 className="text-3xl md:text-4xl font-black text-gray-900">
                 Pemerintah Desa Kerjo
               </h2>
-              
               <div className="flex justify-center gap-6 mt-6">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
                   <div className="w-8 h-1 bg-green-600"></div> Garis Instruksi
@@ -273,7 +327,7 @@ function ProfilContent() {
             ) : aparaturDesa.length === 0 ? (
               <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-2xl">
                 <span className="text-5xl text-gray-300 block mb-4">👔</span>
-                <p className="text-gray-500 font-medium">Bagan aparatur belum diatur.</p>
+                <p className="text-gray-500 font-medium">Bagan aparatur belum diatur oleh admin.</p>
               </div>
             ) : (
               <div className="py-10 flex flex-col items-center min-w-[800px]">
@@ -309,34 +363,50 @@ function ProfilContent() {
                 <p className="text-gray-500 font-medium">Belum ada lembaga yang terdaftar.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {daftarLembaga.map((lem) => (
                   <div
                     key={lem.id}
-                    className="bg-gray-50 p-6 rounded-3xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-center md:items-start gap-5 hover:shadow-md hover:border-blue-300 transition-all text-center md:text-left"
+                    className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex flex-col items-start gap-5 hover:shadow-md hover:border-blue-300 transition-all"
                   >
-                    <div className="w-24 h-24 bg-white rounded-2xl flex items-center justify-center flex-shrink-0 border border-gray-200 p-2 shadow-sm">
-                      {lem.foto ? (
-                        <img
-                          src={`https://wsrv.nl/?url=${lem.foto}`}
-                          className="w-full h-full object-contain"
-                          alt={lem.singkatan}
-                        />
-                      ) : (
-                        <span className="text-4xl">🏛️</span>
-                      )}
+                    <div className="flex flex-row items-center gap-5 w-full border-b border-gray-100 pb-4">
+                      <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-gray-200 p-2 shadow-sm">
+                        {lem.foto ? (
+                          <img src={`https://wsrv.nl/?url=${lem.foto}`} className="w-full h-full object-contain" alt={lem.singkatan} />
+                        ) : (
+                          <span className="text-3xl">🏛️</span>
+                        )}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-2xl font-black text-gray-900 leading-tight">
+                          {lem.singkatan}
+                        </h3>
+                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">
+                          {lem.nama}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-black text-gray-900 leading-tight">
-                        {lem.singkatan}
-                      </h3>
-                      <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 mt-1">
-                        {lem.nama}
-                      </p>
-                      <p className="text-sm text-gray-600 leading-relaxed text-justify line-clamp-4 hover:line-clamp-none transition-all cursor-pointer">
-                        {lem.deskripsi}
-                      </p>
-                    </div>
+                    
+                    <p className="text-sm text-gray-600 leading-relaxed text-justify">
+                      {lem.deskripsi}
+                    </p>
+
+                    {/* Rendering Daftar Anggota Pengurus (Sesuai Dashboard Baru) */}
+                    {lem.anggota && lem.anggota.length > 0 && (
+                      <div className="w-full mt-2 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                        <h4 className="text-xs font-black text-indigo-900 mb-3 uppercase tracking-wider flex items-center gap-2">
+                          <span>👥</span> Susunan Pengurus
+                        </h4>
+                        <ul className="space-y-2">
+                          {lem.anggota.map((ang: any, i: number) => (
+                            <li key={i} className="flex justify-between items-center text-sm border-b border-indigo-200/50 last:border-0 pb-1 last:pb-0">
+                              <span className="font-bold text-indigo-800">{ang.jabatan}</span>
+                              <span className="text-gray-700 font-medium">{ang.nama}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -351,10 +421,10 @@ function ProfilContent() {
           <section className="animate-fade-in bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
             <div className="text-center mb-12">
               <span className="text-yellow-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">
-                Pemberdayaan Ekonomi
+                Pemberdayaan Ekonomi & Wisata
               </span>
               <h2 className="text-3xl md:text-4xl font-black text-gray-900">
-                Katalog Potensi & UMKM
+                Katalog Potensi Desa
               </h2>
             </div>
 
@@ -365,51 +435,103 @@ function ProfilContent() {
             ) : daftarUmkm.length === 0 ? (
               <div className="bg-gray-50 p-10 rounded-3xl text-center border border-dashed border-gray-300">
                 <span className="text-4xl block mb-3">🛍️</span>
-                <p className="text-gray-500 font-medium">Belum ada produk UMKM yang dipromosikan.</p>
+                <p className="text-gray-500 font-medium">Belum ada potensi atau produk UMKM yang didaftarkan.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {daftarUmkm.map((umkm) => (
-                  <div
-                    key={umkm.id}
-                    className="bg-gray-50 rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col hover:shadow-lg hover:border-yellow-400 transition-all group"
-                  >
-                    <div className="h-56 bg-gray-200 relative overflow-hidden">
-                      {umkm.foto ? (
-                        <img
-                          src={`https://wsrv.nl/?url=${umkm.foto}`}
-                          className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-500"
-                          alt={umkm.nama_produk}
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-5xl">📦</div>
-                      )}
-                      <div className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full text-xs font-bold text-gray-800 shadow-md">
-                        {umkm.pemilik}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {daftarUmkm.map((umkm) => {
+                  // Mengolah data gambar array
+                  const gambarArray = Array.isArray(umkm.gambar) && umkm.gambar.length > 0 
+                    ? umkm.gambar 
+                    : (umkm.foto ? [umkm.foto] : []);
+                  
+                  // Mengolah data harga (Gratis vs Rentang Harga)
+                  const isGratis = umkm.harga_mulai === 0 && umkm.harga_sampai === 0;
+                  const hargaText = isGratis 
+                    ? "GRATIS" 
+                    : `Rp ${formatRupiah(umkm.harga_mulai || umkm.harga)}${umkm.harga_sampai ? ` - Rp ${formatRupiah(umkm.harga_sampai)}` : ''}`;
+
+                  return (
+                    <div
+                      key={umkm.id}
+                      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-xl hover:border-yellow-400 transition-all duration-300"
+                    >
+                      {/* Bagian Slider Gambar */}
+                      <div className="h-56 relative bg-gray-200">
+                        <ImageCarousel gambarArray={gambarArray} />
+                        
+                        <div className="absolute top-3 left-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md z-10">
+                          {umkm.kategori || "UMKM"}
+                        </div>
+                        {umkm.pemilik && (
+                          <div className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full text-[10px] font-bold text-gray-800 shadow-md z-10">
+                            By: {umkm.pemilik}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="p-6 flex-grow flex flex-col">
+                        <h3 className="text-xl font-bold text-gray-900 mb-1 leading-tight">
+                          {umkm.nama_produk}
+                        </h3>
+                        <p className="text-green-700 font-black text-lg mb-4">
+                          {hargaText}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-4 flex-grow line-clamp-3 leading-relaxed">
+                          {umkm.deskripsi}
+                        </p>
+
+                        {/* Akordeon Jam Operasional Menggunakan HTML Native */}
+                        {umkm.jam_operasional && (
+                          <details className="mb-6 group">
+                            <summary className="text-xs font-bold text-yellow-700 cursor-pointer bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200 outline-none list-none flex justify-between items-center hover:bg-yellow-100 transition-colors">
+                              <span>🕒 Lihat Jam Operasional</span>
+                              <span className="transition group-open:rotate-180">▼</span>
+                            </summary>
+                            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 shadow-inner">
+                              {Object.keys(umkm.jam_operasional).map((hari) => {
+                                const jam = umkm.jam_operasional[hari];
+                                return (
+                                  <div key={hari} className="flex justify-between text-xs border-b border-gray-200/50 last:border-0 pb-1 last:pb-0">
+                                    <span className="font-bold text-gray-700">{hari}</span>
+                                    {jam.libur ? (
+                                      <span className="text-red-500 font-bold">TUTUP / LIBUR</span>
+                                    ) : (
+                                      <span className="text-green-700 font-medium">{jam.buka} - {jam.tutup} WIB</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </details>
+                        )}
+
+                        {/* Tombol Aksi (WhatsApp & Maps) */}
+                        <div className="flex gap-2 mt-auto">
+                          <a
+                            href={`https://wa.me/${umkm.wa}?text=Halo,%20saya%20tertarik%20dengan%20informasi%20${umkm.nama_produk}%20yang%20ada%20di%20Website%20Desa.`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 hover:border-green-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm"
+                          >
+                            <span className="text-lg">💬</span> Kontak
+                          </a>
+                          
+                          {umkm.link_maps && (
+                            <a
+                              href={umkm.link_maps}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex-1 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm"
+                            >
+                              <span className="text-lg">📍</span> Maps
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="p-6 flex-grow flex flex-col">
-                      <h3 className="text-xl font-bold text-gray-900 mb-1 leading-tight">
-                        {umkm.nama_produk}
-                      </h3>
-                      <p className="text-green-700 font-black text-xl mb-3">
-                        {formatRupiah(umkm.harga)}
-                      </p>
-                      <p className="text-sm text-gray-600 mb-6 flex-grow line-clamp-3 leading-relaxed">
-                        {umkm.deskripsi}
-                      </p>
-                      <a
-                        href={`https://wa.me/${umkm.wa}?text=Halo,%20saya%20tertarik%20dengan%20produk%20${umkm.nama_produk}%20yang%20ada%20di%20Website%20Desa.`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="w-full bg-white hover:bg-green-600 text-green-700 hover:text-white border-2 border-green-600 font-bold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
-                      >
-                        <span className="text-xl">💬</span> Hubungi Penjual
-                      </a>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
