@@ -19,7 +19,6 @@ export default function Home() {
       try {
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
-        // PERBAIKAN ERROR TYPESCRIPT (Menambahkan 'as any')
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
         const kabarTampil = allKabar.filter(item => item.is_featured !== false).slice(0, 10);
@@ -27,7 +26,6 @@ export default function Home() {
 
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
-        // PERBAIKAN ERROR TYPESCRIPT (Menambahkan 'as any')
         const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
         const now = new Date();
@@ -62,7 +60,7 @@ export default function Home() {
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://i.ibb.co.com/WNMqY32d/2239715431.webp" 
+            src="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop" 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
@@ -82,13 +80,10 @@ export default function Home() {
           <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md">
             Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.
           </p>
-          <Link href="/layanan" className="bg-green-600 hover:bg-green-500 text-white font-extrabold text-lg py-4 px-10 rounded-full shadow-xl transition-all transform hover:scale-105 border-2 border-green-400/30">
-            Akses Layanan Warga
-          </Link>
+          {/* Tombol Akses Layanan Dihapus sesuai permintaan */}
         </div>
       </section>
 
-      {/* QUICK LINKS DENGAN URUTAN BARU */}
       <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
@@ -166,7 +161,8 @@ export default function Home() {
                             <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
                           </div>
                           
-                          <Link href={`/kabar`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
+                          {/* MENGARAH KE ARTIKEL DETAIL DI TAHAP 32 */}
+                          <Link href={`/kabar/${berita.id}`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
                             Baca Selengkapnya
                           </Link>
                         </div>
@@ -231,6 +227,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
+
           <div className="mt-8 text-center md:hidden">
             <Link href="/kabar" className="inline-flex items-center gap-2 font-bold text-green-700 bg-green-50 px-6 py-3 rounded-full transition-colors border border-green-200">
               Lihat Semua Informasi

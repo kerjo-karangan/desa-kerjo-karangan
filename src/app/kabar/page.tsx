@@ -1,11 +1,13 @@
+// src/app/kabar/page.tsx
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link"; // Ditambahkan untuk link detail berita
 
-// --- KOMPONEN SLIDER GAMBAR OTOMATIS & MANUAL ---
+// --- KOMPONEN SLIDER GAMBAR ---
 const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -51,7 +53,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   );
 };
 
-// --- KOMPONEN UTAMA (DIBUNGKUS SUSPENSE UNTUK MENCEGAH ERROR LAYOUT) ---
+// --- KOMPONEN UTAMA ---
 export default function KabarDesa() {
   return (
     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div></div>}>
@@ -65,14 +67,15 @@ function KabarContent() {
   const searchParams = useSearchParams();
   const tabQuery = searchParams.get("tab");
   
-  // Default tab adalah berita
   const [tabAktif, setTabAktif] = useState("berita");
 
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // STATE KOTAK PENCARIAN
+  const [searchTerm, setSearchTerm] = useState("");
 
-  // Menerima perintah perubahan tab dari URL Navbar
   useEffect(() => {
     if (tabQuery === "berita" || tabQuery === "agenda") {
       setTabAktif(tabQuery);
@@ -108,6 +111,17 @@ function KabarContent() {
     return new Date(isoString).toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
 
+  // LOGIKA PENCARIAN (FILTER DATA)
+  const beritaTerfilter = daftarBerita.filter((b) => 
+    b.judul.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    b.isi.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  
+  const agendaTerfilter = daftarAgenda.filter((a) => 
+    a.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden">
@@ -121,6 +135,18 @@ function KabarContent() {
 
       <div className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
         
+        {/* KOTAK PENCARIAN PINTAR */}
+        <div className="mb-10 max-w-2xl mx-auto relative">
+          <input 
+            type="text" 
+            placeholder="Cari berita atau kegiatan desa..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-green-200 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all font-medium text-gray-800 shadow-sm"
+          />
+          <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-2xl text-green-600">🔍</span>
+        </div>
+
         {/* TABS NAVIGASI */}
         <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-10">
           <button 
@@ -142,25 +168,35 @@ function KabarContent() {
           <div className="animate-fade-in">
             {loading ? (
               <div className="flex justify-center my-20"><div className="w-12 h-12 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin"></div></div>
-            ) : daftarBerita.length === 0 ? (
+            ) : beritaTerfilter.length === 0 ? (
               <div className="bg-white p-12 rounded-3xl shadow-sm border border-gray-100 text-center">
                 <span className="text-5xl mb-4 block">📭</span>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">Belum Ada Kabar Baru</h3>
-                <p className="text-gray-500">Pemerintah desa belum mempublikasikan berita apapun saat ini.</p>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{searchTerm ? "Berita Tidak Ditemukan" : "Belum Ada Kabar Baru"}</h3>
+                <p className="text-gray-500">{searchTerm ? `Coba gunakan kata kunci pencarian yang lain.` : "Pemerintah desa belum mempublikasikan berita apapun saat ini."}</p>
               </div>
             ) : (
               <div className="space-y-10">
-                {daftarBerita.map((berita) => {
+                {beritaTerfilter.map((berita) => {
                   const gambarArray = Array.isArray(berita.gambar) ? berita.gambar : berita.gambar ? [berita.gambar] : [];
                   return (
                     <article key={berita.id} className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-gray-100 transition-all hover:shadow-lg">
                       <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3 leading-tight">{berita.judul}</h2>
                       <div className="flex flex-wrap items-center gap-4 mb-6">
                         <span className="bg-green-50 text-green-700 px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2">📅 {formatTanggal(berita.tanggal_posting)}</span>
-                        <span className="text-gray-400 text-sm font-medium">Dipublikasikan oleh {berita.penulis || "Admin"}</span>
+                        <span className="text-gray-400 text-sm font-medium">Oleh: {berita.penulis || "Admin"}</span>
                       </div>
+                      
                       <ImageCarousel gambarArray={gambarArray} />
-                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg mt-4 text-justify">{berita.isi}</p>
+                      
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg mt-4 text-justify line-clamp-4">
+                        {berita.isi}
+                      </p>
+                      
+                      <div className="mt-6 text-right border-t border-gray-100 pt-4">
+                        <Link href={`/kabar/${berita.id}`} className="inline-block bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 font-bold px-6 py-2.5 rounded-xl transition-colors">
+                          Baca Artikel Selengkapnya →
+                        </Link>
+                      </div>
                     </article>
                   );
                 })}
@@ -180,13 +216,13 @@ function KabarContent() {
               <div className="space-y-6">
                 {loading ? (
                    <p className="text-gray-400 animate-pulse text-center py-10">Memuat jadwal kegiatan...</p>
-                ) : daftarAgenda.length === 0 ? (
+                ) : agendaTerfilter.length === 0 ? (
                   <div className="border border-dashed border-gray-300 p-10 rounded-2xl text-center bg-gray-50">
                     <span className="text-4xl text-gray-300 mb-3 block">🗓️</span>
-                    <p className="text-gray-500 font-medium text-lg">Belum ada agenda terdekat yang dijadwalkan.</p>
+                    <p className="text-gray-500 font-medium text-lg">{searchTerm ? "Jadwal Tidak Ditemukan" : "Belum ada agenda terdekat yang dijadwalkan."}</p>
                   </div>
                 ) : (
-                  daftarAgenda.map((agenda) => {
+                  agendaTerfilter.map((agenda) => {
                     const tgl = new Date(agenda.tanggal);
                     return (
                       <div key={agenda.id} className="flex gap-6 group bg-gray-50 p-6 rounded-2xl border border-gray-100 hover:border-green-300 hover:shadow-md transition-all">

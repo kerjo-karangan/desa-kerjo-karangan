@@ -10,7 +10,7 @@ export default function Navbar() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const pathname = usePathname();
 
-  // Struktur Menu & Sub-Menu (URUTAN BARU: Profil -> Kabar -> Transparansi -> Layanan)
+  // Struktur Menu & Sub-Menu
   const navItems = [
     { name: "Beranda", path: "/", sub: [] },
     { 
@@ -96,11 +96,6 @@ export default function Navbar() {
                 )}
               </div>
             ))}
-            
-            {/* Tombol Login Admin */}
-            <Link href="/login" className="ml-4 bg-green-700 hover:bg-green-800 text-white font-bold px-6 py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5">
-              Login Admin
-            </Link>
           </div>
 
           {/* TOMBOL HAMBURGER MOBILE */}
@@ -147,11 +142,6 @@ export default function Navbar() {
               )}
             </div>
           ))}
-          <div className="pt-4 px-2">
-            <Link href="/login" onClick={() => setIsOpen(false)} className="block w-full bg-green-700 hover:bg-green-800 text-white text-center font-bold px-6 py-3 rounded-xl shadow-md transition-colors">
-              Login Admin
-            </Link>
-          </div>
         </div>
       </div>
     </nav>
