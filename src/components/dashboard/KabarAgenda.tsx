@@ -6,7 +6,9 @@ import { collection, addDoc, doc, query, orderBy, getDocs, deleteDoc, updateDoc 
 import { db } from "../../lib/firebase";
 
 export default function KabarAgenda({ userEmail }: { userEmail: string | null }) {
-  // --- KABAR ---
+  // ==========================================
+  // STATE KABAR BERITA
+  // ==========================================
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
   const [fotoKabarList, setFotoKabarList] = useState<FileList | null>(null);
@@ -16,7 +18,9 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   const [editKabarId, setEditKabarId] = useState<string | null>(null);
   const [gambarLama, setGambarLama] = useState<string[]>([]);
 
-  // --- AGENDA ---
+  // ==========================================
+  // STATE AGENDA DESA
+  // ==========================================
   const [namaAgenda, setNamaAgenda] = useState("");
   const [tanggalAgenda, setTanggalAgenda] = useState("");
   const [lokasiAgenda, setLokasiAgenda] = useState("");
@@ -24,13 +28,20 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   const [statusAgenda, setStatusAgenda] = useState("");
   const [isLoadingAgenda, setIsLoadingAgenda] = useState(false);
 
+  // ==========================================
+  // FUNGSI PENGAMBILAN DATA
+  // ==========================================
   const ambilData = async () => {
     try {
       const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
-      setRiwayatKabar((await getDocs(qKabar)).docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const snapKabar = await getDocs(qKabar);
+      // PERBAIKAN TS2339: Menambahkan as any
+      setRiwayatKabar(snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
 
       const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
-      setDaftarAgenda((await getDocs(qAgenda)).docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const snapAgenda = await getDocs(qAgenda);
+      // PERBAIKAN TS2339: Menambahkan as any
+      setDaftarAgenda(snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
     } catch (error) {
       console.error("Gagal mengambil data", error);
     }
@@ -40,6 +51,9 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     ambilData();
   }, []);
 
+  // ==========================================
+  // FUNGSI UPLOAD GAMBAR API
+  // ==========================================
   const uploadFotoKeImgBB = async (file: File) => {
     const formData = new FormData();
     formData.append("image", file);
@@ -60,6 +74,9 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     }
   };
 
+  // ==========================================
+  // MANAJEMEN KABAR BERITA
+  // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKabar(true);
@@ -75,11 +92,20 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
       const gambarFinal = [...gambarLama, ...tautanGambarBaru];
       
       if (editKabarId) {
-        await updateDoc(doc(db, "kabar_desa", editKabarId), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal });
+        await updateDoc(doc(db, "kabar_desa", editKabarId), { 
+          judul: judulKabar, 
+          isi: isiKabar, 
+          gambar: gambarFinal 
+        });
         setStatusKabar("✅ Diperbarui!");
       } else {
         await addDoc(collection(db, "kabar_desa"), {
-          judul: judulKabar, isi: isiKabar, gambar: gambarFinal, tanggal_posting: new Date().toISOString(), penulis: userEmail,
+          judul: judulKabar, 
+          isi: isiKabar, 
+          gambar: gambarFinal, 
+          tanggal_posting: new Date().toISOString(), 
+          penulis: userEmail,
+          is_featured: true // Secara default berita baru akan tampil di Beranda
         });
         setStatusKabar("✅ Dipublikasikan!");
       }
@@ -94,7 +120,9 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   };
 
   const mulaiEditKabar = (item: any) => {
-    setEditKabarId(item.id); setJudulKabar(item.judul); setIsiKabar(item.isi);
+    setEditKabarId(item.id); 
+    setJudulKabar(item.judul); 
+    setIsiKabar(item.isi);
     setGambarLama(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -104,7 +132,11 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
   };
 
   const batalEditKabar = () => {
-    setEditKabarId(null); setJudulKabar(""); setIsiKabar(""); setGambarLama([]); setFotoKabarList(null);
+    setEditKabarId(null); 
+    setJudulKabar(""); 
+    setIsiKabar(""); 
+    setGambarLama([]); 
+    setFotoKabarList(null);
     const input = document.getElementById("inputFotoKabar") as HTMLInputElement;
     if (input) input.value = "";
   };
@@ -116,14 +148,34 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     }
   };
 
+  // FITUR PLAY/PAUSE (TAMPILKAN/SEMBUNYIKAN DI BERANDA) UNTUK BERITA
+  const toggleTampilBerita = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, "kabar_desa", id), { is_featured: !currentStatus });
+      ambilData();
+    } catch (error) {
+      alert("Gagal merubah status tampil berita.");
+    }
+  };
+
+  // ==========================================
+  // MANAJEMEN AGENDA DESA
+  // ==========================================
   const handleSimpanAgenda = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingAgenda(true);
     setStatusAgenda("Menyimpan...");
     try {
-      await addDoc(collection(db, "agenda_desa"), { nama: namaAgenda, tanggal: tanggalAgenda, lokasi: lokasiAgenda });
+      await addDoc(collection(db, "agenda_desa"), { 
+        nama: namaAgenda, 
+        tanggal: tanggalAgenda, 
+        lokasi: lokasiAgenda,
+        is_featured: true // Secara default agenda baru akan tampil di Beranda
+      });
       setStatusAgenda("✅ Ditambahkan!");
-      setNamaAgenda(""); setTanggalAgenda(""); setLokasiAgenda("");
+      setNamaAgenda(""); 
+      setTanggalAgenda(""); 
+      setLokasiAgenda("");
       ambilData();
       setTimeout(() => setStatusAgenda(""), 4000);
     } catch (error) {
@@ -140,18 +192,38 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
     }
   };
 
+  // FITUR PLAY/PAUSE (TAMPILKAN/SEMBUNYIKAN DI BERANDA) UNTUK AGENDA
+  const toggleTampilAgenda = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, "agenda_desa", id), { is_featured: !currentStatus });
+      ambilData();
+    } catch (error) {
+      alert("Gagal merubah status tampil agenda.");
+    }
+  };
+
+  // ==========================================
+  // TAMPILAN UI
+  // ==========================================
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in pb-20">
+      
+      {/* BAGIAN BERITA DESA */}
       <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500">
         <div className="flex justify-between mb-2 border-b pb-4">
           <div>
-            <h3 className="text-2xl font-bold flex items-center gap-2">{editKabarId ? "✏️ Edit Berita" : "📰 Publikasi Berita Baru"}</h3>
+            <h3 className="text-2xl font-bold flex items-center gap-2">
+              {editKabarId ? "✏️ Edit Berita" : "📰 Publikasi Berita Baru"}
+            </h3>
             <p className="text-gray-500 text-sm mt-1">Tambahkan berita terbaru, kegiatan, atau pengumuman desa.</p>
           </div>
           {editKabarId && (
-            <button onClick={batalEditKabar} className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors">Batal Edit</button>
+            <button onClick={batalEditKabar} className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors">
+              Batal Edit
+            </button>
           )}
         </div>
+
         <form onSubmit={handleSimpanKabar} className="space-y-5 mt-6">
           <div>
             <label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label>
@@ -164,7 +236,7 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
               <div className="flex flex-wrap gap-4">
                 {gambarLama.map((url, idx) => (
                   <div key={idx} className="relative w-32 h-32 border-2 border-white rounded-xl overflow-hidden group shadow-md">
-                    <img src={`https://wsrv.nl/?url=${url}`} alt="Foto Berita Lama" className="w-full h-full object-cover" />
+                    <img src={`https://wsrv.nl/?url=${url}`} alt="Foto Berita" className="w-full h-full object-cover" />
                     <button type="button" onClick={() => hapusGambarDariDaftarLama(idx)} className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full text-sm font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700" title="Hapus Foto Ini">X</button>
                   </div>
                 ))}
@@ -204,43 +276,63 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
         </form>
       </div>
 
+      {/* TABEL MANAJEMEN BERITA (DENGAN TOMBOL PLAY/PAUSE) */}
       <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100">
         <h4 className="text-xl font-bold mb-6 text-gray-800">Riwayat Publikasi Berita</h4>
         <table className="min-w-full text-sm text-left">
           <thead className="bg-gray-50 border-b">
             <tr>
-              <th className="py-4 px-4 font-bold text-gray-600">Tanggal</th>
+              <th className="py-4 px-4 font-bold text-gray-600">Tanggal Posting</th>
               <th className="py-4 px-4 font-bold text-gray-600">Judul Berita & Penulis</th>
+              <th className="py-4 px-4 text-center font-bold text-gray-600">Tampil di Beranda?</th>
               <th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th>
             </tr>
           </thead>
           <tbody>
-            {riwayatKabar.map((item) => (
-              <tr key={item.id} className="border-b hover:bg-gray-50">
-                <td className="py-4 px-4 font-medium text-gray-500">{new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'long', year: 'numeric'})}</td>
-                <td className="py-4 px-4">
-                  <div className="font-bold text-gray-900 text-base mb-1">{item.judul}</div>
-                  <div className="text-xs text-gray-400">Oleh: {item.penulis}</div>
-                </td>
-                <td className="py-4 px-4 text-center">
-                  <button onClick={() => mulaiEditKabar(item)} className="bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 px-4 py-2 rounded-lg mr-2 font-bold transition-colors">Edit Berita</button>
-                  <button onClick={() => hapusKabar(item.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 px-4 py-2 rounded-lg font-bold transition-colors">Hapus</button>
-                </td>
-              </tr>
-            ))}
+            {riwayatKabar.map((item) => {
+              const isTampil = item.is_featured !== false; 
+              return (
+                <tr key={item.id} className="border-b hover:bg-gray-50 transition-colors">
+                  <td className="py-4 px-4 font-medium text-gray-500">
+                    {new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'long', year: 'numeric'})}
+                  </td>
+                  <td className="py-4 px-4">
+                    <div className="font-bold text-gray-900 text-base mb-1">{item.judul}</div>
+                    <div className="text-xs text-gray-400">Oleh: {item.penulis}</div>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <button 
+                      onClick={() => toggleTampilBerita(item.id, isTampil)} 
+                      className={`px-4 py-2 rounded-lg font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1 mx-auto w-32 ${isTampil ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300"}`}
+                      title="Klik untuk mengubah status tampil di Slide Beranda"
+                    >
+                      {isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}
+                    </button>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    <div className="flex flex-col gap-2 items-center">
+                      <button onClick={() => mulaiEditKabar(item)} className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Edit</button>
+                      <button onClick={() => hapusKabar(item.id)} className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Hapus</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
             {riwayatKabar.length === 0 && (
-              <tr><td colSpan={3} className="text-center py-8 text-gray-500">Belum ada berita yang dipublikasikan.</td></tr>
+              <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada berita yang dipublikasikan.</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
+      {/* BAGIAN AGENDA DESA */}
       <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 mt-8 border-t-4 border-yellow-500">
         <h3 className="text-2xl font-bold mb-2">📅 Agenda & Kalender Kegiatan Desa</h3>
         <p className="text-gray-500 text-sm mb-6">Atur jadwal kegiatan desa yang akan datang agar warga dapat berpartisipasi.</p>
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 bg-yellow-50 p-6 rounded-2xl border border-yellow-200 shadow-inner">
-            <h4 className="font-bold text-yellow-900 mb-4 text-lg">Tambah Jadwal Agenda Baru</h4>
+          <div className="lg:col-span-1 bg-yellow-50 p-6 rounded-2xl border border-yellow-200 shadow-inner h-fit">
+            <h4 className="font-bold text-yellow-900 mb-4 text-lg">Tambah Jadwal Baru</h4>
             <form onSubmit={handleSimpanAgenda} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold mb-1 text-gray-700">Nama Kegiatan / Acara</label>
@@ -254,8 +346,14 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
                 <label className="block text-xs font-bold mb-1 text-gray-700">Lokasi / Tempat</label>
                 <input type="text" required value={lokasiAgenda} onChange={(e) => setLokasiAgenda(e.target.value)} placeholder="Misal: Balai Desa Kerjo" className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500" />
               </div>
-              {statusAgenda && (<div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">{statusAgenda}</div>)}
-              <button type="submit" disabled={isLoadingAgenda} className="w-full bg-yellow-600 text-white font-bold py-3 rounded-xl hover:bg-yellow-700 shadow-md transition-colors">{isLoadingAgenda ? "Menyimpan..." : "Tambahkan ke Kalender"}</button>
+              {statusAgenda && (
+                <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
+                  {statusAgenda}
+                </div>
+              )}
+              <button type="submit" disabled={isLoadingAgenda} className="w-full bg-yellow-600 text-white font-bold py-3 rounded-xl hover:bg-yellow-700 shadow-md transition-colors">
+                {isLoadingAgenda ? "Menyimpan..." : "Tambahkan ke Kalender"}
+              </button>
             </form>
           </div>
           
@@ -264,33 +362,49 @@ export default function KabarAgenda({ userEmail }: { userEmail: string | null })
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="py-3 px-4 font-bold text-gray-600">Jadwal Waktu</th>
-                  <th className="py-3 px-4 font-bold text-gray-600">Nama Kegiatan & Lokasi</th>
+                  <th className="py-3 px-4 font-bold text-gray-600">Kegiatan & Lokasi</th>
+                  <th className="py-3 px-4 text-center font-bold text-gray-600">Tampil di Beranda?</th>
                   <th className="py-3 px-4 text-center font-bold text-gray-600">Aksi</th>
                 </tr>
               </thead>
               <tbody>
-                {daftarAgenda.map((agenda) => (
-                  <tr key={agenda.id} className="border-b hover:bg-yellow-50 transition-colors">
-                    <td className="py-4 px-4 font-bold text-gray-700">
-                      {new Date(agenda.tanggal).toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="font-bold text-gray-900 text-base">{agenda.nama}</div>
-                      <div className="text-xs font-bold text-yellow-600 mt-1 flex items-center gap-1"><span>📍</span> {agenda.lokasi}</div>
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <button onClick={() => hapusAgenda(agenda.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors">Hapus Agenda</button>
-                    </td>
-                  </tr>
-                ))}
+                {daftarAgenda.map((agenda) => {
+                  const isTampil = agenda.is_featured !== false;
+                  const tgl = new Date(agenda.tanggal);
+                  return (
+                    <tr key={agenda.id} className="border-b hover:bg-yellow-50 transition-colors">
+                      <td className="py-4 px-4 font-bold text-gray-700">
+                        {tgl.toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })} WIB
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="font-bold text-gray-900 text-base">{agenda.nama}</div>
+                        <div className="text-xs font-bold text-yellow-600 mt-1 flex items-center gap-1"><span>📍</span> {agenda.lokasi}</div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <button 
+                          onClick={() => toggleTampilAgenda(agenda.id, isTampil)} 
+                          className={`px-3 py-1.5 rounded-md font-bold text-[10px] shadow-sm transition-all flex items-center justify-center gap-1 mx-auto w-24 ${isTampil ? "bg-green-100 text-green-700 hover:bg-green-200 border border-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300"}`}
+                        >
+                          {isTampil ? "▶️ Play" : "⏸️ Pause"}
+                        </button>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <button onClick={() => hapusAgenda(agenda.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                          Hapus
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {daftarAgenda.length === 0 && (
-                  <tr><td colSpan={3} className="text-center py-8 text-gray-500">Belum ada jadwal agenda desa yang didaftarkan.</td></tr>
+                  <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada jadwal agenda desa yang didaftarkan.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
     </div>
   );
 }

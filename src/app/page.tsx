@@ -1,134 +1,243 @@
+// src/app/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 export default function Home() {
-  // State untuk pergeseran banner otomatis (Carousel)
-  const [currentBanner, setCurrentBanner] = useState(0);
+  const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
+  const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const bannerPengumuman = [
-    {
-      judul: "Jadwal Pelayanan Posyandu Serentak",
-      keterangan: "Dilaksanakan besok Senin di masing-masing Pos Dusun Krajan & Krandon mulai pukul 08.00 WIB.",
-      bg: "bg-green-700"
-    },
-    {
-      judul: "Transparansi Anggaran Dana Desa Perdana",
-      keterangan: "Laporan APBDes tahun anggaran berjalan kini dapat diakses secara terbuka di menu Transparansi.",
-      bg: "bg-emerald-800"
-    }
-  ];
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  // Efek geser banner otomatis setiap 4 detik
   useEffect(() => {
+    const ambilDataBeranda = async () => {
+      try {
+        const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
+        const snapKabar = await getDocs(qKabar);
+        // PERBAIKAN ERROR TYPESCRIPT (Menambahkan 'as any')
+        const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        
+        const kabarTampil = allKabar.filter(item => item.is_featured !== false).slice(0, 10);
+        setDaftarBerita(kabarTampil);
+
+        const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
+        const snapAgenda = await getDocs(qAgenda);
+        // PERBAIKAN ERROR TYPESCRIPT (Menambahkan 'as any')
+        const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        
+        const now = new Date();
+        const agendaTampil = allAgenda.filter(item => {
+          const tglAgenda = new Date(item.tanggal);
+          return item.is_featured !== false && tglAgenda >= now;
+        }).slice(0, 10);
+        setDaftarAgenda(agendaTampil);
+
+      } catch (error) {
+        console.error("Gagal memuat data beranda", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    ambilDataBeranda();
+  }, []);
+
+  useEffect(() => {
+    if (!isAutoPlay || daftarBerita.length <= 1) return;
     const interval = setInterval(() => {
-      setCurrentBanner((prev) => (prev === bannerPengumuman.length - 1 ? 0 : prev + 1));
-    }, 4000);
+      setCurrentSlide(prev => (prev === daftarBerita.length - 1 ? 0 : prev + 1));
+    }, 5000);
     return () => clearInterval(interval);
-  }, [bannerPengumuman.length]);
+  }, [isAutoPlay, daftarBerita.length]);
+
+  const prevSlide = () => setCurrentSlide(currentSlide === 0 ? daftarBerita.length - 1 : currentSlide - 1);
+  const nextSlide = () => setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col">
-      
-      {/* 1. CAROUSEL PENGUMUMAN TERKINI */}
-      <div className="w-full text-white overflow-hidden relative shadow-inner">
-        {bannerPengumuman.map((banner, index) => (
-          <div
-            key={index}
-            className={`w-full p-6 md:p-12 text-center transition-all duration-700 ease-in-out ${banner.bg} ${
-              index === currentBanner ? "block animate-fade-in" : "hidden"
-            }`}
-          >
-            <span className="inline-block bg-yellow-400 text-gray-950 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-wider mb-3 shadow-sm">
-              📢 Pengumuman Terkini
-            </span>
-            <h2 className="text-xl md:text-3xl font-extrabold tracking-tight mb-2 max-w-3xl mx-auto">
-              {banner.judul}
-            </h2>
-            <p className="text-sm md:text-base text-green-50 max-w-2xl mx-auto font-light">
-              {banner.keterangan}
-            </p>
+    <main className="flex min-h-screen flex-col bg-gray-50">
+      <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900">
+        <div className="absolute inset-0 z-0">
+          <img 
+            src="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop" 
+            alt="Pemandangan Desa" 
+            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
+        </div>
+        
+        <div className="relative z-10 text-center px-4 max-w-4xl animate-fade-in mt-16">
+          <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-6 bg-white p-2 rounded-full shadow-2xl">
+            <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
           </div>
-        ))}
-      </div>
-
-      {/* 2. HERO SECTION / SELAMAT DATANG */}
-      <div className="container mx-auto px-4 py-12 md:py-16 text-center max-w-4xl flex-grow">
-        <h1 className="text-3xl md:text-5xl font-black text-gray-900 tracking-tight mb-4">
-          Selamat Datang di Portal Resmi <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-700 to-green-600">
-            Desa Kerjo
+          <span className="bg-yellow-500 text-green-950 font-black px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-widest shadow-md inline-block mb-6">
+            Portal Informasi Publik
           </span>
-        </h1>
-        <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed mb-8">
-          Pusat pelayanan digital mandiri, pusat informasi pembangunan publik, serta wadah keterbukaan informasi bagi seluruh masyarakat.
-        </p>
-
-        {/* 3. WIDGET COUNTER RINGKASAN DESA */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:scale-105 duration-300">
-            <span className="text-3xl mb-1">👥</span>
-            <p className="text-2xl font-black text-green-800">1.840+</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Penduduk</p>
-          </div>
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:scale-105 duration-300">
-            <span className="text-3xl mb-1">🏡</span>
-            <p className="text-2xl font-black text-green-800">540+</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Kepala Keluarga</p>
-          </div>
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:scale-105 duration-300">
-            <span className="text-3xl mb-1">🗺️</span>
-            <p className="text-2xl font-black text-green-800">2</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Dusun Wilayah</p>
-          </div>
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center transition-transform hover:scale-105 duration-300">
-            <span className="text-3xl mb-1">📍</span>
-            <p className="text-2xl font-black text-green-800">23</p>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Rukun Tetangga (RT)</p>
-          </div>
-        </div>
-
-        {/* 4. AREA PETA LOKASI WILAYAH DESA INTERAKTIF */}
-        <div className="bg-white p-4 md:p-6 rounded-3xl shadow-md border border-gray-100 max-w-3xl mx-auto text-left">
-          <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
-            📍 Peta Batas Wilayah Interaktif
-          </h3>
-          <p className="text-xs text-gray-500 mb-4">
-            Lokasi pusat administrasi Kantor Desa Kerjo, Kecamatan Karangan, Trenggalek.
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-lg leading-tight">
+            Selamat Datang di<br/>Desa Kerjo
+          </h1>
+          <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md">
+            Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.
           </p>
-          
-          {/* Pembungkus Peta Google Maps Responsive */}
-          <div className="w-full h-64 md:h-80 rounded-xl overflow-hidden shadow-inner border border-gray-150 relative">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d3950.396513428833!2d111.66158007476895!3d-8.060974991966665!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zOMKwMDMnMzkuNSJTIDExMcKwMzknNTEuMCJF!5e0!3m2!1sid!2sid!4v1783875233794!5m2!1sid!2sid"
-              className="absolute top-0 left-0 w-full h-full border-0"
-              allowFullScreen={true}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            ></iframe>
+          <Link href="/layanan" className="bg-green-600 hover:bg-green-500 text-white font-extrabold text-lg py-4 px-10 rounded-full shadow-xl transition-all transform hover:scale-105 border-2 border-green-400/30">
+            Akses Layanan Warga
+          </Link>
+        </div>
+      </section>
+
+      {/* QUICK LINKS DENGAN URUTAN BARU */}
+      <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">🏛️</div>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Profil & UMKM</h3>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">Jelajahi potensi wisata dan dukung produk lokal asli desa.</p>
+          </Link>
+          <Link href="/kabar" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📰</div>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Kabar Desa</h3>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">Pantau terus perkembangan berita dan kegiatan terkini.</p>
+          </Link>
+          <Link href="/transparansi" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📊</div>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Transparansi</h3>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">Akses grafik rincian APBDes dan laporan anggaran publik.</p>
+          </Link>
+          <Link href="/layanan" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📄</div>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Layanan Surat</h3>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">Urus surat pengantar, SKCK, SKTM, dll secara mandiri online.</p>
+          </Link>
+        </div>
+      </section>
+
+      <section className="py-16 bg-white border-t border-gray-200">
+        <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
+          <div className="flex justify-between items-end mb-10">
+            <div>
+              <span className="text-green-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">Informasi Publik</span>
+              <h2 className="text-3xl md:text-5xl font-black text-gray-900">Kabar & Agenda</h2>
+            </div>
+            <Link href="/kabar" className="hidden md:inline-flex items-center gap-2 font-bold text-green-700 hover:text-green-800 bg-green-50 px-5 py-2.5 rounded-full transition-colors">
+              Lihat Semua Informasi <span className="text-xl">→</span>
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="lg:col-span-2 flex flex-col h-full">
+              {loading ? (
+                 <div className="w-full h-96 bg-gray-100 rounded-3xl flex items-center justify-center shadow-inner">
+                   <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                 </div>
+              ) : daftarBerita.length === 0 ? (
+                <div className="w-full h-96 bg-gray-50 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center text-center p-10">
+                   <span className="text-5xl mb-4">📰</span>
+                   <p className="text-gray-500 font-medium text-lg">Belum ada berita yang ditampilkan di beranda.</p>
+                </div>
+              ) : (
+                <div className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-lg group bg-black">
+                  {daftarBerita.map((berita, index) => {
+                    const gambarSlide = Array.isArray(berita.gambar) && berita.gambar.length > 0 ? berita.gambar[0] : (berita.gambar || "");
+                    return (
+                      <div 
+                        key={berita.id} 
+                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
+                      >
+                        {gambarSlide ? (
+                          <img src={`https://wsrv.nl/?url=${gambarSlide}`} alt={berita.judul} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-[10000ms] ease-out" />
+                        ) : (
+                          <div className="w-full h-full bg-gray-800 flex items-center justify-center text-6xl opacity-80">📸</div>
+                        )}
+                        
+                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
+                        
+                        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 text-white">
+                          <span className="bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-md mb-3 inline-block shadow-sm">
+                            Berita Terbaru
+                          </span>
+                          <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight drop-shadow-md line-clamp-2">
+                            {berita.judul}
+                          </h3>
+                          <div className="flex items-center gap-4 text-xs md:text-sm font-medium text-gray-300 mb-4">
+                            <span className="flex items-center gap-1"><span>📅</span> {new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { day:'numeric', month:'long', year:'numeric'})}</span>
+                            <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
+                          </div>
+                          
+                          <Link href={`/kabar`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
+                            Baca Selengkapnya
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 font-black shadow-lg">&#10094;</button>
+                  <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 font-black shadow-lg">&#10095;</button>
+
+                  <button onClick={() => setIsAutoPlay(!isAutoPlay)} className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-full backdrop-blur-md z-20 text-xs font-bold flex items-center gap-1.5 transition-colors border border-white/20">
+                    {isAutoPlay ? "⏸️ Pause Slide" : "▶️ Play Slide"}
+                  </button>
+
+                  <div className="absolute bottom-4 right-6 flex space-x-1.5 z-20">
+                    {daftarBerita.map((_, idx) => (
+                      <button key={idx} onClick={() => setCurrentSlide(idx)} className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentSlide ? "bg-yellow-400 w-6" : "bg-white/50 w-2 hover:bg-white"}`}></button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-1 bg-yellow-50 p-6 md:p-8 rounded-3xl border border-yellow-200 shadow-inner flex flex-col h-[400px] md:h-[500px]">
+              <h3 className="text-xl font-black text-yellow-900 mb-6 flex items-center gap-2 border-b border-yellow-300 pb-4">
+                <span className="text-2xl">📅</span> Agenda Terdekat
+              </h3>
+              
+              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+                {loading ? (
+                  <p className="text-center text-gray-500 font-medium py-10 animate-pulse">Memuat agenda...</p>
+                ) : daftarAgenda.length === 0 ? (
+                  <div className="text-center py-10">
+                    <span className="text-4xl block mb-2 text-yellow-700 opacity-50">🗓️</span>
+                    <p className="text-sm font-medium text-yellow-800">Tidak ada agenda / jadwal kegiatan dalam waktu dekat.</p>
+                  </div>
+                ) : (
+                  daftarAgenda.map((agenda) => {
+                    const tgl = new Date(agenda.tanggal);
+                    return (
+                      <div key={agenda.id} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100 flex gap-4 hover:border-yellow-400 transition-colors group">
+                        <div className="flex-shrink-0 w-14 h-16 bg-yellow-100 rounded-xl flex flex-col items-center justify-center text-yellow-800 border border-yellow-200">
+                          <span className="text-[10px] font-black uppercase">{tgl.toLocaleDateString('id-ID', { month: 'short' })}</span>
+                          <span className="text-xl font-black leading-none my-0.5">{tgl.getDate()}</span>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 group-hover:text-green-700 transition-colors">
+                            {agenda.nama}
+                          </h4>
+                          <div className="text-xs text-gray-500 mt-1.5 flex flex-col gap-0.5 font-medium">
+                            <span className="flex items-center gap-1"><span>🕒</span> {tgl.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })} WIB</span>
+                            <span className="flex items-center gap-1 truncate w-40"><span>📍</span> {agenda.lokasi}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+              <Link href="/kabar?tab=agenda" className="block text-center bg-yellow-200 hover:bg-yellow-300 text-yellow-900 font-bold py-3 mt-4 rounded-xl transition-colors text-sm">
+                Lihat Kalender Lengkap
+              </Link>
+            </div>
+          </div>
+          <div className="mt-8 text-center md:hidden">
+            <Link href="/kabar" className="inline-flex items-center gap-2 font-bold text-green-700 bg-green-50 px-6 py-3 rounded-full transition-colors border border-green-200">
+              Lihat Semua Informasi
+            </Link>
           </div>
         </div>
-
-      </div>
-
-      {/* TOMBOL QUICK ACCESS WHATSAPP (MELAYANG DI POJOK JEMPOL) */}
-      <a
-        href="https://wa.me/6281234567890" // Ganti dengan nomor pelayanan desa asli kelak
-        target="_blank"
-        rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 bg-green-600 text-white p-4 rounded-full shadow-2xl transition-transform duration-300 hover:scale-110 hover:bg-green-700 z-50 flex items-center justify-center group"
-      >
-        <span className="text-2xl">💬</span>
-        <span className="max-w-0 overflow-hidden group-hover:max-w-xs group-hover:ml-2 text-sm font-bold transition-all duration-350 ease-in-out whitespace-nowrap">
-          Hubungi Desa
-        </span>
-      </a>
-
-      {/* FOOTER SEDERHANA */}
-      <footer className="bg-white border-t border-gray-100 py-6 text-center text-xs text-gray-400 font-medium">
-        © {new Date().getFullYear()} Pemerintah Desa Kerjo. Hak Cipta Dilindungi Undang-Undang.
-      </footer>
+      </section>
     </main>
   );
 }

@@ -1,3 +1,4 @@
+// src/components/Footer.tsx
 "use client";
 
 import Link from "next/link";
@@ -51,7 +52,7 @@ export default function Footer() {
               </li>
             </ul>
 
-            {/* Ikon Sosial Media Berwarna (Sesuai Urutan Permintaan) */}
+            {/* Ikon Sosial Media Berwarna (URUTAN BARU: IG, TT, YT, FB) */}
             <div className="flex gap-3 mt-6">
               <a href="https://www.instagram.com/desakerjounggul?igshid=u7rfq9zt22tj" target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-full bg-white flex items-center justify-center hover:scale-110 transition-transform shadow-md" title="Instagram">
                 <FaInstagram className="text-[#E4405F] text-2xl" />

@@ -3,16 +3,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { FiMenu, FiX, FiChevronDown } from "react-icons/fi";
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [openDropdownMobile, setOpenDropdownMobile] = useState<string | null>(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const pathname = usePathname();
 
-  const toggleMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
-  const toggleDropdownMobile = (name: string) => setOpenDropdownMobile(openDropdownMobile === name ? null : name);
-
-  // Struktur Menu & Sub-Menu (URUTAN BARU)
+  // Struktur Menu & Sub-Menu (URUTAN BARU: Profil -> Kabar -> Transparansi -> Layanan)
   const navItems = [
     { name: "Beranda", path: "/", sub: [] },
     { 
@@ -54,65 +52,108 @@ export default function Navbar() {
       <div className="container mx-auto px-4 lg:px-8">
         <div className="flex justify-between items-center h-20">
           
-          <div className="flex-shrink-0 flex items-center gap-3">
+          {/* LOGO */}
+          <Link href="/" className="flex items-center gap-3">
             <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
-              {/* PASTE LINK LANGSUNG (DIRECT LINK) DARI IMGBB DI SINI */}
-              <img 
-                src="https://i.ibb.co.com/4ny8JgGm/1.png" 
-                alt="Logo Desa" 
-                className="w-full h-full object-contain"
-                onError={(e) => { e.currentTarget.src = "https://cdn-icons-png.flaticon.com/512/2633/2633804.png"; }}
-              />
+              <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa Kerjo" className="w-full h-full object-contain" />
             </div>
-            <Link href="/" className="font-black text-2xl text-green-900 tracking-tighter hover:text-green-700 transition-colors">
-              Desa Kerjo
+            <span className="font-black text-2xl text-green-800 tracking-tight">Desa Kerjo</span>
+          </Link>
+
+          {/* MENU DESKTOP */}
+          <div className="hidden md:flex space-x-1 items-center">
+            {navItems.map((item) => (
+              <div 
+                key={item.name} 
+                className="relative group"
+                onMouseEnter={() => setOpenDropdown(item.name)}
+                onMouseLeave={() => setOpenDropdown(null)}
+              >
+                <Link 
+                  href={item.path}
+                  className={`px-4 py-2 rounded-lg font-bold transition-all duration-300 flex items-center gap-1
+                    ${pathname === item.path ? "text-green-700 bg-green-50" : "text-gray-600 hover:text-green-700 hover:bg-green-50"}`}
+                >
+                  {item.name}
+                  {item.sub.length > 0 && <span className="text-xs transition-transform duration-300 group-hover:rotate-180">▼</span>}
+                </Link>
+
+                {/* Sub Menu Desktop */}
+                {item.sub.length > 0 && (
+                  <div className={`absolute top-full left-0 w-64 bg-white shadow-xl rounded-xl border border-gray-100 py-3 transition-all duration-300 origin-top
+                    ${openDropdown === item.name ? "opacity-100 scale-y-100" : "opacity-0 scale-y-0 pointer-events-none"}`}
+                  >
+                    {item.sub.map((subItem) => (
+                      <Link 
+                        key={subItem.title} 
+                        href={subItem.link} 
+                        className="block px-6 py-2.5 text-sm font-bold text-gray-600 hover:text-green-700 hover:bg-green-50 transition-colors"
+                      >
+                        {subItem.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {/* Tombol Login Admin */}
+            <Link href="/login" className="ml-4 bg-green-700 hover:bg-green-800 text-white font-bold px-6 py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5">
+              Login Admin
             </Link>
           </div>
 
-          <div className="hidden lg:flex space-x-1 items-center">
-            {navItems.map((item, index) => (
-              <div key={index} className="relative group px-3 py-2">
-                {item.sub.length === 0 ? (
-                  <Link href={item.path} className="text-gray-600 hover:text-green-700 font-bold transition-colors">{item.name}</Link>
-                ) : (
-                  <div className="cursor-pointer text-gray-600 hover:text-green-700 font-bold transition-colors flex items-center gap-1">
-                    <Link href={item.path}>{item.name}</Link><FiChevronDown className="mt-0.5 group-hover:rotate-180 transition-transform duration-300" />
-                  </div>
-                )}
-                {item.sub.length > 0 && (
-                  <div className="absolute left-0 mt-4 w-56 bg-white border border-gray-100 shadow-xl rounded-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 overflow-hidden">
-                    <div className="p-2 flex flex-col">
-                      {item.sub.map((subItem, idx) => (<Link key={idx} href={subItem.link} className="px-4 py-3 text-sm font-semibold text-gray-600 hover:text-green-700 hover:bg-green-50 rounded-xl transition-colors">{subItem.title}</Link>))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div className="lg:hidden flex items-center"><button onClick={toggleMenu} className="text-gray-800 hover:text-green-700 p-2 rounded-lg bg-gray-50 focus:outline-none">{isMobileMenuOpen ? <FiX size={28} /> : <FiMenu size={28} />}</button></div>
+          {/* TOMBOL HAMBURGER MOBILE */}
+          <button 
+            className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg focus:outline-none"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            <div className="w-6 flex flex-col items-end gap-1.5">
+              <span className={`h-0.5 bg-green-800 rounded-full transition-all duration-300 ${isOpen ? "w-6 rotate-45 translate-y-2" : "w-6"}`}></span>
+              <span className={`h-0.5 bg-green-800 rounded-full transition-all duration-300 ${isOpen ? "opacity-0" : "w-4"}`}></span>
+              <span className={`h-0.5 bg-green-800 rounded-full transition-all duration-300 ${isOpen ? "w-6 -rotate-45 -translate-y-2" : "w-6"}`}></span>
+            </div>
+          </button>
         </div>
       </div>
 
-      {isMobileMenuOpen && (
-        <div className="lg:hidden bg-white border-t border-gray-100 shadow-inner max-h-[80vh] overflow-y-auto">
-          <div className="px-4 py-4 space-y-2">
-            {navItems.map((item, index) => (
-              <div key={index} className="flex flex-col">
-                <div className="flex justify-between items-center px-4 py-3 bg-gray-50 rounded-xl">
-                  <Link href={item.path} onClick={() => setIsMobileMenuOpen(false)} className="font-bold text-gray-800 flex-grow">{item.name}</Link>
-                  {item.sub.length > 0 && (<button onClick={() => toggleDropdownMobile(item.name)} className="p-2 bg-gray-200 rounded-lg text-gray-600"><FiChevronDown className={`transition-transform duration-300 ${openDropdownMobile === item.name ? "rotate-180" : ""}`} /></button>)}
-                </div>
-                {item.sub.length > 0 && openDropdownMobile === item.name && (
-                  <div className="pl-6 pr-4 py-2 space-y-1 mt-1 border-l-2 border-green-500 ml-4">
-                    {item.sub.map((subItem, idx) => (<Link key={idx} href={subItem.link} onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-sm font-semibold text-gray-600 hover:text-green-700 hover:bg-green-100 rounded-lg">- {subItem.title}</Link>))}
-                  </div>
-                )}
+      {/* MENU MOBILE (DROPDOWN) */}
+      <div className={`md:hidden bg-white border-t border-gray-100 transition-all duration-300 overflow-hidden ${isOpen ? "max-h-screen pb-4" : "max-h-0"}`}>
+        <div className="container mx-auto px-4 py-2 space-y-1">
+          {navItems.map((item) => (
+            <div key={item.name} className="border-b border-gray-50 last:border-0">
+              <div 
+                className="flex justify-between items-center px-4 py-3 cursor-pointer text-gray-700 hover:text-green-700 hover:bg-green-50 rounded-lg font-bold"
+                onClick={() => setOpenDropdown(openDropdown === item.name ? null : item.name)}
+              >
+                <Link href={item.path} onClick={() => { if(item.sub.length === 0) setIsOpen(false) }}>{item.name}</Link>
+                {item.sub.length > 0 && <span>{openDropdown === item.name ? "▲" : "▼"}</span>}
               </div>
-            ))}
+              
+              {/* Sub Menu Mobile */}
+              {item.sub.length > 0 && openDropdown === item.name && (
+                <div className="bg-gray-50 rounded-lg mx-2 mb-2 py-2">
+                  {item.sub.map((subItem) => (
+                    <Link 
+                      key={subItem.title} 
+                      href={subItem.link} 
+                      onClick={() => setIsOpen(false)}
+                      className="block px-8 py-2 text-sm font-semibold text-gray-600 hover:text-green-700"
+                    >
+                      • {subItem.title}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          <div className="pt-4 px-2">
+            <Link href="/login" onClick={() => setIsOpen(false)} className="block w-full bg-green-700 hover:bg-green-800 text-white text-center font-bold px-6 py-3 rounded-xl shadow-md transition-colors">
+              Login Admin
+            </Link>
           </div>
         </div>
-      )}
+      </div>
     </nav>
   );
 }
