@@ -7,11 +7,14 @@ import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/fires
 import { db } from "../lib/firebase";
 
 export default function Home() {
+  // STATE MENCEGAH HYDRATION ERROR (CRASH VERCEL)
+  const [isClient, setIsClient] = useState(false);
+  
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // PERBAIKAN BUG FLICKER: Inisialisasi state awal dengan gambar/teks yang elegan agar tidak ada kedipan
+  // STATE HERO BEBAS FLICKER
   const [heroData, setHeroData] = useState({
     judul: "",
     sub: "",
@@ -21,10 +24,16 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
+  // Mencegah Crash SSR di Vercel
   useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isClient) return;
+
     const ambilDataBeranda = async () => {
       try {
-        // 1. Fetch Pengaturan Hero Beranda
         const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
         if (snapHero.exists()) {
           setHeroData({
@@ -34,18 +43,15 @@ export default function Home() {
           });
         }
 
-        // 2. Fetch Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
-        // Memastikan berita yang dipin ada di atas (diutamakan)
         const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
         const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
         const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
         setDaftarBerita(kabarTampil);
 
-        // 3. Fetch Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
@@ -64,7 +70,7 @@ export default function Home() {
       }
     };
     ambilDataBeranda();
-  }, []);
+  }, [isClient]);
 
   useEffect(() => {
     if (!isAutoPlay || daftarBerita.length <= 1) return;
@@ -81,6 +87,9 @@ export default function Home() {
   const nextSlide = () => {
     setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
   };
+
+  // Jika belum dirender di Client (Browser), tampilkan blank agar Vercel tidak bingung
+  if (!isClient) return <div className="min-h-screen bg-green-900"></div>;
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
@@ -210,16 +219,15 @@ export default function Home() {
                     );
                   })}
 
-                  {/* PERBAIKAN: opacity-100 di HP, hover di desktop */}
                   <button 
                     onClick={prevSlide} 
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
                   >
                     &#10094;
                   </button>
                   <button 
                     onClick={nextSlide} 
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
                   >
                     &#10095;
                   </button>

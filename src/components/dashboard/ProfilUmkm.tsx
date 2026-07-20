@@ -67,7 +67,7 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   const [fotoLamaLembaga, setFotoLamaLembaga] = useState("");
 
   // STATE KEANGGOTAAN LEMBAGA (SOTK LEMBAGA)
-  const [selectedLembaga, setSelectedLembaga] = useState<any>(null); // Jika tidak null, masuk ke Mode SOTK Lembaga
+  const [selectedLembaga, setSelectedLembaga] = useState<any>(null);
   const [namaAnggotaLem, setNamaAnggotaLem] = useState("");
   const [jabatanAnggotaLem, setJabatanAnggotaLem] = useState("");
   const [urutanAnggotaLem, setUrutanAnggotaLem] = useState<number>(1);
@@ -96,7 +96,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
       const dataLemb = qLembaga.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setDaftarLembaga(dataLemb);
 
-      // Jika sedang mengedit keanggotaan lembaga, perbarui datanya secara real-time
       if (selectedLembaga) {
         const upToDateLembaga = dataLemb.find(l => l.id === selectedLembaga.id);
         if (upToDateLembaga) setSelectedLembaga(upToDateLembaga);
@@ -108,7 +107,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
 
   useEffect(() => { ambilData(); }, []);
 
-  // FUNGSI UPLOAD GAMBAR BASE64 (ANTI BLOKIR)
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -191,6 +189,7 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
 
   // --- MANAJEMEN UMKM & WISATA ---
   const handleJamChange = (hari: string, field: string, value: any) => { setJamOperasional((prev: any) => ({ ...prev, [hari]: { ...prev[hari], [field]: value } })); };
+  
   const handleSimpanUmkm = async (e: React.FormEvent) => {
     e.preventDefault(); setIsLoadingUmkm(true); setStatusUmkm("Memproses...");
     try {
@@ -208,12 +207,16 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
       batalEditUmkm(); ambilData(); setTimeout(() => setStatusUmkm(""), 4000);
     } catch (error) { setStatusUmkm("❌ Gagal menyimpan data."); } finally { setIsLoadingUmkm(false); }
   };
+  
   const mulaiEditUmkm = (item: any) => { 
     setEditUmkmId(item.id); setKategoriPotensi(item.kategori || "UMKM"); setNamaPotensi(item.nama_produk || ""); setPengelola(item.pemilik || ""); setHargaMulai(item.harga_mulai || item.harga || ""); setHargaSampai(item.harga_sampai || ""); setKontak(item.wa || ""); setLinkMaps(item.link_maps || ""); setDeskripsiPotensi(item.deskripsi || ""); setJamOperasional(item.jam_operasional || DEFAULT_JAM);
     setGambarLamaPotensi(Array.isArray(item.gambar) ? item.gambar : (item.foto ? [item.foto] : [])); setFotoPotensiList(null);
   };
+  
   const hapusGambarLamaPotensi = (index: number) => { setGambarLamaPotensi(prev => prev.filter((_, i) => i !== index)); };
-  const batalEditUmkm = () => { setEditUmkmId(null); setKategoriPotensi("UMKM"); setNamaPotensi(""); setPengelola(""); setHargaMulai(""); setHargaSampai(""); setKontak(""); setLinkMaps(""); setDeskripsiPotensi(""); setJamOperasional(DEFAULT_JAM); setGambarLamaPotensi([]); setFotoPotensiList(null); };
+  
+  const batalEditUmkm = () => { setEditUmkmId(null); setKategoriPotensi("UMKM"); setNamaPotensi(""); setPengelola(""); setHargaMulai(""); setHargaSampai(""); setKontak(""); setLinkMaps(""); setDeskripsiPotensi(""); setJamOperasional(DEFAULT_JAM); setGambarLamaPotensi([]); setFotoPotensiList(null); const input = document.getElementById('inputFotoPotensi') as HTMLInputElement; if(input) input.value = ''; };
+  
   const hapusUmkm = async (id: string) => { if (confirm("Yakin menghapus data Potensi ini?")) { await deleteDoc(doc(db, "potensi_desa", id)); ambilData(); } };
 
   // --- MANAJEMEN LEMBAGA MASYARAKAT ---
@@ -281,7 +284,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   return (
     <div className="animate-fade-in pb-20">
       
-      {/* 1. MODUL PENGATURAN TEKS PROFIL & HERO */}
       {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-teks") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 mb-8">
           <h3 className="text-2xl font-bold mb-2">🏛️ Pengaturan Profil & Background</h3>
@@ -293,8 +295,8 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
               {heroProfilBgLama && (
                 <div className="relative w-full h-40 md:h-64 rounded-xl overflow-hidden shadow-inner border border-gray-200 group mb-4">
                   <img src={heroProfilBgLama.startsWith("http") ? heroProfilBgLama : `https://wsrv.nl/?url=${heroProfilBgLama}`} alt="Background Profil" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button type="button" onClick={() => setHeroProfilBgLama("")} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700">Hapus Background</button>
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button type="button" onClick={() => setHeroProfilBgLama("")} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500">Hapus Background</button>
                   </div>
                 </div>
               )}
@@ -315,7 +317,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
         </div>
       )}
 
-      {/* 2. MODUL SOTK APARATUR (PEMERINTAHAN DESA) */}
       {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-sotk") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-blue-600 mb-8">
           <h3 className="text-2xl font-bold mb-2">👔 Susunan Pemerintah Desa (SOTK)</h3>
@@ -361,11 +362,9 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
         </div>
       )}
 
-      {/* 3. MODUL LEMBAGA MASYARAKAT (DENGAN MODE SOTK DINAMIS) */}
       {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-lembaga") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-indigo-500 mb-8 transition-all">
           
-          {/* LOGIKA CABANG: TAMPILKAN TABEL LEMBAGA ATAU BUILDER SOTK LEMBAGA */}
           {!selectedLembaga ? (
             <>
               <h3 className="text-2xl font-bold mb-2">🤝 Lembaga Kemasyarakatan Desa</h3>
@@ -421,9 +420,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
               </div>
             </>
           ) : (
-            // ==========================================
-            // MODE: BUILDER SOTK KHUSUS LEMBAGA
-            // ==========================================
             <div className="animate-fade-in">
               <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
                 <div>
@@ -526,8 +522,23 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
                   </div>
                 </div>
                 <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Deskripsi Daya Tarik</label><textarea required rows={3} value={deskripsiPotensi} onChange={(e)=>setDeskripsiPotensi(e.target.value)} className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white leading-relaxed"></textarea></div>
-                <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Bisa lebih dari 1)</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"><span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2"><span className="text-3xl">📸</span> Klik Pilih File</span><input id="inputFotoPotensi" type="file" accept="image/*" multiple onChange={(e) => { setFotoPotensiList(e.target.files)}} className="hidden" /></label></div>
-                {editUmkmId && gambarLamaPotensi.length > 0 && (<div className="bg-orange-50 p-3 rounded-xl border border-orange-200"><p className="text-xs font-bold text-orange-900 mb-2">Foto Tersimpan (Klik X menghapus):</p><div className="flex flex-wrap gap-2">{gambarLamaPotensi.map((url, idx) => (<div key={idx} className="relative w-16 h-16 border-2 border-white rounded-lg overflow-hidden group shadow-md"><img src={`https://wsrv.nl/?url=${url}`} className="w-full h-full object-cover" /><button type="button" onClick={() => hapusGambarLamaPotensi(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button></div>))}</div></div>)}
+                <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Bisa lebih dari 1)</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"><span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2"><span className="text-3xl">📸</span> Klik Pilih File</span><input id="inputFotoPotensi" type="file" accept="image/*" multiple onChange={(e) => { if(e.target.files) setFotoPotensiList(e.target.files)}} className="hidden" /></label></div>
+                
+                {editUmkmId && gambarLamaPotensi.length > 0 && (
+                  <div className="bg-orange-50 p-3 rounded-xl border border-orange-200">
+                    <p className="text-xs font-bold text-orange-900 mb-2">Foto Tersimpan (Klik X menghapus):</p>
+                    <div className="flex flex-wrap gap-2">
+                      {gambarLamaPotensi.map((url, idx) => (
+                        <div key={idx} className="relative w-16 h-16 border-2 border-white rounded-lg overflow-hidden group shadow-md">
+                          <img src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} className="w-full h-full object-cover" />
+                          {/* PERBAIKAN: opacity-100 di HP */}
+                          <button type="button" onClick={() => hapusGambarLamaPotensi(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border border-red-800">X</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 {statusUmkm && (<div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">{statusUmkm}</div>)}
                 <button type="submit" disabled={isLoadingUmkm} className="w-full bg-yellow-600 text-white font-bold py-3.5 rounded-xl hover:bg-yellow-700 shadow-md transition-colors text-lg">{isLoadingUmkm ? "Memproses Data..." : editUmkmId ? "Simpan Perubahan Potensi" : "Tambahkan ke Katalog"}</button>
               </form>
@@ -540,7 +551,7 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
                     return (
                     <tr key={umkm.id} className="border-b hover:bg-yellow-50 transition-colors">
                       <td className="py-4 px-4 flex items-start gap-4">
-                        <div className="w-20 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md relative">{fotonya ? (<img src={`https://wsrv.nl/?url=${fotonya}`} className="w-full h-full object-cover"/>) : (<span className="flex items-center justify-center h-full text-3xl text-gray-400">🏞️</span>)}{Array.isArray(umkm.gambar) && umkm.gambar.length > 1 && (<div className="absolute bottom-1 right-1 bg-black bg-opacity-60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">+{umkm.gambar.length - 1}</div>)}</div>
+                        <div className="w-20 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md relative">{fotonya ? (<img src={fotonya.startsWith("http") ? fotonya : `https://wsrv.nl/?url=${fotonya}`} className="w-full h-full object-cover"/>) : (<span className="flex items-center justify-center h-full text-3xl text-gray-400">🏞️</span>)}{Array.isArray(umkm.gambar) && umkm.gambar.length > 1 && (<div className="absolute bottom-1 right-1 bg-black bg-opacity-60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">+{umkm.gambar.length - 1}</div>)}</div>
                         <div><div className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black uppercase tracking-widest inline-block mb-1 border border-yellow-200">{umkm.kategori || "UMKM"}</div><div className="font-bold text-gray-900 text-base leading-tight">{umkm.nama_produk}</div><div className="text-[10px] text-blue-600 font-mono mt-1 font-bold">WA: {umkm.wa || "-"}</div></div>
                       </td>
                       <td className="py-4 px-4 align-top">

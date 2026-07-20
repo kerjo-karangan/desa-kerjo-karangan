@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link"; 
 
 // ==========================================
-// KOMPONEN PEMBUNGKUS UTAMA MENGHINDARI ERROR LAYOUT
+// KOMPONEN PEMBUNGKUS UTAMA (MENGHINDARI ERROR SUSPENSE)
 // ==========================================
 export default function KabarDesa() {
   return (
@@ -55,7 +55,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
       />
       {gambarArray.length > 1 && (
         <>
-          {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
+          {/* PERBAIKAN: opacity-100 agar tombol panah PERMANEN muncul di HP */}
           <button 
             onClick={prevSlide} 
             className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 md:p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold border border-gray-200 z-10"
@@ -89,7 +89,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
 };
 
 // ==========================================
-// KOMPONEN ISI HALAMAN UTAMA
+// KOMPONEN ISI HALAMAN UTAMA (KABAR CONTENT)
 // ==========================================
 function KabarContent() {
   const searchParams = useSearchParams();
@@ -104,7 +104,7 @@ function KabarContent() {
   // STATE PENCARIAN & PAGINATION DINAMIS
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); 
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Default 10 baris
 
   useEffect(() => {
     if (tabQuery === "berita" || tabQuery === "agenda") {
@@ -293,7 +293,10 @@ function KabarContent() {
                       </p>
                       
                       <div className="mt-6 text-right border-t border-gray-100 pt-5">
-                        <Link href={`/kabar/${berita.id}`} className="inline-block bg-white text-green-700 border-2 border-green-600 hover:bg-green-600 hover:text-white font-black px-8 py-3 rounded-xl transition-all transform hover:-translate-y-1 shadow-sm">
+                        <Link 
+                          href={`/kabar/${berita.id}`} 
+                          className="inline-block bg-white text-green-700 border-2 border-green-600 hover:bg-green-600 hover:text-white font-black px-8 py-3 rounded-xl transition-all transform hover:-translate-y-1 shadow-sm"
+                        >
                           Baca Artikel Selengkapnya →
                         </Link>
                       </div>

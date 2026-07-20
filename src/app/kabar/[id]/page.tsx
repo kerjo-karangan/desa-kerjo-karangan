@@ -79,7 +79,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
 export default function DetailBerita() {
   const router = useRouter();
   
-  // PERBAIKAN BUG ENDLESS LOADING: Menggunakan useParams() untuk membaca URL dengan akurat
+  // PERBAIKAN BUG ENDLESS LOADING: Menggunakan useParams()
   const params = useParams(); 
   const idArtikel = params?.id as string;
   
@@ -88,7 +88,7 @@ export default function DetailBerita() {
   const [errorStatus, setErrorStatus] = useState(false);
 
   useEffect(() => {
-    // Tahan eksekusi Firebase jika idArtikel dari Next.js belum ter-render
+    // Cegah eksekusi jika parameter URL belum terbaca oleh browser
     if (!idArtikel) return;
 
     const ambilDetailBerita = async () => {
@@ -110,7 +110,7 @@ export default function DetailBerita() {
     };
 
     ambilDetailBerita();
-  }, [idArtikel]);
+  }, [idArtikel]); // Hook bergantung secara reaktif pada idArtikel
 
   // Tampilan Proses Loading
   if (loading) {
