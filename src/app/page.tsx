@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 export default function Home() {
@@ -11,20 +11,41 @@ export default function Home() {
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // STATE UNTUK HERO DINAMIS DARI DASHBOARD
+  const [heroData, setHeroData] = useState({
+    judul: "Selamat Datang di\nDesa Kerjo",
+    sub: "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
+    bg: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop"
+  });
+
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
   useEffect(() => {
     const ambilDataBeranda = async () => {
       try {
+        // 1. Fetch Pengaturan Hero Beranda
+        const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
+        if (snapHero.exists()) {
+          setHeroData({
+            judul: snapHero.data().judul || "Selamat Datang di\nDesa Kerjo",
+            sub: snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
+            bg: snapHero.data().bg || "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop"
+          });
+        }
+
+        // 2. Fetch Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
-        // Filter: Hanya yang is_featured = true (baik karena baru atau karena di-Pin)
-        const kabarTampil = allKabar.filter(item => item.is_featured !== false).slice(0, 10);
+        // Memastikan berita yang dipin ada di atas (diutamakan)
+        const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
+        const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
+        const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
         setDaftarBerita(kabarTampil);
 
+        // 3. Fetch Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
@@ -58,10 +79,13 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
+      
+      {/* 1. HERO SECTION (DINAMIS) */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900">
         <div className="absolute inset-0 z-0">
+          {/* Gambar Background Dinamis */}
           <img 
-            src="https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop" 
+            src={heroData.bg.startsWith("http") ? heroData.bg : `https://wsrv.nl/?url=${heroData.bg}`} 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
@@ -75,15 +99,17 @@ export default function Home() {
           <span className="bg-yellow-500 text-green-950 font-black px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-widest shadow-md inline-block mb-6">
             Portal Informasi Publik
           </span>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-lg leading-tight">
-            Selamat Datang di<br/>Desa Kerjo
+          {/* Judul & Sub Dinamis (mendukung Enter / Baris Baru) */}
+          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-lg leading-tight whitespace-pre-wrap">
+            {heroData.judul}
           </h1>
-          <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md">
-            Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.
+          <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md whitespace-pre-wrap">
+            {heroData.sub}
           </p>
         </div>
       </section>
 
+      {/* 2. QUICK LINKS */}
       <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
@@ -109,6 +135,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* 3. BERITA & AGENDA SLIDER */}
       <section className="py-16 bg-white border-t border-gray-200">
         <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
           <div className="flex justify-between items-end mb-10">
@@ -232,7 +259,6 @@ export default function Home() {
                 Lihat Kalender Lengkap
               </Link>
             </div>
-
           </div>
 
           <div className="mt-8 text-center md:hidden">

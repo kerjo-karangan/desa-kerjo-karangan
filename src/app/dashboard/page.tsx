@@ -8,6 +8,7 @@ import { auth } from "../../lib/firebase";
 
 // Import SEMUA Komponen Modular
 import Welcome from "../../components/dashboard/Welcome";
+import PengaturanBeranda from "../../components/dashboard/PengaturanBeranda";
 import DataPenduduk from "../../components/dashboard/DataPenduduk";
 import ProfilUmkm from "../../components/dashboard/ProfilUmkm";
 import KabarAgenda from "../../components/dashboard/KabarAgenda";
@@ -23,7 +24,7 @@ export default function DashboardAdmin() {
   // State untuk Navigasi Menu & Dropdown
   const [activeMenu, setActiveMenu] = useState("welcome");
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Untuk Mobile Hamburger
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -42,21 +43,19 @@ export default function DashboardAdmin() {
     router.push("/login");
   };
 
-  // Fungsi untuk menangani klik menu utama (bisa toggle dropdown atau langsung buka menu)
   const handleMainMenuClick = (menuId: string, hasSubMenu: boolean) => {
     if (hasSubMenu) {
       setOpenDropdown(openDropdown === menuId ? null : menuId);
     } else {
       setActiveMenu(menuId);
       setOpenDropdown(null);
-      setIsSidebarOpen(false); // Tutup sidebar di HP setelah klik
+      setIsSidebarOpen(false); 
     }
   };
 
-  // Fungsi untuk menangani klik submenu
   const handleSubMenuClick = (subMenuId: string) => {
     setActiveMenu(subMenuId);
-    setIsSidebarOpen(false); // Tutup sidebar di HP setelah klik
+    setIsSidebarOpen(false); 
   };
 
   if (isCheckingAuth) {
@@ -67,9 +66,10 @@ export default function DashboardAdmin() {
     );
   }
 
-  // Struktur Menu Dinamis Dashboard
+  // Struktur Menu Dinamis Dashboard (DITAMBAH MENU PENGATURAN BERANDA)
   const menuItems = [
     { id: "welcome", label: "Ringkasan Sistem", icon: "🏠", sub: [] },
+    { id: "beranda", label: "Pengaturan Beranda", icon: "🖼️", sub: [] },
     { id: "datadesa", label: "Data Penduduk", icon: "👥", sub: [] },
     { 
       id: "profil", label: "Profil & UMKM", icon: "🏛️", 
@@ -102,13 +102,13 @@ export default function DashboardAdmin() {
         { id: "layan-pengaduan", label: "Kotak Pengaduan" }
       ] 
     },
-    { id: "akun", label: "Manajemen Akun", icon: "👥", sub: [] }
+    { id: "akun", label: "Manajemen Akun", icon: "⚙️", sub: [] }
   ];
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row font-sans">
       
-      {/* HEADER MOBILE (TAMPIL HANYA DI HP) */}
+      {/* HEADER MOBILE */}
       <div className="md:hidden bg-green-900 text-white p-4 flex justify-between items-center shadow-md z-30 sticky top-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-white rounded-full p-1 flex items-center justify-center">
@@ -128,7 +128,6 @@ export default function DashboardAdmin() {
         </button>
       </div>
 
-      {/* OVERLAY GELAP UNTUK MOBILE (Jika Sidebar Terbuka) */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -136,10 +135,9 @@ export default function DashboardAdmin() {
         ></div>
       )}
 
-      {/* SIDEBAR NAVIGATION (RESPONSIVE) */}
+      {/* SIDEBAR NAVIGATION */}
       <aside className={`fixed md:sticky top-0 left-0 h-screen w-72 bg-green-900 text-white flex flex-col shadow-2xl z-50 transition-transform duration-300 ease-in-out transform ${isSidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         
-        {/* Profil Singkat Admin */}
         <div className="p-6 border-b border-green-800 hidden md:block">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-white rounded-full p-1 flex items-center justify-center">
@@ -150,11 +148,9 @@ export default function DashboardAdmin() {
           <p className="text-green-400 text-xs font-mono truncate">{userEmail}</p>
         </div>
         
-        {/* Menu Items dengan Logika Dropdown */}
-        <nav className="flex-grow p-4 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar">
+        <nav className="p-4 flex flex-col gap-1.5 overflow-y-auto custom-scrollbar">
           {menuItems.map((menu) => {
             const hasSub = menu.sub.length > 0;
-            // Deteksi apakah salah satu submenu sedang aktif agar menu induknya ikut 'menyala'
             const isMenuOrSubActive = activeMenu === menu.id || menu.sub.some(sub => activeMenu === sub.id);
             const isDropdownOpen = openDropdown === menu.id;
 
@@ -176,7 +172,6 @@ export default function DashboardAdmin() {
                   )}
                 </button>
                 
-                {/* Render Dropdown Submenu */}
                 {hasSub && (
                   <div className={`flex flex-col gap-1 overflow-hidden transition-all duration-300 ease-in-out ${isDropdownOpen ? "max-h-96 opacity-100 mt-2 ml-4 border-l-2 border-green-700 pl-2" : "max-h-0 opacity-0 pointer-events-none"}`}>
                     {menu.sub.map((sub) => (
@@ -195,22 +190,21 @@ export default function DashboardAdmin() {
               </div>
             );
           })}
+
+          {/* RELOKASI TOMBOL LOGOUT (TEPAT DI BAWAH MENU TERAKHIR) */}
+          <div className="mt-4 pt-4 border-t border-green-800">
+            <button onClick={handleLogout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 rounded-xl transition-colors shadow-md flex justify-center items-center gap-2 transform hover:-translate-y-1">
+              <span className="text-xl">🚪</span> Keluar Sistem
+            </button>
+          </div>
         </nav>
-        
-        <div className="p-4 border-t border-green-800 bg-green-900 mt-auto">
-          <button onClick={handleLogout} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-md flex justify-center items-center gap-2">
-            <span>🚪</span> Keluar Sistem
-          </button>
-        </div>
       </aside>
 
-      {/* CONTENT AREA (MENGIRIMKAN PROPS ACTIVE MENU AGAR KOMPONEN BISA TERISOLASI) */}
       <main className="flex-1 p-4 md:p-10 overflow-y-auto relative w-full h-[calc(100vh-64px)] md:h-screen">
         {activeMenu === "welcome" && <Welcome />}
+        {activeMenu === "beranda" && <PengaturanBeranda userEmail={userEmail} />}
         {activeMenu === "datadesa" && <DataPenduduk />}
         {activeMenu === "akun" && <ManajemenAkun userEmail={userEmail} />}
-        
-        {/* PENGIRIMAN PROPS `activeSubMenu` KE KOMPONEN YANG MEMILIKI SUBMENU */}
         {activeMenu.startsWith("profil") && <ProfilUmkm activeSubMenu={activeMenu} />}
         {activeMenu.startsWith("kabar") && <KabarAgenda userEmail={userEmail} activeSubMenu={activeMenu} />}
         {activeMenu.startsWith("trans") && <Transparansi activeSubMenu={activeMenu} />}
