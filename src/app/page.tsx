@@ -7,14 +7,14 @@ import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/fires
 import { db } from "../lib/firebase";
 
 export default function Home() {
-  // STATE MENCEGAH HYDRATION ERROR (CRASH VERCEL)
+  // STATE PENGAMAN VERCEL CRASH (HYDRATION FIX)
   const [isClient, setIsClient] = useState(false);
-  
+
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // STATE HERO BEBAS FLICKER
+  // STATE HERO BEBAS FLICKER AYAM GORENG
   const [heroData, setHeroData] = useState({
     judul: "",
     sub: "",
@@ -24,12 +24,13 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  // Mencegah Crash SSR di Vercel
+  // Aktifkan Client Render
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
+    // Cegah penarikan data sebelum Client siap
     if (!isClient) return;
 
     const ambilDataBeranda = async () => {
@@ -88,13 +89,19 @@ export default function Home() {
     setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
   };
 
-  // Jika belum dirender di Client (Browser), tampilkan blank agar Vercel tidak bingung
-  if (!isClient) return <div className="min-h-screen bg-green-900"></div>;
+  // Mencegah Vercel Server menabrak kode browser
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-green-900">
+        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       
-      {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
+      {/* 1. HERO SECTION DINAMIS TANPA FLICKER */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
         <div className="absolute inset-0 z-0">
           <img 
@@ -219,6 +226,7 @@ export default function Home() {
                     );
                   })}
 
+                  {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
                   <button 
                     onClick={prevSlide} 
                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
