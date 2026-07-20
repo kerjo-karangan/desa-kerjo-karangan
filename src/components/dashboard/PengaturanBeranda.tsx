@@ -17,7 +17,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
   // ==========================================
-  // STATE MANAJEMEN BERITA (DUPLIKASI DARI KABAR AGENDA)
+  // STATE MANAJEMEN BERITA
   // ==========================================
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
@@ -33,7 +33,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   // ==========================================
   const ambilData = async () => {
     try {
-      // Ambil Pengaturan Beranda
       const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
       if (snapHero.exists()) {
         setHeroJudul(snapHero.data().judul || "Selamat Datang di\nDesa Kerjo");
@@ -41,7 +40,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         setHeroBgLama(snapHero.data().bg || "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop");
       }
 
-      // Ambil Riwayat Berita
       const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
       const snapKabar = await getDocs(qKabar);
       setRiwayatKabar(snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
@@ -55,25 +53,55 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   }, []);
 
   // ==========================================
-  // FUNGSI UPLOAD GAMBAR API IMGBB
+  // FUNGSI UPLOAD GAMBAR API IMGBB (ANTI-BLOKIR BASE64)
   // ==========================================
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+        if ((encoded.length % 4) > 0) {
+          encoded += '='.repeat(4 - (encoded.length % 4));
+        }
+        resolve(encoded);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const uploadFotoKeImgBB = async (file: File) => {
-    const formData = new FormData();
-    formData.append("image", file);
-    const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
+      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("image", base64Data);
+      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
+      
+      // Jalur Utama (Tanpa Proxy)
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
+        method: "POST", 
+        body: formData 
+      });
       const data = await res.json();
       if (data.success) return data.data.url;
       throw new Error("Jalur utama gagal");
     } catch (error) {
+      // Jalur Cadangan (Dengan Proxy)
       try {
+        const base64Data = await fileToBase64(file);
+        const formData = new FormData();
+        formData.append("image", base64Data);
+        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
         const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
+        
         const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
         const dataCdn = await resCdn.json();
         if (dataCdn.success) return dataCdn.data.url;
         return null;
-      } catch (errCdn) { return null; }
+      } catch (errCdn) { 
+        console.error("Gagal Upload ImgBB", errCdn);
+        return null; 
+      }
     }
   };
 
@@ -84,12 +112,21 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     e.preventDefault();
     setIsLoadingHero(true);
     setStatusHero("Menyimpan pengaturan...");
+    
     try {
       let imageUrl = heroBgLama;
+      
+      // Jika admin mengunggah gambar baru
       if (heroBgList && heroBgList.length > 0) {
-        setStatusHero("Mengunggah gambar background...");
+        setStatusHero("Mengunggah gambar background ke Server ImgBB...");
         const newBg = await uploadFotoKeImgBB(heroBgList[0]);
-        if (newBg) imageUrl = newBg;
+        if (newBg) {
+          imageUrl = newBg;
+        } else {
+          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil atau coba file lain.");
+          setIsLoadingHero(false);
+          return; // Hentikan eksekusi jika gambar gagal agar tidak menimpa dengan string kosong
+        }
       }
 
       await setDoc(doc(db, "pengaturan_web", "beranda"), {
@@ -106,7 +143,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       if (input) input.value = "";
       setTimeout(() => setStatusHero(""), 4000);
     } catch (error) {
-      setStatusHero("❌ Gagal menyimpan pengaturan.");
+      setStatusHero("❌ Gagal menyimpan pengaturan ke Database.");
     } finally {
       setIsLoadingHero(false);
     }
@@ -145,7 +182,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   };
 
   // ==========================================
-  // MANAJEMEN KABAR BERITA (DUPLIKASI)
+  // MANAJEMEN KABAR BERITA
   // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,6 +258,9 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     } catch (error) { alert("Gagal mengunci (Pin) berita."); }
   };
 
+  // ==========================================
+  // TAMPILAN UI
+  // ==========================================
   return (
     <div className="space-y-8 animate-fade-in pb-20">
       
@@ -271,7 +311,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </form>
       </div>
 
-      {/* 2. MANAJEMEN BERITA (SINKRON DENGAN KABAR AGENDA) */}
+      {/* 2. MANAJEMEN BERITA */}
       <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500">
         <div className="flex justify-between mb-2 border-b pb-4">
           <div>
