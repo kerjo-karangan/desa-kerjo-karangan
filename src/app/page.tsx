@@ -7,9 +7,6 @@ import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/fires
 import { db } from "../lib/firebase";
 
 export default function Home() {
-  // STATE PENGAMAN VERCEL CRASH (HYDRATION FIX)
-  const [isClient, setIsClient] = useState(false);
-
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,19 +21,13 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  // Aktifkan Client Render
+  // FETCH DATA BERANDA (Aman dijalankan karena berada di dalam useEffect Client-Side)
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  useEffect(() => {
-    // Cegah penarikan data sebelum Client siap
-    if (!isClient) return;
-
     const ambilDataBeranda = async () => {
       try {
+        // 1. Fetch Pengaturan Hero Beranda
         const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
-        if (snapHero.exists()) {
+        if (snapHero.exists() && snapHero.data()) {
           setHeroData({
             judul: snapHero.data().judul || "Selamat Datang di\nDesa Kerjo",
             sub: snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
@@ -44,21 +35,25 @@ export default function Home() {
           });
         }
 
+        // 2. Fetch Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
+        // Memastikan berita yang dipin ada di atas (diutamakan)
         const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
         const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
         const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
         setDaftarBerita(kabarTampil);
 
+        // 3. Fetch Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
         const now = new Date();
         const agendaTampil = allAgenda.filter(item => {
+          if (!item.tanggal) return false;
           const tglAgenda = new Date(item.tanggal);
           return item.is_featured !== false && tglAgenda >= now;
         }).slice(0, 10);
@@ -70,9 +65,11 @@ export default function Home() {
         setLoading(false);
       }
     };
+    
     ambilDataBeranda();
-  }, [isClient]);
+  }, []);
 
+  // LOGIKA SLIDER OTOMATIS
   useEffect(() => {
     if (!isAutoPlay || daftarBerita.length <= 1) return;
     const interval = setInterval(() => {
@@ -89,23 +86,16 @@ export default function Home() {
     setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
   };
 
-  // Mencegah Vercel Server menabrak kode browser
-  if (!isClient) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-green-900">
-        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
+  // KERANGKA UTAMA AMAN (TIDAK ADA PENGAMAN isClient YANG MEMICU CRASH)
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       
-      {/* 1. HERO SECTION DINAMIS TANPA FLICKER */}
+      {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
         <div className="absolute inset-0 z-0">
+          {/* PENGAMAN: Menggunakan Optional Chaining (?.) untuk mencegah error jika .bg kosong */}
           <img 
-            src={heroData.bg.startsWith("http") ? heroData.bg : `https://wsrv.nl/?url=${heroData.bg}`} 
+            src={heroData.bg?.startsWith("http") ? heroData.bg : `https://wsrv.nl/?url=${heroData.bg}`} 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
@@ -226,7 +216,6 @@ export default function Home() {
                     );
                   })}
 
-                  {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
                   <button 
                     onClick={prevSlide} 
                     className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
@@ -275,6 +264,8 @@ export default function Home() {
                   </div>
                 ) : (
                   daftarAgenda.map((agenda) => {
+                    // PENGAMAN: Mencegah invalid date crash
+                    if (!agenda.tanggal) return null;
                     const tgl = new Date(agenda.tanggal);
                     return (
                       <div key={agenda.id} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100 flex gap-4 hover:border-yellow-400 transition-colors group">
