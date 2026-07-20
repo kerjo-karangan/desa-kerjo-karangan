@@ -81,16 +81,43 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
 
   useEffect(() => { ambilData(); }, []);
 
+  // GANTI FUNGSI INI SAJA DI src/components/dashboard/ProfilUmkm.tsx
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+        if ((encoded.length % 4) > 0) {
+          encoded += '='.repeat(4 - (encoded.length % 4));
+        }
+        resolve(encoded);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const uploadFotoKeImgBB = async (file: File) => {
-    const formData = new FormData(); formData.append("image", file);
-    const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
+      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("image", base64Data);
+      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
+      
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
+        method: "POST", body: formData 
+      });
       const data = await res.json();
-      if (data.success) return data.data.url; throw new Error("Jalur utama gagal");
+      if (data.success) return data.data.url;
+      throw new Error("Jalur utama gagal");
     } catch (error) {
       try {
+        const base64Data = await fileToBase64(file);
+        const formData = new FormData();
+        formData.append("image", base64Data);
+        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
         const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
+        
         const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
         const dataCdn = await resCdn.json();
         if (dataCdn.success) return dataCdn.data.url;

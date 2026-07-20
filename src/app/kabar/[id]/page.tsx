@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../../lib/firebase";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 
 // ==========================================
 // KOMPONEN SLIDER GAMBAR UNTUK ARTIKEL
@@ -58,16 +58,22 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
 // ==========================================
 // HALAMAN UTAMA DETAIL BERITA
 // ==========================================
-export default function DetailBerita({ params }: { params: { id: string } }) {
+export default function DetailBerita() {
   const router = useRouter();
+  const params = useParams(); // PERBAIKAN BUG: Gunakan useParams agar kebal error
+  const idArtikel = params?.id as string;
+  
   const [berita, setBerita] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState(false);
 
   useEffect(() => {
+    // Tahan eksekusi jika idArtikel belum siap (mencegah endless loading)
+    if (!idArtikel) return;
+
     const ambilDetailBerita = async () => {
       try {
-        const docRef = doc(db, "kabar_desa", params.id);
+        const docRef = doc(db, "kabar_desa", idArtikel);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -83,11 +89,10 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
       }
     };
 
-    if (params.id) {
-      ambilDetailBerita();
-    }
-  }, [params.id]);
+    ambilDetailBerita();
+  }, [idArtikel]);
 
+  // Tampilan Proses Loading
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -97,6 +102,7 @@ export default function DetailBerita({ params }: { params: { id: string } }) {
     );
   }
 
+  // Tampilan Jika ID Salah / Dihapus
   if (errorStatus || !berita) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-6 text-center">

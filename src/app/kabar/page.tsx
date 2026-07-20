@@ -79,10 +79,10 @@ function KabarContent() {
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // STATE KOTAK PENCARIAN & PAGINATION
+  // STATE PENCARIAN & PAGINATION DINAMIS
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6; 
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Default tampilkan 10
 
   useEffect(() => {
     if (tabQuery === "berita" || tabQuery === "agenda") {
@@ -129,17 +129,20 @@ function KabarContent() {
     a.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // LOGIKA PAGINATION
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentBerita = beritaTerfilter.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(beritaTerfilter.length / itemsPerPage);
 
+  // Reset pagination ke halaman 1 jika user melakukan pencarian baru atau ubah jumlah baris
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [searchTerm, itemsPerPage]);
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
+      
       <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
         <div className="absolute inset-0 bg-black opacity-10"></div>
         <div className="container mx-auto px-4 relative z-10 text-center">
@@ -179,6 +182,25 @@ function KabarContent() {
 
         {(tabAktif === "berita" || !tabAktif) && (
           <div className="animate-fade-in">
+            
+            {/* FITUR DROPDOWN TAMPILKAN BARIS */}
+            {!loading && beritaTerfilter.length > 0 && (
+              <div className="flex justify-end mb-6">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
+                  <span className="text-sm font-bold text-gray-600">Tampilkan:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block p-1.5 font-bold outline-none"
+                  >
+                    <option value={10}>10 Baris</option>
+                    <option value={20}>20 Baris</option>
+                    <option value={50}>50 Baris</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {loading ? (
               <div className="flex justify-center my-20"><div className="w-12 h-12 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin"></div></div>
             ) : beritaTerfilter.length === 0 ? (
@@ -219,12 +241,13 @@ function KabarContent() {
               </div>
             )}
 
+            {/* KOMPONEN PAGINATION */}
             {totalPages > 1 && (
               <div className="flex justify-center items-center gap-2 mt-12 mb-8">
                 <button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
                   disabled={currentPage === 1}
-                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50"
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
                 >
                   &laquo; Prev
                 </button>
@@ -242,7 +265,7 @@ function KabarContent() {
                 <button 
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
                   disabled={currentPage === totalPages}
-                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50"
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
                 >
                   Next &raquo;
                 </button>
