@@ -5,10 +5,8 @@ import { useEffect, useState, Suspense } from "react";
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
-// ==========================================
-// KOMPONEN PEMBUNGKUS UTAMA (MENCEGAH ERROR LAYOUT)
-// ==========================================
 export default function ProfilDesa() {
   return (
     <Suspense
@@ -29,7 +27,6 @@ export default function ProfilDesa() {
 const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Auto-slide setiap 4 detik
   useEffect(() => {
     if (gambarArray.length <= 1) return;
     const interval = setInterval(() => {
@@ -52,7 +49,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
   return (
     <div className="relative w-full h-full group overflow-hidden bg-gray-100">
       <img
-        src={`https://wsrv.nl/?url=${gambarArray[currentIndex]}`}
+        src={gambarArray[currentIndex].startsWith("http") ? gambarArray[currentIndex] : `https://wsrv.nl/?url=${gambarArray[currentIndex]}`}
         alt="Galeri"
         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
       />
@@ -80,7 +77,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
 };
 
 // ==========================================
-// KOMPONEN ISI HALAMAN UTAMA
+// KOMPONEN ISI HALAMAN
 // ==========================================
 function ProfilContent() {
   const searchParams = useSearchParams();
@@ -89,24 +86,18 @@ function ProfilContent() {
   const [tabAktif, setTabAktif] = useState("sejarah");
 
   const [profil, setProfil] = useState({ sejarah: "", visi_misi: "" });
+  const [heroBg, setHeroBg] = useState("https://i.ibb.co.com/YFJVHD07/2239715431.webp"); 
   const [aparaturDesa, setAparaturDesa] = useState<any[]>([]);
   const [daftarUmkm, setDaftarUmkm] = useState<any[]>([]);
   const [daftarLembaga, setDaftarLembaga] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Sinkronisasi Tab dari URL
   useEffect(() => {
-    if (
-      tabQuery === "sejarah" ||
-      tabQuery === "sotk" ||
-      tabQuery === "lembaga" ||
-      tabQuery === "umkm"
-    ) {
+    if (tabQuery === "sejarah" || tabQuery === "sotk" || tabQuery === "lembaga" || tabQuery === "umkm") {
       setTabAktif(tabQuery);
     }
   }, [tabQuery]);
 
-  // Penarikan Data Firestore
   useEffect(() => {
     const ambilData = async () => {
       try {
@@ -119,11 +110,14 @@ function ProfilContent() {
           });
         }
 
+        const heroRef = doc(db, "pengaturan_web", "profil_hero");
+        const heroSnap = await getDoc(heroRef);
+        if (heroSnap.exists() && heroSnap.data().bg) {
+          setHeroBg(heroSnap.data().bg);
+        }
+
         const qAparatur = query(collection(db, "aparatur_desa"), orderBy("urutan", "asc"));
-        const dataAparatur = (await getDocs(qAparatur)).docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        const dataAparatur = (await getDocs(qAparatur)).docs.map((doc) => ({ id: doc.id, ...doc.data() }));
         setAparaturDesa(dataAparatur);
 
         const qLembaga = query(collection(db, "lembaga_desa"));
@@ -141,11 +135,52 @@ function ProfilContent() {
   }, []);
 
   const formatRupiah = (angka: number) =>
-    new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      maximumFractionDigits: 0,
-    }).format(angka);
+    new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(angka);
+
+  // ==========================================
+  // LOGIKA JAM CERDAS (SMART OPERATIONAL HOURS)
+  // ==========================================
+  const getHariIniString = () => {
+    const hariIndo = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+    return hariIndo[new Date().getDay()];
+  };
+
+  const getSortedJamOperasional = (jamObj: any) => {
+    if (!jamObj) return [];
+    const urutanHari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+    const hariIniStr = getHariIniString();
+    
+    const startIndex = urutanHari.indexOf(hariIniStr);
+    
+    // Potong dan sambung array agar hari ini selalu urutan ke-0
+    const sortedHariList = [
+      ...urutanHari.slice(startIndex),
+      ...urutanHari.slice(0, startIndex)
+    ];
+
+    return sortedHariList.map(hari => ({
+      hari: hari,
+      isHariIni: hari === hariIniStr,
+      ...jamObj[hari]
+    }));
+  };
+
+  const cekStatusBuka = (jamObjHariIni: any) => {
+    if (!jamObjHariIni || jamObjHariIni.libur) {
+      return { status: "TUTUP HARI INI", color: "bg-red-100 text-red-700 border-red-200" };
+    }
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+
+    if (currentStr >= jamObjHariIni.buka && currentStr <= jamObjHariIni.tutup) {
+      return { status: "BUKA SEKARANG", color: "bg-green-100 text-green-800 border-green-300 shadow-sm" };
+    } else {
+      return { status: "SEDANG TUTUP", color: "bg-gray-100 text-gray-600 border-gray-300" };
+    }
+  };
 
   // ==========================================
   // KOMPONEN REKURSIF UNTUK MENGGAMBAR BAGAN SOTK
@@ -172,7 +207,7 @@ function ProfilContent() {
             <div className="bg-white border-b-4 border-green-600 p-5 rounded-2xl shadow-md w-48 text-center z-10 hover:-translate-y-2 transition-transform duration-300">
               <div className="w-20 h-20 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3 overflow-hidden shadow-inner border border-gray-200">
                 {child.foto ? (
-                  <img src={`https://wsrv.nl/?url=${child.foto}`} className="w-full h-full object-cover" alt={child.nama} />
+                  <img src={child.foto.startsWith("http") ? child.foto : `https://wsrv.nl/?url=${child.foto}`} className="w-full h-full object-cover" alt={child.nama} />
                 ) : (
                   <span className="text-3xl text-gray-300">👤</span>
                 )}
@@ -194,18 +229,21 @@ function ProfilContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      {/* HERO SECTION */}
-      <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
+      {/* HERO SECTION DINAMIS */}
+      <div className="bg-green-900 text-white py-16 md:py-24 relative overflow-hidden shadow-md transition-all duration-700">
+        <div className="absolute inset-0 z-0">
+          <img src={heroBg.startsWith("http") ? heroBg : `https://wsrv.nl/?url=${heroBg}`} alt="Background Profil" className="w-full h-full object-cover opacity-30 mix-blend-overlay" />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+        </div>
         <div className="container mx-auto px-4 relative z-10 text-center">
-          <span className="text-green-300 font-extrabold tracking-widest uppercase text-sm mb-2 block">
+          <span className="bg-yellow-500 text-green-950 px-4 py-1 rounded-full font-extrabold tracking-widest uppercase text-xs mb-4 inline-block shadow-md">
             Mengenal Lebih Dekat
           </span>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 drop-shadow-md">
             Profil & Kelembagaan
           </h1>
-          <p className="text-lg md:text-xl text-green-100 max-w-2xl mx-auto font-light">
-            Sejarah, susunan aparatur, pilar masyarakat, serta produk dan potensi unggulan Desa Kerjo.
+          <p className="text-lg md:text-xl text-green-50 max-w-2xl mx-auto font-medium drop-shadow-md">
+            Sejarah, susunan aparatur, pilar masyarakat, serta produk unggulan Desa Kerjo.
           </p>
         </div>
       </div>
@@ -299,7 +337,7 @@ function ProfilContent() {
         )}
 
         {/* ==========================================
-            KONTEN ISOLASI 2: SOTK & HIERARKI
+            KONTEN ISOLASI 2: SOTK & HIERARKI DESA
         ========================================== */}
         {tabAktif === "sotk" && (
           <section className="animate-fade-in bg-white p-6 md:p-12 rounded-3xl shadow-sm border border-gray-100 overflow-x-auto">
@@ -310,6 +348,7 @@ function ProfilContent() {
               <h2 className="text-3xl md:text-4xl font-black text-gray-900">
                 Pemerintah Desa Kerjo
               </h2>
+              
               <div className="flex justify-center gap-6 mt-6">
                 <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
                   <div className="w-8 h-1 bg-green-600"></div> Garis Instruksi
@@ -327,11 +366,10 @@ function ProfilContent() {
             ) : aparaturDesa.length === 0 ? (
               <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-2xl">
                 <span className="text-5xl text-gray-300 block mb-4">👔</span>
-                <p className="text-gray-500 font-medium">Bagan aparatur belum diatur oleh admin.</p>
+                <p className="text-gray-500 font-medium">Bagan aparatur belum diatur.</p>
               </div>
             ) : (
               <div className="py-10 flex flex-col items-center min-w-[800px]">
-                {/* Memanggil Komponen Rekursif, dimulai dari orang yang tidak punya atasan ("") */}
                 <RenderPohonSOTK parentId="" />
               </div>
             )}
@@ -365,47 +403,31 @@ function ProfilContent() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {daftarLembaga.map((lem) => (
-                  <div
-                    key={lem.id}
-                    className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex flex-col items-start gap-5 hover:shadow-md hover:border-blue-300 transition-all"
-                  >
-                    <div className="flex flex-row items-center gap-5 w-full border-b border-gray-100 pb-4">
-                      <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-gray-200 p-2 shadow-sm">
+                  <div key={lem.id} className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-start gap-5 hover:shadow-lg hover:border-blue-300 transition-all group">
+                    <div className="flex flex-row items-center gap-5 w-full border-b border-gray-100 pb-5">
+                      <div className="w-20 h-20 bg-gray-50 rounded-2xl flex items-center justify-center flex-shrink-0 border border-gray-200 p-2 shadow-sm group-hover:scale-105 transition-transform">
                         {lem.foto ? (
-                          <img src={`https://wsrv.nl/?url=${lem.foto}`} className="w-full h-full object-contain" alt={lem.singkatan} />
+                          <img src={lem.foto.startsWith("http") ? lem.foto : `https://wsrv.nl/?url=${lem.foto}`} className="w-full h-full object-contain" alt={lem.singkatan} />
                         ) : (
                           <span className="text-3xl">🏛️</span>
                         )}
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-2xl font-black text-gray-900 leading-tight">
-                          {lem.singkatan}
-                        </h3>
-                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">
-                          {lem.nama}
-                        </p>
+                        <h3 className="text-2xl font-black text-gray-900 leading-tight">{lem.singkatan}</h3>
+                        <p className="text-xs font-bold text-blue-600 uppercase tracking-widest mt-1">{lem.nama}</p>
                       </div>
                     </div>
+                    <p className="text-sm text-gray-600 leading-relaxed text-justify line-clamp-4 hover:line-clamp-none transition-all">{lem.deskripsi}</p>
                     
-                    <p className="text-sm text-gray-600 leading-relaxed text-justify">
-                      {lem.deskripsi}
-                    </p>
-
-                    {/* Rendering Daftar Anggota Pengurus (Sesuai Dashboard Baru) */}
-                    {lem.anggota && lem.anggota.length > 0 && (
-                      <div className="w-full mt-2 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
-                        <h4 className="text-xs font-black text-indigo-900 mb-3 uppercase tracking-wider flex items-center gap-2">
-                          <span>👥</span> Susunan Pengurus
-                        </h4>
-                        <ul className="space-y-2">
-                          {lem.anggota.map((ang: any, i: number) => (
-                            <li key={i} className="flex justify-between items-center text-sm border-b border-indigo-200/50 last:border-0 pb-1 last:pb-0">
-                              <span className="font-bold text-indigo-800">{ang.jabatan}</span>
-                              <span className="text-gray-700 font-medium">{ang.nama}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    {/* Tombol Dinamis ke Halaman SOTK Lembaga Khusus (Rute: /profil/lembaga/[id]) */}
+                    {lem.anggota_sotk && lem.anggota_sotk.length > 0 ? (
+                      <Link href={`/profil/lembaga/${lem.id}`} className="mt-auto w-full text-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-bold py-3 rounded-xl transition-all shadow-sm">
+                        Lihat Susunan Pengurus →
+                      </Link>
+                    ) : (
+                      <button disabled className="mt-auto w-full text-center bg-gray-50 text-gray-400 border border-gray-200 font-bold py-3 rounded-xl cursor-not-allowed text-xs">
+                        Struktur Organisasi Belum Tersedia
+                      </button>
                     )}
                   </div>
                 ))}
@@ -418,13 +440,13 @@ function ProfilContent() {
             KONTEN ISOLASI 4: UMKM & POTENSI DESA
         ========================================== */}
         {tabAktif === "umkm" && (
-          <section className="animate-fade-in bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
+          <section className="animate-fade-in bg-white p-6 md:p-12 rounded-3xl shadow-sm border border-gray-100">
             <div className="text-center mb-12">
               <span className="text-yellow-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">
-                Pemberdayaan Ekonomi & Wisata
+                Pemberdayaan Ekonomi
               </span>
               <h2 className="text-3xl md:text-4xl font-black text-gray-900">
-                Katalog Potensi Desa
+                Katalog Potensi & UMKM
               </h2>
             </div>
 
@@ -435,95 +457,70 @@ function ProfilContent() {
             ) : daftarUmkm.length === 0 ? (
               <div className="bg-gray-50 p-10 rounded-3xl text-center border border-dashed border-gray-300">
                 <span className="text-4xl block mb-3">🛍️</span>
-                <p className="text-gray-500 font-medium">Belum ada potensi atau produk UMKM yang didaftarkan.</p>
+                <p className="text-gray-500 font-medium">Belum ada produk UMKM yang dipromosikan.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {daftarUmkm.map((umkm) => {
-                  // Mengolah data gambar array
-                  const gambarArray = Array.isArray(umkm.gambar) && umkm.gambar.length > 0 
-                    ? umkm.gambar 
-                    : (umkm.foto ? [umkm.foto] : []);
-                  
-                  // Mengolah data harga (Gratis vs Rentang Harga)
+                  const gambarArray = Array.isArray(umkm.gambar) && umkm.gambar.length > 0 ? umkm.gambar : (umkm.foto ? [umkm.foto] : []);
                   const isGratis = umkm.harga_mulai === 0 && umkm.harga_sampai === 0;
-                  const hargaText = isGratis 
-                    ? "GRATIS" 
-                    : `Rp ${formatRupiah(umkm.harga_mulai || umkm.harga)}${umkm.harga_sampai ? ` - Rp ${formatRupiah(umkm.harga_sampai)}` : ''}`;
+                  const hargaText = isGratis ? "GRATIS" : `Rp ${formatRupiah(umkm.harga_mulai || umkm.harga)}${umkm.harga_sampai ? ` - Rp ${formatRupiah(umkm.harga_sampai)}` : ''}`;
+
+                  // Menganalisis Jam Operasional dengan Cerdas
+                  const listJamUrut = getSortedJamOperasional(umkm.jam_operasional);
+                  const jamHariIniObj = listJamUrut.find(j => j.isHariIni);
+                  const statusToko = cekStatusBuka(jamHariIniObj);
 
                   return (
-                    <div
-                      key={umkm.id}
-                      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-xl hover:border-yellow-400 transition-all duration-300"
-                    >
-                      {/* Bagian Slider Gambar */}
+                    <div key={umkm.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden flex flex-col hover:shadow-xl hover:border-yellow-400 transition-all duration-300 group">
                       <div className="h-56 relative bg-gray-200">
                         <ImageCarousel gambarArray={gambarArray} />
-                        
                         <div className="absolute top-3 left-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md z-10">
                           {umkm.kategori || "UMKM"}
                         </div>
-                        {umkm.pemilik && (
-                          <div className="absolute top-3 right-3 bg-white px-3 py-1 rounded-full text-[10px] font-bold text-gray-800 shadow-md z-10">
-                            By: {umkm.pemilik}
-                          </div>
-                        )}
+                        {/* Indikator BUKA/TUTUP Otomatis di atas gambar */}
+                        <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md z-10 border ${statusToko.color}`}>
+                          {statusToko.status}
+                        </div>
                       </div>
                       
                       <div className="p-6 flex-grow flex flex-col">
-                        <h3 className="text-xl font-bold text-gray-900 mb-1 leading-tight">
-                          {umkm.nama_produk}
-                        </h3>
-                        <p className="text-green-700 font-black text-lg mb-4">
-                          {hargaText}
-                        </p>
-                        <p className="text-sm text-gray-600 mb-4 flex-grow line-clamp-3 leading-relaxed">
-                          {umkm.deskripsi}
-                        </p>
+                        <h3 className="text-xl font-bold text-gray-900 mb-1 leading-tight">{umkm.nama_produk}</h3>
+                        <p className="text-xs text-gray-500 font-medium mb-2">Oleh: <span className="font-bold text-gray-700">{umkm.pemilik || "Warga Desa"}</span></p>
+                        <p className="text-green-700 font-black text-lg mb-4">{hargaText}</p>
+                        <p className="text-sm text-gray-600 mb-6 flex-grow line-clamp-3 leading-relaxed">{umkm.deskripsi}</p>
 
-                        {/* Akordeon Jam Operasional Menggunakan HTML Native */}
-                        {umkm.jam_operasional && (
+                        {/* Akordeon Jam Operasional yang Cerdas dan Responsif */}
+                        {listJamUrut.length > 0 && (
                           <details className="mb-6 group">
-                            <summary className="text-xs font-bold text-yellow-700 cursor-pointer bg-yellow-50 px-3 py-2 rounded-lg border border-yellow-200 outline-none list-none flex justify-between items-center hover:bg-yellow-100 transition-colors">
-                              <span>🕒 Lihat Jam Operasional</span>
-                              <span className="transition group-open:rotate-180">▼</span>
+                            <summary className="text-xs font-bold text-yellow-800 cursor-pointer bg-yellow-50 hover:bg-yellow-100 px-4 py-2.5 rounded-xl border border-yellow-200 outline-none list-none flex justify-between items-center transition-colors">
+                              <span className="flex items-center gap-1.5"><span className="text-lg">🕒</span> Lihat Jam Operasional</span>
+                              <span className="transition-transform group-open:rotate-180">▼</span>
                             </summary>
-                            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1.5 shadow-inner">
-                              {Object.keys(umkm.jam_operasional).map((hari) => {
-                                const jam = umkm.jam_operasional[hari];
-                                return (
-                                  <div key={hari} className="flex justify-between text-xs border-b border-gray-200/50 last:border-0 pb-1 last:pb-0">
-                                    <span className="font-bold text-gray-700">{hari}</span>
-                                    {jam.libur ? (
-                                      <span className="text-red-500 font-bold">TUTUP / LIBUR</span>
-                                    ) : (
-                                      <span className="text-green-700 font-medium">{jam.buka} - {jam.tutup} WIB</span>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                            <div className="mt-2 bg-gray-50 border border-gray-200 rounded-xl p-3 shadow-inner flex flex-col gap-1.5">
+                              {listJamUrut.map((jam: any) => (
+                                <div key={jam.hari} className={`flex justify-between items-center text-xs p-1.5 rounded-lg ${jam.isHariIni ? 'bg-yellow-100 border border-yellow-300' : 'border-b border-gray-200/50 last:border-0'}`}>
+                                  <span className={`font-bold ${jam.isHariIni ? 'text-yellow-900' : 'text-gray-700'}`}>
+                                    {jam.hari} {jam.isHariIni && <span className="text-[9px] bg-yellow-500 text-white px-1.5 py-0.5 rounded ml-1 shadow-sm">HARI INI</span>}
+                                  </span>
+                                  {jam.libur ? (
+                                    <span className="text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100">LIBUR / TUTUP</span>
+                                  ) : (
+                                    <span className={`font-medium ${jam.isHariIni ? 'text-green-800' : 'text-gray-600'}`}>{jam.buka} - {jam.tutup} WIB</span>
+                                  )}
+                                </div>
+                              ))}
                             </div>
                           </details>
                         )}
 
                         {/* Tombol Aksi (WhatsApp & Maps) */}
-                        <div className="flex gap-2 mt-auto">
-                          <a
-                            href={`https://wa.me/${umkm.wa}?text=Halo,%20saya%20tertarik%20dengan%20informasi%20${umkm.nama_produk}%20yang%20ada%20di%20Website%20Desa.`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex-1 bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 hover:border-green-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm"
-                          >
+                        <div className="flex flex-wrap sm:flex-nowrap gap-2 mt-auto">
+                          <a href={`https://wa.me/${umkm.wa}?text=Halo,%20saya%20tertarik%20dengan%20informasi%20${umkm.nama_produk}%20yang%20ada%20di%20Website%20Desa.`} target="_blank" rel="noreferrer" className="flex-1 w-full sm:w-auto bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 hover:border-green-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm whitespace-nowrap">
                             <span className="text-lg">💬</span> Kontak
                           </a>
-                          
                           {umkm.link_maps && (
-                            <a
-                              href={umkm.link_maps}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex-1 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm"
-                            >
+                            <a href={umkm.link_maps} target="_blank" rel="noreferrer" className="flex-1 w-full sm:w-auto bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm whitespace-nowrap">
                               <span className="text-lg">📍</span> Maps
                             </a>
                           )}
