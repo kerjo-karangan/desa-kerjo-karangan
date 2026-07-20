@@ -11,7 +11,7 @@ export default function Home() {
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // STATE HERO BEBAS FLICKER AYAM GORENG
+  // STATE HERO BEBAS FLICKER
   const [heroData, setHeroData] = useState({
     judul: "",
     sub: "",
@@ -21,7 +21,6 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
 
-  // FETCH DATA BERANDA (Aman dijalankan karena berada di dalam useEffect Client-Side)
   useEffect(() => {
     const ambilDataBeranda = async () => {
       try {
@@ -69,7 +68,6 @@ export default function Home() {
     ambilDataBeranda();
   }, []);
 
-  // LOGIKA SLIDER OTOMATIS
   useEffect(() => {
     if (!isAutoPlay || daftarBerita.length <= 1) return;
     const interval = setInterval(() => {
@@ -86,16 +84,20 @@ export default function Home() {
     setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
   };
 
-  // KERANGKA UTAMA AMAN (TIDAK ADA PENGAMAN isClient YANG MEMICU CRASH)
+  // PENGAMANAN FATAL ERROR: Memastikan bg selalu string yang sah
+  let heroBgSafe = "https://i.ibb.co.com/YFJVHD07/2239715431.webp";
+  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
+    heroBgSafe = heroData.bg;
+  }
+
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       
       {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
         <div className="absolute inset-0 z-0">
-          {/* PENGAMAN: Menggunakan Optional Chaining (?.) untuk mencegah error jika .bg kosong */}
           <img 
-            src={heroData.bg?.startsWith("http") ? heroData.bg : `https://wsrv.nl/?url=${heroData.bg}`} 
+            src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
@@ -171,7 +173,16 @@ export default function Home() {
               ) : (
                 <div className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-lg group bg-black">
                   {daftarBerita.map((berita, index) => {
-                    const gambarSlide = Array.isArray(berita.gambar) && berita.gambar.length > 0 ? berita.gambar[0] : (berita.gambar || "");
+                    
+                    // PENGAMANAN FATAL ERROR (CRASH LAYAR HITAM): 
+                    // Memastikan variabel gambarSlide benar-benar sebuah string yang sah
+                    let gambarSlide = "";
+                    if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
+                      gambarSlide = berita.gambar[0];
+                    } else if (typeof berita.gambar === "string") {
+                      gambarSlide = berita.gambar;
+                    }
+
                     return (
                       <div 
                         key={berita.id} 
@@ -204,7 +215,7 @@ export default function Home() {
                             {berita.judul}
                           </h3>
                           <div className="flex items-center gap-4 text-xs md:text-sm font-medium text-gray-300 mb-4">
-                            <span className="flex items-center gap-1"><span>📅</span> {new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { day:'numeric', month:'long', year:'numeric'})}</span>
+                            <span className="flex items-center gap-1"><span>📅</span> {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { day:'numeric', month:'long', year:'numeric'}) : ""}</span>
                             <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
                           </div>
                           
@@ -264,7 +275,6 @@ export default function Home() {
                   </div>
                 ) : (
                   daftarAgenda.map((agenda) => {
-                    // PENGAMAN: Mencegah invalid date crash
                     if (!agenda.tanggal) return null;
                     const tgl = new Date(agenda.tanggal);
                     return (
