@@ -11,7 +11,7 @@ export default function Home() {
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // PERBAIKAN: Default Background Elegan & Teks Kosong agar tidak ada kedipan (flash) tulisan default
+  // PERBAIKAN BUG FLICKER: Inisialisasi state awal dengan gambar/teks yang elegan agar tidak ada kedipan
   const [heroData, setHeroData] = useState({
     judul: "",
     sub: "",
@@ -24,6 +24,7 @@ export default function Home() {
   useEffect(() => {
     const ambilDataBeranda = async () => {
       try {
+        // 1. Fetch Pengaturan Hero Beranda
         const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
         if (snapHero.exists()) {
           setHeroData({
@@ -33,15 +34,18 @@ export default function Home() {
           });
         }
 
+        // 2. Fetch Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
+        // Memastikan berita yang dipin ada di atas (diutamakan)
         const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
         const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
         const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
         setDaftarBerita(kabarTampil);
 
+        // 3. Fetch Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
@@ -70,18 +74,22 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isAutoPlay, daftarBerita.length]);
 
-  const prevSlide = () => setCurrentSlide(currentSlide === 0 ? daftarBerita.length - 1 : currentSlide - 1);
-  const nextSlide = () => setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
+  const prevSlide = () => {
+    setCurrentSlide(currentSlide === 0 ? daftarBerita.length - 1 : currentSlide - 1);
+  };
+  
+  const nextSlide = () => {
+    setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
+  };
 
   return (
     <main className="flex min-h-screen flex-col bg-gray-50">
       
-      {/* HERO SECTION */}
+      {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
       <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
         <div className="absolute inset-0 z-0">
-          {/* PERBAIKAN: Menggunakan URL langsung tanpa proxy yang berisiko memblokir ImgBB */}
           <img 
-            src={heroData.bg} 
+            src={heroData.bg.startsWith("http") ? heroData.bg : `https://wsrv.nl/?url=${heroData.bg}`} 
             alt="Pemandangan Desa" 
             className="w-full h-full object-cover opacity-40 mix-blend-overlay"
           />
@@ -104,7 +112,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* QUICK LINKS */}
+      {/* 2. QUICK LINKS */}
       <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
@@ -130,7 +138,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BERITA & AGENDA SLIDER */}
+      {/* 3. BERITA & AGENDA SLIDER */}
       <section className="py-16 bg-white border-t border-gray-200">
         <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
           <div className="flex justify-between items-end mb-10">
@@ -164,7 +172,11 @@ export default function Home() {
                         className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
                       >
                         {gambarSlide ? (
-                          <img src={`https://wsrv.nl/?url=${gambarSlide}`} alt={berita.judul} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-[10000ms] ease-out" />
+                          <img 
+                            src={gambarSlide.startsWith("http") ? gambarSlide : `https://wsrv.nl/?url=${gambarSlide}`} 
+                            alt={berita.judul} 
+                            className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-[10000ms] ease-out" 
+                          />
                         ) : (
                           <div className="w-full h-full bg-gray-800 flex items-center justify-center text-6xl opacity-80">📸</div>
                         )}
@@ -198,16 +210,34 @@ export default function Home() {
                     );
                   })}
 
-                  <button onClick={prevSlide} className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 font-black shadow-lg">&#10094;</button>
-                  <button onClick={nextSlide} className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all z-20 font-black shadow-lg">&#10095;</button>
+                  {/* PERBAIKAN: opacity-100 di HP, hover di desktop */}
+                  <button 
+                    onClick={prevSlide} 
+                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg"
+                  >
+                    &#10094;
+                  </button>
+                  <button 
+                    onClick={nextSlide} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg"
+                  >
+                    &#10095;
+                  </button>
 
-                  <button onClick={() => setIsAutoPlay(!isAutoPlay)} className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-full backdrop-blur-md z-20 text-xs font-bold flex items-center gap-1.5 transition-colors border border-white/20">
+                  <button 
+                    onClick={() => setIsAutoPlay(!isAutoPlay)} 
+                    className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-full backdrop-blur-md z-20 text-xs font-bold flex items-center gap-1.5 transition-colors border border-white/20"
+                  >
                     {isAutoPlay ? "⏸️ Pause Slide" : "▶️ Play Slide"}
                   </button>
 
                   <div className="absolute bottom-4 right-6 flex space-x-1.5 z-20">
                     {daftarBerita.map((_, idx) => (
-                      <button key={idx} onClick={() => setCurrentSlide(idx)} className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentSlide ? "bg-yellow-400 w-6" : "bg-white/50 w-2 hover:bg-white"}`}></button>
+                      <button 
+                        key={idx} 
+                        onClick={() => setCurrentSlide(idx)} 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentSlide ? "bg-yellow-400 w-6" : "bg-white/50 w-2 hover:bg-white"}`}
+                      ></button>
                     ))}
                   </div>
                 </div>

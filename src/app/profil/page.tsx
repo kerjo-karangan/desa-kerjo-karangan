@@ -35,8 +35,13 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
     return () => clearInterval(interval);
   }, [gambarArray.length]);
 
-  const prevSlide = () => setCurrentIndex(currentIndex === 0 ? gambarArray.length - 1 : currentIndex - 1);
-  const nextSlide = () => setCurrentIndex(currentIndex === gambarArray.length - 1 ? 0 : currentIndex + 1);
+  const prevSlide = () => {
+    setCurrentIndex(currentIndex === 0 ? gambarArray.length - 1 : currentIndex - 1);
+  };
+  
+  const nextSlide = () => {
+    setCurrentIndex(currentIndex === gambarArray.length - 1 ? 0 : currentIndex + 1);
+  };
 
   if (gambarArray.length === 0) {
     return (
@@ -56,17 +61,30 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
       
       {gambarArray.length > 1 && (
         <>
-          <button onClick={prevSlide} className="absolute top-1/2 left-2 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10">
+          {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
+          <button 
+            onClick={prevSlide} 
+            className="absolute top-1/2 left-2 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10 border border-gray-200"
+          >
             &#10094;
           </button>
-          <button onClick={nextSlide} className="absolute top-1/2 right-2 transform -translate-y-1/2 bg-white bg-opacity-70 text-gray-900 rounded-full p-2 opacity-0 group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10">
+          
+          <button 
+            onClick={nextSlide} 
+            className="absolute top-1/2 right-2 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-md font-bold z-10 border border-gray-200"
+          >
             &#10095;
           </button>
+          
           <div className="absolute bottom-2 left-0 right-0 flex justify-center space-x-1.5 z-10">
             {gambarArray.map((_, idx) => (
-              <span key={idx} className={`block h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? "bg-yellow-400 w-4" : "bg-white/60 w-1.5"}`}></span>
+              <span 
+                key={idx} 
+                className={`block h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? "bg-yellow-400 w-4" : "bg-white/60 w-1.5"}`}
+              ></span>
             ))}
           </div>
+          
           <div className="absolute top-2 left-2 bg-black bg-opacity-60 text-white text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm z-10">
             {currentIndex + 1} / {gambarArray.length}
           </div>
@@ -229,10 +247,15 @@ function ProfilContent() {
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      {/* HERO SECTION DINAMIS */}
+      
+      {/* HERO SECTION DINAMIS TANPA FLICKER */}
       <div className="bg-green-900 text-white py-16 md:py-24 relative overflow-hidden shadow-md transition-all duration-700">
         <div className="absolute inset-0 z-0">
-          <img src={heroBg.startsWith("http") ? heroBg : `https://wsrv.nl/?url=${heroBg}`} alt="Background Profil" className="w-full h-full object-cover opacity-30 mix-blend-overlay" />
+          <img 
+            src={heroBg.startsWith("http") ? heroBg : `https://wsrv.nl/?url=${heroBg}`} 
+            alt="Background Profil" 
+            className="w-full h-full object-cover opacity-30 mix-blend-overlay" 
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
         </div>
         <div className="container mx-auto px-4 relative z-10 text-center">
@@ -294,9 +317,7 @@ function ProfilContent() {
           </button>
         </div>
 
-        {/* ==========================================
-            KONTEN ISOLASI 1: SEJARAH & VISI MISI
-        ========================================== */}
+        {/* KONTEN ISOLASI 1: SEJARAH & VISI MISI */}
         {(tabAktif === "sejarah" || !tabAktif) && (
           <div className="grid grid-cols-1 gap-8 animate-fade-in max-w-4xl mx-auto">
             <section className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow relative overflow-hidden">
@@ -311,7 +332,7 @@ function ProfilContent() {
                   <div className="h-4 bg-gray-200 rounded w-4/6"></div>
                 </div>
               ) : (
-                <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap text-justify relative z-10">
+                <p className="text-gray-700 text-lg leading-relaxed whitespace-pre-wrap text-justify relative z-10 font-serif">
                   {profil.sejarah || "Sejarah desa belum dipublikasikan oleh admin."}
                 </p>
               )}
@@ -328,7 +349,7 @@ function ProfilContent() {
                   <div className="h-4 bg-green-700 rounded w-full"></div>
                 </div>
               ) : (
-                <p className="text-green-50 text-lg leading-relaxed whitespace-pre-wrap text-justify font-medium relative z-10">
+                <p className="text-green-50 text-lg leading-relaxed whitespace-pre-wrap text-justify font-medium relative z-10 font-serif">
                   {profil.visi_misi || "Visi dan Misi desa belum dipublikasikan oleh admin."}
                 </p>
               )}
@@ -336,9 +357,7 @@ function ProfilContent() {
           </div>
         )}
 
-        {/* ==========================================
-            KONTEN ISOLASI 2: SOTK & HIERARKI DESA
-        ========================================== */}
+        {/* KONTEN ISOLASI 2: SOTK & HIERARKI DESA */}
         {tabAktif === "sotk" && (
           <section className="animate-fade-in bg-white p-6 md:p-12 rounded-3xl shadow-sm border border-gray-100 overflow-x-auto">
             <div className="text-center mb-10">
@@ -376,9 +395,7 @@ function ProfilContent() {
           </section>
         )}
 
-        {/* ==========================================
-            KONTEN ISOLASI 3: LEMBAGA MASYARAKAT
-        ========================================== */}
+        {/* KONTEN ISOLASI 3: LEMBAGA MASYARAKAT */}
         {tabAktif === "lembaga" && (
           <section className="animate-fade-in bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100 max-w-5xl mx-auto">
             <div className="text-center mb-12">
@@ -419,7 +436,7 @@ function ProfilContent() {
                     </div>
                     <p className="text-sm text-gray-600 leading-relaxed text-justify line-clamp-4 hover:line-clamp-none transition-all">{lem.deskripsi}</p>
                     
-                    {/* Tombol Dinamis ke Halaman SOTK Lembaga Khusus (Rute: /profil/lembaga/[id]) */}
+                    {/* Tombol Dinamis ke Halaman SOTK Lembaga Khusus */}
                     {lem.anggota_sotk && lem.anggota_sotk.length > 0 ? (
                       <Link href={`/profil/lembaga/${lem.id}`} className="mt-auto w-full text-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-bold py-3 rounded-xl transition-all shadow-sm">
                         Lihat Susunan Pengurus →
@@ -436,9 +453,7 @@ function ProfilContent() {
           </section>
         )}
 
-        {/* ==========================================
-            KONTEN ISOLASI 4: UMKM & POTENSI DESA
-        ========================================== */}
+        {/* KONTEN ISOLASI 4: UMKM & POTENSI DESA */}
         {tabAktif === "umkm" && (
           <section className="animate-fade-in bg-white p-6 md:p-12 rounded-3xl shadow-sm border border-gray-100">
             <div className="text-center mb-12">
@@ -466,7 +481,6 @@ function ProfilContent() {
                   const isGratis = umkm.harga_mulai === 0 && umkm.harga_sampai === 0;
                   const hargaText = isGratis ? "GRATIS" : `Rp ${formatRupiah(umkm.harga_mulai || umkm.harga)}${umkm.harga_sampai ? ` - Rp ${formatRupiah(umkm.harga_sampai)}` : ''}`;
 
-                  // Menganalisis Jam Operasional dengan Cerdas
                   const listJamUrut = getSortedJamOperasional(umkm.jam_operasional);
                   const jamHariIniObj = listJamUrut.find(j => j.isHariIni);
                   const statusToko = cekStatusBuka(jamHariIniObj);
@@ -478,7 +492,6 @@ function ProfilContent() {
                         <div className="absolute top-3 left-3 bg-yellow-400 text-yellow-900 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md z-10">
                           {umkm.kategori || "UMKM"}
                         </div>
-                        {/* Indikator BUKA/TUTUP Otomatis di atas gambar */}
                         <div className={`absolute top-3 right-3 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-md z-10 border ${statusToko.color}`}>
                           {statusToko.status}
                         </div>
@@ -490,7 +503,6 @@ function ProfilContent() {
                         <p className="text-green-700 font-black text-lg mb-4">{hargaText}</p>
                         <p className="text-sm text-gray-600 mb-6 flex-grow line-clamp-3 leading-relaxed">{umkm.deskripsi}</p>
 
-                        {/* Akordeon Jam Operasional yang Cerdas dan Responsif */}
                         {listJamUrut.length > 0 && (
                           <details className="mb-6 group">
                             <summary className="text-xs font-bold text-yellow-800 cursor-pointer bg-yellow-50 hover:bg-yellow-100 px-4 py-2.5 rounded-xl border border-yellow-200 outline-none list-none flex justify-between items-center transition-colors">
@@ -514,7 +526,6 @@ function ProfilContent() {
                           </details>
                         )}
 
-                        {/* Tombol Aksi (WhatsApp & Maps) */}
                         <div className="flex flex-wrap sm:flex-nowrap gap-2 mt-auto">
                           <a href={`https://wa.me/${umkm.wa}?text=Halo,%20saya%20tertarik%20dengan%20informasi%20${umkm.nama_produk}%20yang%20ada%20di%20Website%20Desa.`} target="_blank" rel="noreferrer" className="flex-1 w-full sm:w-auto bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 hover:border-green-600 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-1.5 text-sm shadow-sm whitespace-nowrap">
                             <span className="text-lg">💬</span> Kontak

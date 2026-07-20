@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { collection, addDoc, doc, query, orderBy, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// MENERIMA PROP activeSubMenu DARI page.tsx
 export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: string | null; activeSubMenu?: string }) {
   // ==========================================
   // STATE KABAR BERITA
@@ -50,18 +49,46 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     ambilData();
   }, []);
 
+  // ==========================================
+  // FUNGSI UPLOAD GAMBAR API IMGBB (ANTI-BLOKIR BASE64)
+  // ==========================================
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+        if ((encoded.length % 4) > 0) {
+          encoded += '='.repeat(4 - (encoded.length % 4));
+        }
+        resolve(encoded);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const uploadFotoKeImgBB = async (file: File) => {
-    const formData = new FormData();
-    formData.append("image", file);
-    const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
     try {
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
+      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("image", base64Data);
+      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
+      
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
+        method: "POST", 
+        body: formData 
+      });
       const data = await res.json();
       if (data.success) return data.data.url;
       throw new Error("Jalur utama gagal");
     } catch (error) {
       try {
+        const base64Data = await fileToBase64(file);
+        const formData = new FormData();
+        formData.append("image", base64Data);
+        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
         const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
+        
         const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
         const dataCdn = await resCdn.json();
         if (dataCdn.success) return dataCdn.data.url;
@@ -70,6 +97,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     }
   };
 
+  // ==========================================
+  // LOGIKA OTOMATIS: MATIKAN BERITA LAMA (MAX 10) KECUALI PINNED
+  // ==========================================
   const pastikanSepuluhTerbaru = async () => {
     try {
       const q = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
@@ -87,7 +117,6 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
           const updatePromises = beritaUntukDiOff.map(b => 
             updateDoc(doc(db, "kabar_desa", b.id), { is_featured: false })
           );
-          
           await Promise.all(updatePromises);
           ambilData();
         }
@@ -97,6 +126,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     }
   };
 
+  // ==========================================
+  // MANAJEMEN KABAR BERITA
+  // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKabar(true);
@@ -147,6 +179,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     setJudulKabar(item.judul); 
     setIsiKabar(item.isi);
     setGambarLama(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const hapusGambarDariDaftarLama = (indexGambar: number) => {
@@ -183,7 +216,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
   const togglePinBerita = async (id: string, currentPinStatus: boolean) => {
     try {
       await updateDoc(doc(db, "kabar_desa", id), { 
-        is_pinned: !currentPinStatus,
+        is_pinned: !currentPinStatus, 
         is_featured: true 
       });
       await pastikanSepuluhTerbaru();
@@ -193,6 +226,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     }
   };
 
+  // ==========================================
+  // MANAJEMEN AGENDA DESA
+  // ==========================================
   const handleSimpanAgenda = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingAgenda(true);
@@ -233,13 +269,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
     }
   };
 
-  // ==========================================
-  // TAMPILAN UI TERISOLASI BERDASARKAN activeSubMenu
-  // ==========================================
   return (
     <div className="space-y-8 animate-fade-in pb-20">
       
-      {/* 1. BAGIAN BERITA DESA (Muncul jika submenu 'kabar-berita' atau induk 'kabar' diklik) */}
       {(!activeSubMenu || activeSubMenu === "kabar" || activeSubMenu === "kabar-berita") && (
         <>
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500">
@@ -251,7 +283,10 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                 <p className="text-gray-500 text-sm mt-1">Tambahkan berita terbaru, kegiatan, atau pengumuman desa.</p>
               </div>
               {editKabarId && (
-                <button onClick={batalEditKabar} className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors">
+                <button 
+                  onClick={batalEditKabar} 
+                  className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors"
+                >
                   Batal Edit
                 </button>
               )}
@@ -260,7 +295,13 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
             <form onSubmit={handleSimpanKabar} className="space-y-5 mt-6">
               <div>
                 <label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label>
-                <input type="text" required value={judulKabar} onChange={(e) => setJudulKabar(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all text-lg font-bold" />
+                <input 
+                  type="text" 
+                  required 
+                  value={judulKabar} 
+                  onChange={(e) => setJudulKabar(e.target.value)} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all text-lg font-bold" 
+                />
               </div>
               
               {editKabarId && gambarLama.length > 0 && (
@@ -269,8 +310,20 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                   <div className="flex flex-wrap gap-4">
                     {gambarLama.map((url, idx) => (
                       <div key={idx} className="relative w-32 h-32 border-2 border-white rounded-xl overflow-hidden group shadow-md">
-                        <img src={`https://wsrv.nl/?url=${url}`} alt="Foto Berita" className="w-full h-full object-cover" />
-                        <button type="button" onClick={() => hapusGambarDariDaftarLama(idx)} className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full text-sm font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700" title="Hapus Foto Ini">X</button>
+                        <img 
+                          src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} 
+                          alt="Foto Berita" 
+                          className="w-full h-full object-cover" 
+                        />
+                        {/* PERBAIKAN: opacity-100 di HP, opacity-0 md:group-hover:opacity-100 di Desktop */}
+                        <button 
+                          type="button" 
+                          onClick={() => hapusGambarDariDaftarLama(idx)} 
+                          className="absolute top-2 right-2 bg-red-600 text-white w-8 h-8 rounded-full text-sm font-black flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-700" 
+                          title="Hapus Foto Ini"
+                        >
+                          X
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -283,7 +336,14 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                   <span className="text-4xl mb-3 transform group-hover:scale-110 transition-transform">📸</span>
                   <span className="font-bold text-gray-700">Klik di sini untuk memilih foto dari perangkat Anda</span>
                   <span className="text-xs text-gray-400 mt-1">(Bisa memilih lebih dari satu foto sekaligus)</span>
-                  <input id="inputFotoKabar" type="file" accept="image/*" multiple onChange={(e) => setFotoKabarList(e.target.files)} className="hidden" />
+                  <input 
+                    id="inputFotoKabar" 
+                    type="file" 
+                    accept="image/*" 
+                    multiple 
+                    onChange={(e) => setFotoKabarList(e.target.files)} 
+                    className="hidden" 
+                  />
                 </label>
                 {fotoKabarList && (
                   <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-3 inline-block">
@@ -294,7 +354,13 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
               
               <div>
                 <label className="block text-sm font-bold mb-2 text-gray-800">Isi Lengkap Berita</label>
-                <textarea required rows={8} value={isiKabar} onChange={(e) => setIsiKabar(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all leading-relaxed"></textarea>
+                <textarea 
+                  required 
+                  rows={8} 
+                  value={isiKabar} 
+                  onChange={(e) => setIsiKabar(e.target.value)} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all leading-relaxed"
+                ></textarea>
               </div>
               
               {statusKabar && (
@@ -303,7 +369,11 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                 </div>
               )}
               
-              <button type="submit" disabled={isLoadingKabar} className={`w-full text-white font-bold px-6 py-4 rounded-xl shadow-md transition-all text-lg ${isLoadingKabar ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 hover:-translate-y-1"}`}>
+              <button 
+                type="submit" 
+                disabled={isLoadingKabar} 
+                className={`w-full text-white font-bold px-6 py-4 rounded-xl shadow-md transition-all text-lg ${isLoadingKabar ? "bg-gray-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700 hover:-translate-y-1"}`}
+              >
                 {isLoadingKabar ? "Mengunggah Foto & Memproses Berita..." : editKabarId ? "Simpan Perubahan Berita" : "Publikasikan Berita Sekarang"}
               </button>
             </form>
@@ -351,6 +421,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                           >
                             {isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}
                           </button>
+                          
                           <button 
                             onClick={() => togglePinBerita(item.id, isPinned)} 
                             className={`px-4 py-1.5 rounded-lg font-bold text-[10px] shadow-sm transition-all w-32 border ${isPinned ? "bg-yellow-500 text-white border-yellow-600 hover:bg-yellow-600" : "bg-white text-gray-500 border-gray-300 hover:bg-gray-100"}`}
@@ -362,15 +433,29 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                       </td>
                       <td className="py-4 px-4 text-center">
                         <div className="flex flex-col gap-2 items-center">
-                          <button onClick={() => mulaiEditKabar(item)} className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Edit</button>
-                          <button onClick={() => hapusKabar(item.id)} className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Hapus</button>
+                          <button 
+                            onClick={() => mulaiEditKabar(item)} 
+                            className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => hapusKabar(item.id)} 
+                            className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Hapus
+                          </button>
                         </div>
                       </td>
                     </tr>
                   );
                 })}
                 {riwayatKabar.length === 0 && (
-                  <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada berita yang dipublikasikan.</td></tr>
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-gray-500">
+                      Belum ada berita yang dipublikasikan.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -378,7 +463,6 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
         </>
       )}
 
-      {/* 2. BAGIAN AGENDA DESA (Muncul jika submenu 'kabar-agenda' atau induk 'kabar' diklik) */}
       {(!activeSubMenu || activeSubMenu === "kabar" || activeSubMenu === "kabar-agenda") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-yellow-500">
           <h3 className="text-2xl font-bold mb-2">📅 Agenda & Kalender Kegiatan Desa</h3>
@@ -390,22 +474,48 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
               <form onSubmit={handleSimpanAgenda} className="space-y-4">
                 <div>
                   <label className="block text-xs font-bold mb-1 text-gray-700">Nama Kegiatan / Acara</label>
-                  <input type="text" required value={namaAgenda} onChange={(e) => setNamaAgenda(e.target.value)} placeholder="Misal: Posyandu Balita" className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500" />
+                  <input 
+                    type="text" 
+                    required 
+                    value={namaAgenda} 
+                    onChange={(e) => setNamaAgenda(e.target.value)} 
+                    placeholder="Misal: Posyandu Balita" 
+                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500" 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1 text-gray-700">Tanggal & Waktu Pelaksanaan</label>
-                  <input type="datetime-local" required value={tanggalAgenda} onChange={(e) => setTanggalAgenda(e.target.value)} className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 text-gray-800 font-bold" />
+                  <input 
+                    type="datetime-local" 
+                    required 
+                    value={tanggalAgenda} 
+                    onChange={(e) => setTanggalAgenda(e.target.value)} 
+                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 text-gray-800 font-bold" 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold mb-1 text-gray-700">Lokasi / Tempat</label>
-                  <input type="text" required value={lokasiAgenda} onChange={(e) => setLokasiAgenda(e.target.value)} placeholder="Misal: Balai Desa Kerjo" className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500" />
+                  <input 
+                    type="text" 
+                    required 
+                    value={lokasiAgenda} 
+                    onChange={(e) => setLokasiAgenda(e.target.value)} 
+                    placeholder="Misal: Balai Desa Kerjo" 
+                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500" 
+                  />
                 </div>
+                
                 {statusAgenda && (
                   <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
                     {statusAgenda}
                   </div>
                 )}
-                <button type="submit" disabled={isLoadingAgenda} className="w-full bg-yellow-600 text-white font-bold py-3 rounded-xl hover:bg-yellow-700 shadow-md transition-colors">
+                
+                <button 
+                  type="submit" 
+                  disabled={isLoadingAgenda} 
+                  className="w-full bg-yellow-600 text-white font-bold py-3 rounded-xl hover:bg-yellow-700 shadow-md transition-colors"
+                >
                   {isLoadingAgenda ? "Menyimpan..." : "Tambahkan ke Kalender"}
                 </button>
               </form>
@@ -432,7 +542,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                         </td>
                         <td className="py-4 px-4">
                           <div className="font-bold text-gray-900 text-base">{agenda.nama}</div>
-                          <div className="text-xs font-bold text-yellow-600 mt-1 flex items-center gap-1"><span>📍</span> {agenda.lokasi}</div>
+                          <div className="text-xs font-bold text-yellow-600 mt-1 flex items-center gap-1">
+                            <span>📍</span> {agenda.lokasi}
+                          </div>
                         </td>
                         <td className="py-4 px-4 text-center">
                           <button 
@@ -443,7 +555,10 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                           </button>
                         </td>
                         <td className="py-4 px-4 text-center">
-                          <button onClick={() => hapusAgenda(agenda.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                          <button 
+                            onClick={() => hapusAgenda(agenda.id)} 
+                            className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                          >
                             Hapus
                           </button>
                         </td>
@@ -451,7 +566,11 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: { userEmail: s
                     );
                   })}
                   {daftarAgenda.length === 0 && (
-                    <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada jadwal agenda desa yang didaftarkan.</td></tr>
+                    <tr>
+                      <td colSpan={4} className="text-center py-8 text-gray-500">
+                        Belum ada jadwal agenda desa yang didaftarkan.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>

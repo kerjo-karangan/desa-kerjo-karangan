@@ -37,7 +37,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       if (snapHero.exists()) {
         setHeroJudul(snapHero.data().judul || "Selamat Datang di\nDesa Kerjo");
         setHeroSub(snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.");
-        setHeroBgLama(snapHero.data().bg || "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?q=80&w=2070&auto=format&fit=crop");
+        setHeroBgLama(snapHero.data().bg || "https://i.ibb.co.com/YFJVHD07/2239715431.webp");
       }
 
       const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
@@ -53,7 +53,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   }, []);
 
   // ==========================================
-  // FUNGSI UPLOAD GAMBAR API IMGBB (ANTI-BLOKIR BASE64)
+  // FUNGSI UPLOAD GAMBAR API IMGBB
   // ==========================================
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -77,7 +77,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       formData.append("image", base64Data);
       const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
       
-      // Jalur Utama (Tanpa Proxy)
       const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
         method: "POST", 
         body: formData 
@@ -86,7 +85,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       if (data.success) return data.data.url;
       throw new Error("Jalur utama gagal");
     } catch (error) {
-      // Jalur Cadangan (Dengan Proxy)
       try {
         const base64Data = await fileToBase64(file);
         const formData = new FormData();
@@ -98,10 +96,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         const dataCdn = await resCdn.json();
         if (dataCdn.success) return dataCdn.data.url;
         return null;
-      } catch (errCdn) { 
-        console.error("Gagal Upload ImgBB", errCdn);
-        return null; 
-      }
+      } catch (errCdn) { return null; }
     }
   };
 
@@ -116,16 +111,15 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     try {
       let imageUrl = heroBgLama;
       
-      // Jika admin mengunggah gambar baru
       if (heroBgList && heroBgList.length > 0) {
         setStatusHero("Mengunggah gambar background ke Server ImgBB...");
         const newBg = await uploadFotoKeImgBB(heroBgList[0]);
         if (newBg) {
           imageUrl = newBg;
         } else {
-          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil atau coba file lain.");
+          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil.");
           setIsLoadingHero(false);
-          return; // Hentikan eksekusi jika gambar gagal agar tidak menimpa dengan string kosong
+          return; 
         }
       }
 
@@ -199,11 +193,21 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       const gambarFinal = [...gambarLamaKabar, ...tautanGambarBaru];
       
       if (editKabarId) {
-        await updateDoc(doc(db, "kabar_desa", editKabarId), { judul: judulKabar, isi: isiKabar, gambar: gambarFinal });
+        await updateDoc(doc(db, "kabar_desa", editKabarId), { 
+          judul: judulKabar, 
+          isi: isiKabar, 
+          gambar: gambarFinal 
+        });
         setStatusKabar("✅ Diperbarui!");
       } else {
         await addDoc(collection(db, "kabar_desa"), {
-          judul: judulKabar, isi: isiKabar, gambar: gambarFinal, tanggal_posting: new Date().toISOString(), penulis: userEmail, is_featured: true, is_pinned: false
+          judul: judulKabar, 
+          isi: isiKabar, 
+          gambar: gambarFinal, 
+          tanggal_posting: new Date().toISOString(), 
+          penulis: userEmail, 
+          is_featured: true, 
+          is_pinned: false
         });
         setStatusKabar("✅ Dipublikasikan!");
       }
@@ -220,7 +224,9 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   };
 
   const mulaiEditKabar = (item: any) => {
-    setEditKabarId(item.id); setJudulKabar(item.judul); setIsiKabar(item.isi);
+    setEditKabarId(item.id); 
+    setJudulKabar(item.judul); 
+    setIsiKabar(item.isi);
     setGambarLamaKabar(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -230,7 +236,11 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   };
 
   const batalEditKabar = () => {
-    setEditKabarId(null); setJudulKabar(""); setIsiKabar(""); setGambarLamaKabar([]); setFotoKabarList(null);
+    setEditKabarId(null); 
+    setJudulKabar(""); 
+    setIsiKabar(""); 
+    setGambarLamaKabar([]); 
+    setFotoKabarList(null);
     const input = document.getElementById("inputFotoKabarBeranda") as HTMLInputElement;
     if (input) input.value = "";
   };
@@ -247,15 +257,22 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       await updateDoc(doc(db, "kabar_desa", id), { is_featured: !currentStatus });
       await pastikanSepuluhTerbaru();
       ambilData();
-    } catch (error) { alert("Gagal merubah status tampil."); }
+    } catch (error) { 
+      alert("Gagal merubah status tampil."); 
+    }
   };
 
   const togglePinBerita = async (id: string, currentPinStatus: boolean) => {
     try {
-      await updateDoc(doc(db, "kabar_desa", id), { is_pinned: !currentPinStatus, is_featured: true });
+      await updateDoc(doc(db, "kabar_desa", id), { 
+        is_pinned: !currentPinStatus, 
+        is_featured: true 
+      });
       await pastikanSepuluhTerbaru();
       ambilData();
-    } catch (error) { alert("Gagal mengunci (Pin) berita."); }
+    } catch (error) { 
+      alert("Gagal mengunci (Pin) berita."); 
+    }
   };
 
   // ==========================================
@@ -276,11 +293,23 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-bold mb-2 text-gray-800">Judul Utama (Mendukung baris baru/Enter)</label>
-                <textarea required rows={3} value={heroJudul} onChange={(e) => setHeroJudul(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-lg font-black"></textarea>
+                <textarea 
+                  required 
+                  rows={3} 
+                  value={heroJudul} 
+                  onChange={(e) => setHeroJudul(e.target.value)} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-lg font-black"
+                ></textarea>
               </div>
               <div>
                 <label className="block text-sm font-bold mb-2 text-gray-800">Teks Sub-Judul (Deskripsi Singkat)</label>
-                <textarea required rows={4} value={heroSub} onChange={(e) => setHeroSub(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"></textarea>
+                <textarea 
+                  required 
+                  rows={4} 
+                  value={heroSub} 
+                  onChange={(e) => setHeroSub(e.target.value)} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                ></textarea>
               </div>
             </div>
 
@@ -290,9 +319,20 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               
               {heroBgLama && (
                 <div className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200 group">
-                  <img src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} alt="Background Beranda" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button type="button" onClick={hapusGambarBgLama} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700">Hapus Background</button>
+                  <img 
+                    src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                    alt="Background Beranda" 
+                    className="w-full h-full object-cover" 
+                  />
+                  {/* PERBAIKAN: opacity-100 di HP, baru mode hover di laptop */}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <button 
+                      type="button" 
+                      onClick={hapusGambarBgLama} 
+                      className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
+                    >
+                      Hapus Background
+                    </button>
                   </div>
                 </div>
               )}
@@ -300,14 +340,34 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                 <span className="text-3xl mb-2">📸</span>
                 <span className="font-bold text-yellow-800 text-sm">Ganti Gambar Background Baru</span>
-                <input id="inputBgBeranda" type="file" accept="image/*" onChange={(e) => setHeroBgList(e.target.files)} className="hidden" />
+                <input 
+                  id="inputBgBeranda" 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => setHeroBgList(e.target.files)} 
+                  className="hidden" 
+                />
               </label>
-              {heroBgList && (<div className="text-xs font-bold text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">✅ Gambar baru siap diunggah.</div>)}
+              {heroBgList && (
+                <div className="text-xs font-bold text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                  ✅ Gambar baru siap diunggah.
+                </div>
+              )}
             </div>
           </div>
           
-          {statusHero && (<div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusHero.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>{statusHero}</div>)}
-          <button type="submit" disabled={isLoadingHero} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingHero ? "Menyimpan Pengaturan..." : "Terapkan Perubahan ke Beranda"}</button>
+          {statusHero && (
+            <div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusHero.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>
+              {statusHero}
+            </div>
+          )}
+          <button 
+            type="submit" 
+            disabled={isLoadingHero} 
+            className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+          >
+            {isLoadingHero ? "Menyimpan Pengaturan..." : "Terapkan Perubahan ke Beranda"}
+          </button>
         </form>
       </div>
 
@@ -315,57 +375,180 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500">
         <div className="flex justify-between mb-2 border-b pb-4">
           <div>
-            <h3 className="text-2xl font-bold flex items-center gap-2">{editKabarId ? "✏️ Edit Berita" : "📰 Tulis Berita Baru (Tampil di Beranda)"}</h3>
+            <h3 className="text-2xl font-bold flex items-center gap-2">
+              {editKabarId ? "✏️ Edit Berita" : "📰 Tulis Berita Baru (Tampil di Beranda)"}
+            </h3>
             <p className="text-gray-500 text-sm mt-1">Anda juga bisa menambahkan berita dari halaman ini secara langsung.</p>
           </div>
-          {editKabarId && (<button onClick={batalEditKabar} className="bg-gray-200 px-4 py-2 rounded-lg font-bold transition-colors">Batal Edit</button>)}
+          {editKabarId && (
+            <button 
+              onClick={batalEditKabar} 
+              className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors"
+            >
+              Batal Edit
+            </button>
+          )}
         </div>
 
         <form onSubmit={handleSimpanKabar} className="space-y-5 mt-6">
-          <div><label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label><input type="text" required value={judulKabar} onChange={(e) => setJudulKabar(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold" /></div>
-          {editKabarId && gambarLamaKabar.length > 0 && (<div className="bg-orange-50 p-4 rounded-xl border border-orange-200"><p className="text-sm font-bold text-orange-900 mb-3">Foto Tersimpan (Klik X untuk menghapus):</p><div className="flex flex-wrap gap-3">{gambarLamaKabar.map((url, idx) => (<div key={idx} className="relative w-24 h-24 border-2 border-white rounded-xl overflow-hidden group shadow-md"><img src={`https://wsrv.nl/?url=${url}`} className="w-full h-full object-cover" /><button type="button" onClick={() => hapusGambarDariDaftarLamaKabar(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-6 h-6 rounded-full text-[10px] font-black flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button></div>))}</div></div>)}
-          <div><label className="block text-sm font-bold mb-2 text-gray-800">Tambahkan Foto Baru</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-green-50 hover:border-green-400 transition-all"><span className="text-3xl mb-2">📸</span><span className="font-bold text-gray-700 text-sm">Pilih Gambar</span><input id="inputFotoKabarBeranda" type="file" accept="image/*" multiple onChange={(e) => setFotoKabarList(e.target.files)} className="hidden" /></label></div>
-          <div><label className="block text-sm font-bold mb-2 text-gray-800">Isi Berita</label><textarea required rows={6} value={isiKabar} onChange={(e) => setIsiKabar(e.target.value)} className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all leading-relaxed"></textarea></div>
-          {statusKabar && (<div className="p-4 rounded-xl text-sm font-bold text-center bg-green-100 text-green-800 border border-green-300">{statusKabar}</div>)}
-          <button type="submit" disabled={isLoadingKabar} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingKabar ? "Memproses..." : editKabarId ? "Simpan Perubahan Berita" : "Publikasikan Berita Sekarang"}</button>
+          <div>
+            <label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label>
+            <input 
+              type="text" 
+              required 
+              value={judulKabar} 
+              onChange={(e) => setJudulKabar(e.target.value)} 
+              className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold" 
+            />
+          </div>
+          
+          {editKabarId && gambarLamaKabar.length > 0 && (
+            <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
+              <p className="text-sm font-bold text-orange-900 mb-3">Foto Tersimpan (Klik X untuk menghapus):</p>
+              <div className="flex flex-wrap gap-3">
+                {gambarLamaKabar.map((url, idx) => (
+                  <div key={idx} className="relative w-24 h-24 border-2 border-white rounded-xl overflow-hidden group shadow-md">
+                    <img 
+                      src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} 
+                      className="w-full h-full object-cover" 
+                    />
+                    {/* PERBAIKAN: opacity-100 di HP, hover di laptop */}
+                    <button 
+                      type="button" 
+                      onClick={() => hapusGambarDariDaftarLamaKabar(idx)} 
+                      className="absolute top-1 right-1 bg-red-600 text-white w-7 h-7 rounded-full text-[11px] font-black flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border border-red-800"
+                    >
+                      X
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <div>
+            <label className="block text-sm font-bold mb-2 text-gray-800">Tambahkan Foto Baru</label>
+            <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-green-50 hover:border-green-400 transition-all">
+              <span className="text-3xl mb-2">📸</span>
+              <span className="font-bold text-gray-700 text-sm">Pilih Gambar</span>
+              <input 
+                id="inputFotoKabarBeranda" 
+                type="file" 
+                accept="image/*" 
+                multiple 
+                onChange={(e) => setFotoKabarList(e.target.files)} 
+                className="hidden" 
+              />
+            </label>
+            {fotoKabarList && (
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-3 inline-block">
+                <p className="text-sm font-bold text-green-800">✅ {fotoKabarList.length} foto baru siap diunggah.</p>
+              </div>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-bold mb-2 text-gray-800">Isi Berita</label>
+            <textarea 
+              required 
+              rows={6} 
+              value={isiKabar} 
+              onChange={(e) => setIsiKabar(e.target.value)} 
+              className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all leading-relaxed"
+            ></textarea>
+          </div>
+          
+          {statusKabar && (
+            <div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusKabar.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>
+              {statusKabar}
+            </div>
+          )}
+          
+          <button 
+            type="submit" 
+            disabled={isLoadingKabar} 
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+          >
+            {isLoadingKabar ? "Memproses..." : editKabarId ? "Simpan Perubahan Berita" : "Publikasikan Berita Sekarang"}
+          </button>
         </form>
       </div>
 
-      {/* 3. TABEL MANAJEMEN BERITA (DENGAN PIN & PLAY) */}
+      {/* 3. TABEL MANAJEMEN BERITA */}
       <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100">
         <div className="flex justify-between items-center mb-6">
           <h4 className="text-xl font-bold text-gray-800">Riwayat Berita</h4>
-          <span className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-xs font-bold shadow-sm border border-green-200">Max 10 Berita di Slide</span>
+          <span className="bg-green-100 text-green-800 px-4 py-2 rounded-full text-xs font-bold shadow-sm border border-green-200">
+            Max 10 Berita di Slide
+          </span>
         </div>
         <table className="min-w-full text-sm text-left">
-          <thead className="bg-gray-50 border-b"><tr><th className="py-4 px-4 font-bold text-gray-600">Tanggal</th><th className="py-4 px-4 font-bold text-gray-600">Judul Berita</th><th className="py-4 px-4 text-center font-bold text-gray-600">Status Beranda</th><th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th></tr></thead>
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="py-4 px-4 font-bold text-gray-600">Tanggal</th>
+              <th className="py-4 px-4 font-bold text-gray-600">Judul Berita</th>
+              <th className="py-4 px-4 text-center font-bold text-gray-600">Status Beranda</th>
+              <th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th>
+            </tr>
+          </thead>
           <tbody>
             {riwayatKabar.map((item) => {
               const isTampil = item.is_featured !== false; 
               const isPinned = item.is_pinned === true;
               return (
                 <tr key={item.id} className={`border-b transition-colors ${isPinned ? 'bg-yellow-50/50 hover:bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                  <td className="py-4 px-4 font-medium text-gray-500 whitespace-nowrap">{new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric'})}</td>
+                  <td className="py-4 px-4 font-medium text-gray-500 whitespace-nowrap">
+                    {new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric'})}
+                  </td>
                   <td className="py-4 px-4">
-                    <div className="font-bold text-gray-900 text-base mb-1">{isPinned && <span className="text-yellow-600 mr-2" title="Selalu Tampil">🔒</span>}{item.judul}</div>
+                    <div className="font-bold text-gray-900 text-base mb-1">
+                      {isPinned && <span className="text-yellow-600 mr-2" title="Selalu Tampil">🔒</span>}
+                      {item.judul}
+                    </div>
                     <div className="text-xs text-gray-400">Oleh: {item.penulis}</div>
                   </td>
                   <td className="py-4 px-4 text-center">
                     <div className="flex flex-col gap-2 items-center">
-                      <button onClick={() => toggleTampilBerita(item.id, isTampil)} className={`px-4 py-2 rounded-lg font-bold text-xs shadow-sm w-32 ${isTampil ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-300"}`}>{isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}</button>
-                      <button onClick={() => togglePinBerita(item.id, isPinned)} className={`px-4 py-1.5 rounded-lg font-bold text-[10px] shadow-sm w-32 border ${isPinned ? "bg-yellow-500 text-white border-yellow-600" : "bg-white text-gray-500 border-gray-300"}`}>{isPinned ? "🔒 Tergembok" : "🔓 Gembok Normal"}</button>
+                      <button 
+                        onClick={() => toggleTampilBerita(item.id, isTampil)} 
+                        className={`px-4 py-2 rounded-lg font-bold text-xs shadow-sm w-32 ${isTampil ? "bg-green-100 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-300"}`}
+                      >
+                        {isTampil ? "▶️ Dimainkan" : "⏸️ Di-Pause"}
+                      </button>
+                      <button 
+                        onClick={() => togglePinBerita(item.id, isPinned)} 
+                        className={`px-4 py-1.5 rounded-lg font-bold text-[10px] shadow-sm w-32 border ${isPinned ? "bg-yellow-500 text-white border-yellow-600" : "bg-white text-gray-500 border-gray-300"}`}
+                      >
+                        {isPinned ? "🔒 Tergembok" : "🔓 Gembok Normal"}
+                      </button>
                     </div>
                   </td>
                   <td className="py-4 px-4 text-center">
                     <div className="flex flex-col gap-2 items-center">
-                      <button onClick={() => mulaiEditKabar(item)} className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg">Edit</button>
-                      <button onClick={() => hapusKabar(item.id)} className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg">Hapus</button>
+                      <button 
+                        onClick={() => mulaiEditKabar(item)} 
+                        className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg"
+                      >
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => hapusKabar(item.id)} 
+                        className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg"
+                      >
+                        Hapus
+                      </button>
                     </div>
                   </td>
                 </tr>
               );
             })}
-            {riwayatKabar.length === 0 && (<tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada berita yang dipublikasikan.</td></tr>)}
+            {riwayatKabar.length === 0 && (
+              <tr>
+                <td colSpan={4} className="text-center py-8 text-gray-500">
+                  Belum ada berita yang dipublikasikan.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
