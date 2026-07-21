@@ -15,17 +15,34 @@ const DEFAULT_JAM = {
   Minggu: { buka: "08:00", tutup: "16:00", libur: true },
 };
 
-export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }) {
+// ==========================================
+// SOLUSI ERROR TYPESCRIPT (INTRINSIC ATTRIBUTES)
+// ==========================================
+interface ProfilUmkmProps {
+  activeSubMenu?: string;
+}
+
+export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   
-  // STATE PROFIL DESA & HERO PROFIL
+  // ==========================================
+  // STATE PROFIL DESA (SEJARAH & VISI MISI)
+  // ==========================================
   const [sejarahDesa, setSejarahDesa] = useState("");
   const [visiMisiDesa, setVisiMisiDesa] = useState("");
-  const [heroProfilBgLama, setHeroProfilBgLama] = useState("");
-  const [heroProfilBgList, setHeroProfilBgList] = useState<FileList | null>(null);
   const [statusProfil, setStatusProfil] = useState("");
   const [isLoadingProfil, setIsLoadingProfil] = useState(false);
+
+  // ==========================================
+  // STATE PENGATURAN HEADER/HERO
+  // ==========================================
+  const [heroProfilBgLama, setHeroProfilBgLama] = useState("");
+  const [heroProfilBgList, setHeroProfilBgList] = useState<FileList | null>(null);
+  const [statusHero, setStatusHero] = useState("");
+  const [isLoadingHero, setIsLoadingHero] = useState(false);
   
+  // ==========================================
   // STATE APARATUR (SOTK DESA)
+  // ==========================================
   const [namaAparatur, setNamaAparatur] = useState("");
   const [jabatanAparatur, setJabatanAparatur] = useState("");
   const [urutanAparatur, setUrutanAparatur] = useState<number>(1);
@@ -38,7 +55,9 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   const [editAparaturId, setEditAparaturId] = useState<string | null>(null);
   const [fotoLamaAparatur, setFotoLamaAparatur] = useState("");
 
+  // ==========================================
   // STATE UMKM & WISATA
+  // ==========================================
   const [kategoriPotensi, setKategoriPotensi] = useState("UMKM");
   const [namaPotensi, setNamaPotensi] = useState("");
   const [pengelola, setPengelola] = useState("");
@@ -55,7 +74,9 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   const [isLoadingUmkm, setIsLoadingUmkm] = useState(false);
   const [editUmkmId, setEditUmkmId] = useState<string | null>(null);
 
+  // ==========================================
   // STATE LEMBAGA MASYARAKAT
+  // ==========================================
   const [namaLembaga, setNamaLembaga] = useState("");
   const [singkatanLembaga, setSingkatanLembaga] = useState("");
   const [deskripsiLembaga, setDeskripsiLembaga] = useState("");
@@ -66,7 +87,9 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   const [editLembagaId, setEditLembagaId] = useState<string | null>(null);
   const [fotoLamaLembaga, setFotoLamaLembaga] = useState("");
 
+  // ==========================================
   // STATE KEANGGOTAAN LEMBAGA (SOTK LEMBAGA)
+  // ==========================================
   const [selectedLembaga, setSelectedLembaga] = useState<any>(null);
   const [namaAnggotaLem, setNamaAnggotaLem] = useState("");
   const [jabatanAnggotaLem, setJabatanAnggotaLem] = useState("");
@@ -142,22 +165,30 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
     }
   };
 
-  // --- MANAJEMEN PROFIL TEKS & HERO ---
-  const handleSimpanProfil = async (e: React.FormEvent) => {
-    e.preventDefault(); setIsLoadingProfil(true); setStatusProfil("Menyimpan...");
+  // --- MANAJEMEN PENGATURAN HEADER PROFIL ---
+  const handleSimpanHero = async (e: React.FormEvent) => {
+    e.preventDefault(); setIsLoadingHero(true); setStatusHero("Menyimpan Header...");
     try {
-      await setDoc(doc(db, "profil_desa", "utama"), { sejarah: sejarahDesa, visi_misi: visiMisiDesa, terakhir_diperbarui: new Date().toISOString() });
-      
       let imageUrl = heroProfilBgLama;
       if (heroProfilBgList && heroProfilBgList.length > 0) {
-        setStatusProfil("Mengunggah Background...");
+        setStatusHero("Mengunggah Background...");
         const newBg = await uploadFotoKeImgBB(heroProfilBgList[0]);
         if (newBg) imageUrl = newBg;
       }
       await setDoc(doc(db, "pengaturan_web", "profil_hero"), { bg: imageUrl, terakhir_diperbarui: new Date().toISOString() });
 
-      setStatusProfil("✅ Profil & Background berhasil diperbarui!"); 
+      setStatusHero("✅ Background Header berhasil diperbarui!"); 
       setHeroProfilBgLama(imageUrl); setHeroProfilBgList(null);
+      setTimeout(() => setStatusHero(""), 4000);
+    } catch (error) { setStatusHero("❌ Gagal menyimpan header."); } finally { setIsLoadingHero(false); }
+  };
+
+  // --- MANAJEMEN PROFIL TEKS ---
+  const handleSimpanProfil = async (e: React.FormEvent) => {
+    e.preventDefault(); setIsLoadingProfil(true); setStatusProfil("Menyimpan...");
+    try {
+      await setDoc(doc(db, "profil_desa", "utama"), { sejarah: sejarahDesa, visi_misi: visiMisiDesa, terakhir_diperbarui: new Date().toISOString() });
+      setStatusProfil("✅ Profil Teks berhasil diperbarui!"); 
       setTimeout(() => setStatusProfil(""), 4000);
     } catch (error) { setStatusProfil("❌ Gagal menyimpan profil."); } finally { setIsLoadingProfil(false); }
   };
@@ -282,16 +313,16 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
   const daftarAtasanLem = (selectedLembaga?.anggota_sotk || []).filter((org:any) => org.id !== editAnggotaLemId && org.urutan < urutanAnggotaLem);
 
   return (
-    <div className="animate-fade-in pb-20">
+    <div className="animate-fade-in pb-20 font-sans">
       
-      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-teks") && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 mb-8">
-          <h3 className="text-2xl font-bold mb-2">🏛️ Pengaturan Profil & Background</h3>
-          <p className="text-gray-500 text-sm mb-6">Sesuaikan teks Sejarah, Visi Misi, dan Foto Background (Hero) yang akan menjadi wajah utama di halaman Profil Publik.</p>
-          <form onSubmit={handleSimpanProfil} className="space-y-6">
-            
-            <div className="bg-green-50 p-6 rounded-2xl border border-green-200">
-              <label className="block text-sm font-bold text-green-900 border-b border-green-200 pb-2 mb-4">Gambar Background Profil Publik (Hero Section)</label>
+      {/* 1. PENGATURAN HEADER PROFIL (DIPISAHKAN) */}
+      {(!activeSubMenu || activeSubMenu === "profil-hero") && (
+        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 mb-8">
+          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Profil Desa</h3>
+          <p className="text-gray-500 text-sm mb-6">Ubah gambar background (Hero) yang akan menjadi wajah utama di halaman Publik Profil.</p>
+          <form onSubmit={handleSimpanHero} className="space-y-6">
+            <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200">
+              <label className="block text-sm font-bold text-yellow-900 border-b border-yellow-200 pb-2 mb-4">Gambar Background (Minimal 1280x720)</label>
               {heroProfilBgLama && (
                 <div className="relative w-full h-40 md:h-64 rounded-xl overflow-hidden shadow-inner border border-gray-200 group mb-4">
                   <img src={heroProfilBgLama.startsWith("http") ? heroProfilBgLama : `https://wsrv.nl/?url=${heroProfilBgLama}`} alt="Background Profil" className="w-full h-full object-cover" />
@@ -300,24 +331,36 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
                   </div>
                 </div>
               )}
-              <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-green-300 rounded-xl hover:bg-green-100 transition-all shadow-sm">
+              <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                 <span className="text-3xl mb-2">📸</span>
-                <span className="font-bold text-green-800 text-sm">Ganti Gambar Background Baru</span>
+                <span className="font-bold text-yellow-800 text-sm">Ganti Gambar Background Baru</span>
                 <input type="file" accept="image/*" onChange={(e) => setHeroProfilBgList(e.target.files)} className="hidden" />
               </label>
               {heroProfilBgList && (<div className="text-xs font-bold text-green-700 mt-2">✅ 1 Gambar siap diunggah.</div>)}
             </div>
-
-            <div><label className="block text-sm font-bold mb-2 text-gray-800">Sejarah Desa</label><textarea required rows={6} value={sejarahDesa} onChange={(e) => setSejarahDesa(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"></textarea></div>
-            <div><label className="block text-sm font-bold mb-2 text-gray-800">Visi & Misi</label><textarea required rows={6} value={visiMisiDesa} onChange={(e) => setVisiMisiDesa(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"></textarea></div>
             
-            {statusProfil && (<div className="p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border border-green-300">{statusProfil}</div>)}
-            <button type="submit" disabled={isLoadingProfil} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingProfil ? "Menyimpan Perubahan..." : "Simpan Profil Utama"}</button>
+            {statusHero && (<div className="p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border border-green-300">{statusHero}</div>)}
+            <button type="submit" disabled={isLoadingHero} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingHero ? "Menyimpan Perubahan..." : "Simpan Header Baru"}</button>
           </form>
         </div>
       )}
 
-      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-sotk") && (
+      {/* 2. PENGATURAN TEKS PROFIL */}
+      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-teks") && (
+        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 mb-8">
+          <h3 className="text-2xl font-bold mb-2">📖 Sejarah & Visi Misi</h3>
+          <p className="text-gray-500 text-sm mb-6">Sesuaikan teks Sejarah dan Visi Misi Desa Kerjo secara lengkap.</p>
+          <form onSubmit={handleSimpanProfil} className="space-y-6">
+            <div><label className="block text-sm font-bold mb-2 text-gray-800">Sejarah Desa</label><textarea required rows={8} value={sejarahDesa} onChange={(e) => setSejarahDesa(e.target.value)} className="w-full px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"></textarea></div>
+            <div><label className="block text-sm font-bold mb-2 text-gray-800">Visi & Misi</label><textarea required rows={6} value={visiMisiDesa} onChange={(e) => setVisiMisiDesa(e.target.value)} className="w-full px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"></textarea></div>
+            
+            {statusProfil && (<div className="p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border border-green-300">{statusProfil}</div>)}
+            <button type="submit" disabled={isLoadingProfil} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingProfil ? "Menyimpan Perubahan..." : "Simpan Teks Profil"}</button>
+          </form>
+        </div>
+      )}
+
+      {(!activeSubMenu || activeSubMenu === "profil-sotk") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-blue-600 mb-8">
           <h3 className="text-2xl font-bold mb-2">👔 Susunan Pemerintah Desa (SOTK)</h3>
           <p className="text-gray-500 text-sm mb-6">Kelola hierarki aparatur desa beserta garis komando (Instruksi/Koordinasi) mereka.</p>
@@ -362,7 +405,7 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
         </div>
       )}
 
-      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-lembaga") && (
+      {(!activeSubMenu || activeSubMenu === "profil-lembaga") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-indigo-500 mb-8 transition-all">
           
           {!selectedLembaga ? (
@@ -476,7 +519,7 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
       )}
 
       {/* 4. MODUL KATALOG UMKM & WISATA */}
-      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-umkm") && (
+      {(!activeSubMenu || activeSubMenu === "profil-umkm") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-yellow-600">
           <h3 className="text-2xl font-bold mb-2">🛍️ Katalog Potensi, Wisata & UMKM</h3>
           <p className="text-gray-500 text-sm mb-6">Kelola promosi pariwisata, produk UMKM, fasilitas, beserta jam operasional dan lokasi (Maps).</p>
@@ -496,31 +539,34 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
                   <div className="flex items-center gap-2"><input type="number" required value={hargaMulai} onChange={(e)=>setHargaMulai(e.target.value)} placeholder="Mulai" className="w-full p-2 text-sm rounded-lg border border-gray-200 outline-none focus:border-yellow-400" /><span className="font-bold text-gray-400">-</span><input type="number" required value={hargaSampai} onChange={(e)=>setHargaSampai(e.target.value)} placeholder="Sampai" className="w-full p-2 text-sm rounded-lg border border-gray-200 outline-none focus:border-yellow-400" /></div>
                 </div>
                 <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Tautan Google Maps</label><input type="url" value={linkMaps} onChange={(e)=>setLinkMaps(e.target.value)} className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-xs text-blue-600 font-mono" /></div>
-                <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm">
+                
+                {/* PERBAIKAN BUG OVERFLOW LAYAR LAPTOP PADA JAM OPERASIONAL */}
+                <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm overflow-hidden">
                   <label className="block text-xs font-bold mb-3 text-yellow-900 border-b border-yellow-100 pb-1">Jadwal Operasional (Per Hari)</label>
                   <div className="space-y-3">
                     {Object.keys(jamOperasional).map((hari) => (
                       <div key={hari} className="flex flex-col xl:flex-row xl:items-center gap-2 justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                        <div className="flex justify-between xl:justify-start items-center gap-4 w-full xl:w-auto">
-                          <span className="w-14 font-bold text-xs text-gray-700">{hari}</span>
+                        <div className="flex justify-between xl:justify-start items-center gap-2 w-full xl:w-28 flex-shrink-0">
+                          <span className="font-bold text-xs text-gray-700">{hari}</span>
                           <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                            <input type="checkbox" checked={jamOperasional[hari].libur} onChange={(e) => handleJamChange(hari, 'libur', e.target.checked)} className="w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500" />
+                            <input type="checkbox" checked={jamOperasional[hari].libur} onChange={(e) => handleJamChange(hari, 'libur', e.target.checked)} className="w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 flex-shrink-0" />
                             <span className={jamOperasional[hari].libur ? "text-red-600 font-bold" : "text-gray-500"}>Libur</span>
                           </label>
                         </div>
                         {!jamOperasional[hari].libur ? (
-                          <div className="flex items-center justify-between xl:justify-end gap-2 w-full xl:w-auto mt-1 xl:mt-0">
-                            <input type="time" value={jamOperasional[hari].buka} onChange={(e) => handleJamChange(hari, 'buka', e.target.value)} className="w-full xl:w-auto border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" />
+                          <div className="flex items-center justify-between xl:justify-end gap-1.5 w-full">
+                            <input type="time" value={jamOperasional[hari].buka} onChange={(e) => handleJamChange(hari, 'buka', e.target.value)} className="w-full xl:w-20 border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" />
                             <span className="text-gray-400 font-bold">-</span>
-                            <input type="time" value={jamOperasional[hari].tutup} onChange={(e) => handleJamChange(hari, 'tutup', e.target.value)} className="w-full xl:w-auto border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" />
+                            <input type="time" value={jamOperasional[hari].tutup} onChange={(e) => handleJamChange(hari, 'tutup', e.target.value)} className="w-full xl:w-20 border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" />
                           </div>
                         ) : (
-                           <div className="w-full xl:w-32 text-center text-xs font-bold text-red-500 bg-red-100 rounded py-1.5 mt-1 xl:mt-0 border border-red-200">TUTUP / LIBUR</div>
+                           <div className="w-full text-center text-xs font-bold text-red-500 bg-red-100 rounded py-1.5 mt-1 xl:mt-0 border border-red-200">TUTUP / LIBUR</div>
                         )}
                       </div>
                     ))}
                   </div>
                 </div>
+
                 <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Deskripsi Daya Tarik</label><textarea required rows={3} value={deskripsiPotensi} onChange={(e)=>setDeskripsiPotensi(e.target.value)} className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white leading-relaxed"></textarea></div>
                 <div><label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Bisa lebih dari 1)</label><label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"><span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2"><span className="text-3xl">📸</span> Klik Pilih File</span><input id="inputFotoPotensi" type="file" accept="image/*" multiple onChange={(e) => { if(e.target.files) setFotoPotensiList(e.target.files)}} className="hidden" /></label></div>
                 
@@ -531,7 +577,6 @@ export default function ProfilUmkm({ activeSubMenu }: { activeSubMenu?: string }
                       {gambarLamaPotensi.map((url, idx) => (
                         <div key={idx} className="relative w-16 h-16 border-2 border-white rounded-lg overflow-hidden group shadow-md">
                           <img src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} className="w-full h-full object-cover" />
-                          {/* PERBAIKAN: opacity-100 di HP */}
                           <button type="button" onClick={() => hapusGambarLamaPotensi(idx)} className="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border border-red-800">X</button>
                         </div>
                       ))}

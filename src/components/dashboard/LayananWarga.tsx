@@ -2,11 +2,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, doc, deleteDoc, updateDoc, query, orderBy, addDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, updateDoc, query, orderBy, addDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-export default function LayananWarga() {
-  const [tabAktif, setTabAktif] = useState("antrean"); // 'antrean', 'master', 'pengaduan'
+// ==========================================
+// SOLUSI ERROR TYPESCRIPT (INTRINSIC ATTRIBUTES)
+// ==========================================
+interface LayananWargaProps {
+  activeSubMenu?: string;
+}
+
+export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
+  // Set default tab berdasarkan activeSubMenu dari sidebar
+  const defaultTab = activeSubMenu === "layan-master" ? "master" 
+                   : activeSubMenu === "layan-pengaduan" ? "pengaduan" 
+                   : activeSubMenu === "layan-hero" ? "hero"
+                   : "antrean";
+
+  const [tabAktif, setTabAktif] = useState(defaultTab);
+
+  useEffect(() => {
+    if (activeSubMenu === "layan-master") setTabAktif("master");
+    else if (activeSubMenu === "layan-pengaduan") setTabAktif("pengaduan");
+    else if (activeSubMenu === "layan-hero") setTabAktif("hero");
+    else setTabAktif("antrean");
+  }, [activeSubMenu]);
+
+  // ==========================================
+  // STATE PENGATURAN HEADER/HERO LAYANAN
+  // ==========================================
+  const [heroJudul, setHeroJudul] = useState("");
+  const [heroSub, setHeroSub] = useState("");
+  const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
+  const [heroBgLama, setHeroBgLama] = useState("");
+  const [statusHero, setStatusHero] = useState("");
+  const [isLoadingHero, setIsLoadingHero] = useState(false);
 
   // ==========================================
   // STATE MASTER SURAT (JENIS SURAT)
@@ -15,7 +45,7 @@ export default function LayananWarga() {
   const [editMasterId, setEditMasterId] = useState<string | null>(null);
   const [namaSurat, setNamaSurat] = useState("");
   const [harusDatang, setHarusDatang] = useState(false);
-  const [persyaratan, setPersyaratan] = useState<string[]>([""]); // Default 1 input kosong
+  const [persyaratan, setPersyaratan] = useState<string[]>([""]); 
   const [isLoadingMaster, setIsLoadingMaster] = useState(false);
 
   // ==========================================
@@ -44,6 +74,14 @@ export default function LayananWarga() {
   const ambilSemuaData = async () => {
     setLoadingData(true);
     try {
+      // Fetch Header Layanan
+      const snapHero = await getDoc(doc(db, "pengaturan_web", "layanan_hero"));
+      if (snapHero.exists() && snapHero.data()) {
+        setHeroJudul(snapHero.data().judul || "Layanan Surat Mandiri");
+        setHeroSub(snapHero.data().sub || "Ajukan surat administrasi langsung dari HP Anda.");
+        setHeroBgLama(snapHero.data().bg || "");
+      }
+
       // Fetch Master Surat
       const qMaster = query(collection(db, "master_surat"));
       const snapMaster = await getDocs(qMaster);
@@ -69,7 +107,6 @@ export default function LayananWarga() {
     ambilSemuaData();
   }, []);
 
-  // Format Nomor WA
   const formatWA = (no: string) => {
     if (!no) return "";
     let formatted = no.replace(/\D/g, "");
@@ -80,8 +117,103 @@ export default function LayananWarga() {
   const formatTanggal = (isoString: string) => {
     if (!isoString) return "-";
     return new Date(isoString).toLocaleString("id-ID", {
-      day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+      day: "numeric", 
+      month: "short", 
+      year: "numeric", 
+      hour: "2-digit", 
+      minute: "2-digit"
     }) + " WIB";
+  };
+
+  // ==========================================
+  // FUNGSI UPLOAD GAMBAR API IMGBB
+  // ==========================================
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
+        if ((encoded.length % 4) > 0) { 
+          encoded += '='.repeat(4 - (encoded.length % 4)); 
+        }
+        resolve(encoded);
+      };
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const uploadFotoKeImgBB = async (file: File) => {
+    try {
+      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("image", base64Data);
+      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
+      
+      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
+        method: "POST", 
+        body: formData 
+      });
+      const data = await res.json();
+      if (data.success) return data.data.url;
+      throw new Error("Jalur utama gagal");
+    } catch (error) {
+      try {
+        const base64Data = await fileToBase64(file);
+        const formData = new FormData();
+        formData.append("image", base64Data);
+        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
+        const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
+        
+        const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
+        const dataCdn = await resCdn.json();
+        if (dataCdn.success) return dataCdn.data.url;
+        return null;
+      } catch (errCdn) { return null; }
+    }
+  };
+
+  // ==========================================
+  // MANAJEMEN PENGATURAN HEADER/HERO LAYANAN
+  // ==========================================
+  const handleSimpanHero = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoadingHero(true);
+    setStatusHero("Menyimpan pengaturan Header...");
+    
+    try {
+      let imageUrl = heroBgLama;
+      
+      if (heroBgList && heroBgList.length > 0) {
+        setStatusHero("Mengunggah gambar background...");
+        const newBg = await uploadFotoKeImgBB(heroBgList[0]);
+        if (newBg) {
+          imageUrl = newBg;
+        } else {
+          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil.");
+          setIsLoadingHero(false); 
+          return; 
+        }
+      }
+
+      await setDoc(doc(db, "pengaturan_web", "layanan_hero"), {
+        judul: heroJudul,
+        sub: heroSub,
+        bg: imageUrl,
+        terakhir_diperbarui: new Date().toISOString()
+      });
+
+      setStatusHero("✅ Pengaturan Header Layanan berhasil diperbarui!");
+      setHeroBgLama(imageUrl); 
+      setHeroBgList(null);
+      const input = document.getElementById("inputBgLayanan") as HTMLInputElement;
+      if (input) input.value = "";
+      setTimeout(() => setStatusHero(""), 4000);
+    } catch (error) {
+      setStatusHero("❌ Gagal menyimpan pengaturan.");
+    } finally {
+      setIsLoadingHero(false);
+    }
   };
 
   // ==========================================
@@ -106,13 +238,11 @@ export default function LayananWarga() {
     e.preventDefault();
     setIsLoadingMaster(true);
     try {
-      // Bersihkan syarat yang kosong
       const cleanPersyaratan = persyaratan.filter(p => p.trim() !== "");
-      
-      const payload = {
-        nama_surat: namaSurat,
-        harus_datang: harusDatang,
-        persyaratan: cleanPersyaratan
+      const payload = { 
+        nama_surat: namaSurat, 
+        harus_datang: harusDatang, 
+        persyaratan: cleanPersyaratan 
       };
 
       if (editMasterId) {
@@ -140,9 +270,9 @@ export default function LayananWarga() {
   };
 
   const batalEditMaster = () => {
-    setEditMasterId(null);
-    setNamaSurat("");
-    setHarusDatang(false);
+    setEditMasterId(null); 
+    setNamaSurat(""); 
+    setHarusDatang(false); 
     setPersyaratan([""]);
   };
 
@@ -165,48 +295,44 @@ export default function LayananWarga() {
 
   const ubahStatusSurat = async (id: string, statusBaru: string) => {
     if (statusBaru === "Ditolak") {
-      setSuratToReject(id);
-      setAlasanTolak("");
+      setSuratToReject(id); 
+      setAlasanTolak(""); 
       setRejectModalOpen(true);
-      return; // Berhenti disini, biarkan pop-up yang handle proses selanjutnya
+      return; 
     }
-
     try {
-      // Jika statusnya bukan ditolak (misal: dikembalikan ke belum diproses), bersihkan alasan penolakan
       await updateDoc(doc(db, "layanan_surat", id), { 
-        status: statusBaru,
-        alasan_penolakan: "" // Reset jika sebelumnya pernah ditolak
+        status: statusBaru, 
+        alasan_penolakan: "" 
       });
       ambilSemuaData();
-    } catch (error) {
-      alert("Gagal merubah status.");
+    } catch (error) { 
+      alert("Gagal merubah status."); 
     }
   };
 
   const konfirmasiPenolakan = async () => {
     if (!suratToReject) return;
-    if (!alasanTolak.trim()) {
-      alert("Alasan penolakan wajib diisi agar warga tahu kesalahannya!");
-      return;
+    if (!alasanTolak.trim()) { 
+      alert("Alasan penolakan wajib diisi agar warga tahu kesalahannya!"); 
+      return; 
     }
-
     try {
-      await updateDoc(doc(db, "layanan_surat", suratToReject), {
-        status: "Ditolak",
-        alasan_penolakan: alasanTolak
+      await updateDoc(doc(db, "layanan_surat", suratToReject), { 
+        status: "Ditolak", 
+        alasan_penolakan: alasanTolak 
       });
-      setRejectModalOpen(false);
-      setSuratToReject(null);
-      setAlasanTolak("");
+      setRejectModalOpen(false); 
+      setSuratToReject(null); 
+      setAlasanTolak(""); 
       ambilSemuaData();
-    } catch (error) {
-      alert("Gagal menyimpan penolakan.");
+    } catch (error) { 
+      alert("Gagal menyimpan penolakan."); 
     }
   };
 
   const pembersihanSuratOtomatis = async () => {
     if (!confirm(`Tindakan ini akan menghapus riwayat surat yang usianya melebihi ${batasHapusSurat} hari. Lanjutkan?`)) return;
-    
     setIsCleaningSurat(true);
     try {
       const limitDate = new Date();
@@ -214,7 +340,7 @@ export default function LayananWarga() {
       
       let countDeleted = 0;
       const deletePromises = [];
-
+      
       for (const surat of antreanSurat) {
         const tglSurat = new Date(surat.tanggal_pengajuan);
         if (tglSurat < limitDate) {
@@ -222,14 +348,13 @@ export default function LayananWarga() {
           countDeleted++;
         }
       }
-
       await Promise.all(deletePromises);
       alert(`✅ Berhasil menghapus ${countDeleted} data antrean surat usang.`);
       ambilSemuaData();
-    } catch (error) {
-      alert("❌ Gagal melakukan pembersihan otomatis.");
-    } finally {
-      setIsCleaningSurat(false);
+    } catch (error) { 
+      alert("❌ Gagal melakukan pembersihan otomatis."); 
+    } finally { 
+      setIsCleaningSurat(false); 
     }
   };
 
@@ -243,53 +368,157 @@ export default function LayananWarga() {
     }
   };
 
-
   return (
     <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {/* TABS NAVIGASI */}
-      <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-        <button 
-          onClick={() => setTabAktif("antrean")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "antrean" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
-        >
-          <span className="text-xl">📄</span> Antrean Surat
-        </button>
-        <button 
-          onClick={() => setTabAktif("master")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "master" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
-        >
-          <span className="text-xl">⚙️</span> Daftar Jenis Surat
-        </button>
-        <button 
-          onClick={() => setTabAktif("pengaduan")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "pengaduan" ? "bg-red-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
-        >
-          <span className="text-xl">📥</span> Kotak Pengaduan
-        </button>
-      </div>
+      {/* TABS NAVIGASI (Hanya tampil jika tidak ada submenu spesifik yang dipilih) */}
+      {!activeSubMenu && (
+        <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+          <button 
+            onClick={() => setTabAktif("antrean")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "antrean" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">📄</span> Antrean Surat
+          </button>
+          
+          <button 
+            onClick={() => setTabAktif("master")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "master" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">⚙️</span> Daftar Jenis Surat
+          </button>
+          
+          <button 
+            onClick={() => setTabAktif("pengaduan")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "pengaduan" ? "bg-red-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">📥</span> Kotak Pengaduan
+          </button>
+        </div>
+      )}
 
       {loadingData ? (
-        <div className="flex justify-center py-20"><div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div></div>
+        <div className="flex justify-center py-20">
+          <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
       ) : (
         <>
+          {/* ==========================================
+              TAB 0: PENGATURAN HEADER LAYANAN
+          ========================================== */}
+          {tabAktif === "hero" && (
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-500 animate-fade-in">
+              <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Layanan Mandiri</h3>
+              <p className="text-gray-500 text-sm mb-6">Sesuaikan gambar background dan teks sambutan khusus di halaman Layanan Surat Warga.</p>
+              
+              <form onSubmit={handleSimpanHero} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-sm font-bold mb-2 text-gray-800">Judul Header</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={heroJudul} 
+                        onChange={(e) => setHeroJudul(e.target.value)} 
+                        className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 focus:bg-white transition-all font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold mb-2 text-gray-800">Teks Sub-Judul (Deskripsi Singkat)</label>
+                      <textarea 
+                        required 
+                        rows={4} 
+                        value={heroSub} 
+                        onChange={(e) => setHeroSub(e.target.value)} 
+                        className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                      ></textarea>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <label className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2">Gambar Background Header</label>
+                    
+                    {heroBgLama && (
+                      <div className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200 group">
+                        <img 
+                          src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                          alt="Hero Background"
+                          className="w-full h-full object-cover" 
+                        />
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          <button 
+                            type="button" 
+                            onClick={() => setHeroBgLama("")} 
+                            className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
+                          >
+                            Hapus Background
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-purple-50 border-2 border-dashed border-purple-300 rounded-xl hover:bg-purple-100 transition-all shadow-sm">
+                      <span className="text-3xl mb-2">📸</span>
+                      <span className="font-bold text-purple-800 text-sm">Upload Background Baru</span>
+                      <input 
+                        id="inputBgLayanan" 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => setHeroBgList(e.target.files)} 
+                        className="hidden" 
+                      />
+                    </label>
+                    
+                    {heroBgList && (
+                      <div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">
+                        ✅ Gambar baru siap diunggah.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {statusHero && (
+                  <div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusHero.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>
+                    {statusHero}
+                  </div>
+                )}
+                
+                <button 
+                  type="submit" 
+                  disabled={isLoadingHero} 
+                  className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+                >
+                  {isLoadingHero ? "Menyimpan Pengaturan..." : "Simpan Header Layanan"}
+                </button>
+              </form>
+            </div>
+          )}
+
           {/* ==========================================
               TAB 1: ANTREAN SURAT
           ========================================== */}
           {tabAktif === "antrean" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
+              
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-gray-900">📄 Antrean Layanan Surat</h3>
                   <p className="text-sm text-gray-500 mt-1">Periksa berkas, ubah status, dan hubungi warga terkait.</p>
                 </div>
                 
-                {/* AUTO-CLEAN SURAT */}
                 <div className="flex flex-wrap items-center gap-2 bg-red-50 p-2 rounded-xl border border-red-200 w-full md:w-auto">
                   <span className="text-xs font-bold text-red-800 ml-2">🧹 Auto-Clean:</span>
                   <select 
                     value={batasHapusSurat} 
-                    onChange={(e) => setBatasHapusSurat(e.target.value)}
+                    onChange={(e) => setBatasHapusSurat(e.target.value)} 
                     className="text-xs font-bold p-1.5 rounded-lg outline-none border border-red-300"
                   >
                     <option value="7">7 Hari</option>
@@ -298,8 +527,8 @@ export default function LayananWarga() {
                     <option value="90">3 Bulan</option>
                   </select>
                   <button 
-                    onClick={pembersihanSuratOtomatis}
-                    disabled={isCleaningSurat}
+                    onClick={pembersihanSuratOtomatis} 
+                    disabled={isCleaningSurat} 
                     className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     {isCleaningSurat ? "Memproses..." : "Bersihkan"}
@@ -321,14 +550,19 @@ export default function LayananWarga() {
                     {antreanSurat.map((surat) => (
                       <tr key={surat.id} className="border-b hover:bg-yellow-50/50 transition-colors">
                         <td className="py-4 px-4 align-top">
-                          <div className="text-xs font-bold text-gray-400 mb-1">{formatTanggal(surat.tanggal_pengajuan)}</div>
-                          <div className="font-black text-gray-900 text-lg uppercase leading-tight">{surat.nama}</div>
-                          <div className="text-sm font-mono text-gray-600 mb-2">NIK: {surat.nik}</div>
-                          
-                          {/* TOMBOL WA PRIVAT ADMIN */}
+                          <div className="text-xs font-bold text-gray-400 mb-1">
+                            {formatTanggal(surat.tanggal_pengajuan)}
+                          </div>
+                          <div className="font-black text-gray-900 text-lg uppercase leading-tight">
+                            {surat.nama}
+                          </div>
+                          <div className="text-sm font-mono text-gray-600 mb-2">
+                            NIK: {surat.nik}
+                          </div>
                           <a 
-                            href={`https://wa.me/${formatWA(surat.wa)}?text=Halo%20Sdr/i%20${surat.nama},%20ini%20dari%20Admin%20Layanan%20Desa%20Kerjo%20terkait%20pengajuan%20surat%20Anda.`}
-                            target="_blank" rel="noreferrer"
+                            href={`https://wa.me/${formatWA(surat.wa)}?text=Halo%20Sdr/i%20${surat.nama},%20ini%20dari%20Admin%20Layanan%20Desa%20Kerjo%20terkait%20pengajuan%20surat%20Anda.`} 
+                            target="_blank" 
+                            rel="noreferrer" 
                             className="inline-flex items-center gap-1.5 bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 font-bold px-3 py-1 rounded-lg text-xs transition-colors"
                           >
                             <span className="text-base">💬</span> Chat Warga
@@ -351,10 +585,11 @@ export default function LayananWarga() {
                                   href={surat.berkas[key]} 
                                   target="_blank" 
                                   rel="noreferrer" 
-                                  className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white px-2 py-1 rounded flex justify-between items-center transition-colors"
+                                  className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white px-2 py-1 rounded flex justify-between items-center transition-colors" 
                                   title="Lihat Berkas"
                                 >
-                                  <span className="truncate w-32">{key}</span> <span>👁️</span>
+                                  <span className="truncate w-32">{key}</span> 
+                                  <span>👁️</span>
                                 </a>
                               ))}
                             </div>
@@ -365,15 +600,14 @@ export default function LayananWarga() {
                           )}
                         </td>
                         <td className="py-4 px-4 text-center align-top">
-                          {/* KONTROL STATUS (Bisa Diubah-ubah Terus) */}
                           <div className="flex flex-col gap-2 items-center">
                             <select 
                               value={surat.status || "Menunggu"} 
-                              onChange={(e) => ubahStatusSurat(surat.id, e.target.value)}
+                              onChange={(e) => ubahStatusSurat(surat.id, e.target.value)} 
                               className={`text-xs font-bold px-3 py-2 rounded-lg outline-none w-32 border-2 cursor-pointer shadow-sm ${
-                                surat.status === "Selesai" ? "bg-green-50 text-green-700 border-green-500" :
-                                surat.status === "Diproses" ? "bg-blue-50 text-blue-700 border-blue-500" :
-                                surat.status === "Ditolak" ? "bg-red-50 text-red-700 border-red-500" :
+                                surat.status === "Selesai" ? "bg-green-50 text-green-700 border-green-500" : 
+                                surat.status === "Diproses" ? "bg-blue-50 text-blue-700 border-blue-500" : 
+                                surat.status === "Ditolak" ? "bg-red-50 text-red-700 border-red-500" : 
                                 "bg-yellow-50 text-yellow-700 border-yellow-500"
                               }`}
                             >
@@ -382,14 +616,13 @@ export default function LayananWarga() {
                               <option value="Selesai">🟢 Selesai</option>
                               <option value="Ditolak">🔴 Ditolak</option>
                             </select>
-
-                            {/* Info Penolakan jika ada */}
+                            
                             {surat.status === "Ditolak" && surat.alasan_penolakan && (
                               <div className="text-[10px] text-red-600 font-medium italic w-32 leading-tight bg-red-50 p-1.5 rounded border border-red-100">
                                 "{surat.alasan_penolakan}"
                               </div>
                             )}
-
+                            
                             <button 
                               onClick={() => hapusSurat(surat.id)} 
                               className="mt-2 text-[10px] text-red-500 hover:text-red-700 font-bold underline"
@@ -401,7 +634,11 @@ export default function LayananWarga() {
                       </tr>
                     ))}
                     {antreanSurat.length === 0 && (
-                      <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Belum ada antrean surat masuk.</td></tr>
+                      <tr>
+                        <td colSpan={4} className="text-center py-10 text-gray-500 font-medium">
+                          Belum ada antrean surat masuk.
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -410,7 +647,7 @@ export default function LayananWarga() {
           )}
 
           {/* ==========================================
-              TAB 2: MASTER SURAT (PENGATURAN JENIS SURAT)
+              TAB 2: MASTER SURAT
           ========================================== */}
           {tabAktif === "master" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in">
@@ -422,14 +659,18 @@ export default function LayananWarga() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
-                {/* Form Input Master Surat */}
                 <div className="lg:col-span-1 bg-blue-50 p-6 rounded-2xl border border-blue-200 shadow-inner h-fit">
                   <div className="flex justify-between items-center mb-5">
                     <h4 className="font-bold text-blue-900">{editMasterId ? "✏️ Edit Surat" : "Buat Jenis Surat Baru"}</h4>
-                    {editMasterId && <button onClick={batalEditMaster} className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded font-bold transition-colors">Batal</button>}
+                    {editMasterId && (
+                      <button 
+                        onClick={batalEditMaster} 
+                        className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded font-bold transition-colors"
+                      >
+                        Batal
+                      </button>
+                    )}
                   </div>
-                  
                   <form onSubmit={simpanMasterSurat} className="space-y-5">
                     <div>
                       <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama/Jenis Surat</label>
@@ -438,7 +679,7 @@ export default function LayananWarga() {
                         required 
                         value={namaSurat} 
                         onChange={(e) => setNamaSurat(e.target.value)} 
-                        placeholder="Misal: Surat Keterangan Usaha"
+                        placeholder="Misal: Surat Keterangan Usaha" 
                         className="w-full p-3 rounded-xl border border-blue-300 outline-none focus:ring-2 focus:ring-blue-600 bg-white" 
                       />
                     </div>
@@ -454,14 +695,20 @@ export default function LayananWarga() {
                           />
                         </div>
                         <div>
-                          <span className="block text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors">Harus Datang Langsung</span>
-                          <span className="block text-xs text-gray-500 mt-0.5 leading-snug">Jika dicentang, warga tidak perlu mengunggah foto berkas. Warga hanya mengisi NIK & keperluan, lalu membawa berkas fisik ke kantor desa.</span>
+                          <span className="block text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                            Harus Datang Langsung
+                          </span>
+                          <span className="block text-xs text-gray-500 mt-0.5 leading-snug">
+                            Jika dicentang, warga tidak perlu mengunggah foto berkas.
+                          </span>
                         </div>
                       </label>
                     </div>
-
+                    
                     <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
-                      <label className="block text-xs font-bold mb-3 text-gray-800 border-b border-gray-100 pb-2">Daftar Persyaratan Berkas</label>
+                      <label className="block text-xs font-bold mb-3 text-gray-800 border-b border-gray-100 pb-2">
+                        Daftar Persyaratan Berkas
+                      </label>
                       <div className="space-y-3">
                         {persyaratan.map((syarat, index) => (
                           <div key={index} className="flex gap-2 items-center">
@@ -471,13 +718,13 @@ export default function LayananWarga() {
                               required 
                               value={syarat} 
                               onChange={(e) => handlePersyaratanChange(index, e.target.value)} 
-                              placeholder="Misal: Foto KTP Asli"
+                              placeholder="Misal: Foto KTP Asli" 
                               className="w-full p-2.5 text-sm rounded-lg border border-gray-300 outline-none focus:border-blue-500 bg-gray-50 focus:bg-white" 
                             />
                             <button 
                               type="button" 
-                              onClick={() => hapusPersyaratanField(index)}
-                              className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition-colors font-black"
+                              onClick={() => hapusPersyaratanField(index)} 
+                              className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition-colors font-black" 
                               title="Hapus Syarat"
                             >
                               X
@@ -487,7 +734,7 @@ export default function LayananWarga() {
                       </div>
                       <button 
                         type="button" 
-                        onClick={tambahPersyaratanField}
+                        onClick={tambahPersyaratanField} 
                         className="mt-4 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 rounded-lg border border-blue-200 border-dashed text-xs transition-colors"
                       >
                         + Tambah Kolom Persyaratan Baru
@@ -503,8 +750,7 @@ export default function LayananWarga() {
                     </button>
                   </form>
                 </div>
-
-                {/* Tabel Master Surat */}
+                
                 <div className="lg:col-span-2 overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white p-4">
                   <table className="min-w-full text-sm text-left">
                     <thead className="bg-gray-50 border-b">
@@ -545,19 +791,32 @@ export default function LayananWarga() {
                           </td>
                           <td className="py-4 px-4 text-center align-top">
                             <div className="flex flex-col gap-2 items-center">
-                              <button onClick={() => mulaiEditMaster(item)} className="w-full max-w-[80px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors">Edit</button>
-                              <button onClick={() => hapusMasterSurat(item.id)} className="w-full max-w-[80px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors">Hapus</button>
+                              <button 
+                                onClick={() => mulaiEditMaster(item)} 
+                                className="w-full max-w-[80px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors"
+                              >
+                                Edit
+                              </button>
+                              <button 
+                                onClick={() => hapusMasterSurat(item.id)} 
+                                className="w-full max-w-[80px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors"
+                              >
+                                Hapus
+                              </button>
                             </div>
                           </td>
                         </tr>
                       ))}
                       {masterSuratList.length === 0 && (
-                        <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Belum ada Jenis Surat yang didaftarkan.</td></tr>
+                        <tr>
+                          <td colSpan={4} className="text-center py-10 text-gray-500 font-medium">
+                            Belum ada Jenis Surat yang didaftarkan.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
-
               </div>
             </div>
           )}
@@ -568,7 +827,6 @@ export default function LayananWarga() {
           {tabAktif === "pengaduan" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-red-600 animate-fade-in">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">📥 Kotak Pengaduan Masyarakat</h3>
-              
               <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
                 <table className="min-w-full text-sm text-left">
                   <thead className="bg-gray-50 border-b">
@@ -585,7 +843,12 @@ export default function LayananWarga() {
                         <td className="py-4 px-4 align-top">
                           <div className="font-bold text-gray-900 text-base">{aduan.nama}</div>
                           <div className="text-xs text-gray-500 mb-1">{formatTanggal(aduan.tanggal)}</div>
-                          <a href={`https://wa.me/${formatWA(aduan.wa)}`} target="_blank" rel="noreferrer" className="text-[10px] bg-green-50 text-green-700 border border-green-200 font-bold px-2 py-0.5 rounded flex items-center gap-1 w-max hover:bg-green-600 hover:text-white transition-colors">
+                          <a 
+                            href={`https://wa.me/${formatWA(aduan.wa)}`} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="text-[10px] bg-green-50 text-green-700 border border-green-200 font-bold px-2 py-0.5 rounded flex items-center gap-1 w-max hover:bg-green-600 hover:text-white transition-colors"
+                          >
                             <span>💬</span> WA Pelapor
                           </a>
                         </td>
@@ -597,19 +860,28 @@ export default function LayananWarga() {
                         <td className="py-4 px-4 align-top">
                           <p className="text-sm text-gray-600 line-clamp-2 max-w-sm italic mb-2">"{aduan.pesan}"</p>
                           <button 
-                            onClick={() => setPengaduanTerpilih(aduan)}
+                            onClick={() => setPengaduanTerpilih(aduan)} 
                             className="text-xs font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
                           >
                             📖 Baca Laporan Lengkap
                           </button>
                         </td>
                         <td className="py-4 px-4 text-center align-top">
-                          <button onClick={() => hapusPengaduan(aduan.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors">Hapus Aduan</button>
+                          <button 
+                            onClick={() => hapusPengaduan(aduan.id)} 
+                            className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors"
+                          >
+                            Hapus Aduan
+                          </button>
                         </td>
                       </tr>
                     ))}
                     {daftarPengaduan.length === 0 && (
-                      <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Kotak pengaduan kosong.</td></tr>
+                      <tr>
+                        <td colSpan={4} className="text-center py-10 text-gray-500 font-medium">
+                          Kotak pengaduan kosong.
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -627,7 +899,12 @@ export default function LayananWarga() {
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
             <div className="bg-red-600 text-white p-6 flex justify-between items-center">
               <h3 className="text-xl font-black flex items-center gap-2"><span>📥</span> Detail Pengaduan</h3>
-              <button onClick={() => setPengaduanTerpilih(null)} className="text-white hover:bg-red-700 bg-red-500 w-8 h-8 rounded-full font-black flex items-center justify-center transition-colors">X</button>
+              <button 
+                onClick={() => setPengaduanTerpilih(null)} 
+                className="text-white hover:bg-red-700 bg-red-500 w-8 h-8 rounded-full font-black flex items-center justify-center transition-colors"
+              >
+                X
+              </button>
             </div>
             <div className="p-6 md:p-8 overflow-y-auto">
               <div className="flex flex-wrap gap-4 mb-6 text-sm">
@@ -652,7 +929,9 @@ export default function LayananWarga() {
               </div>
               <div className="mt-6 flex justify-end">
                 <a 
-                  href={`https://wa.me/${formatWA(pengaduanTerpilih.wa)}`} target="_blank" rel="noreferrer"
+                  href={`https://wa.me/${formatWA(pengaduanTerpilih.wa)}`} 
+                  target="_blank" 
+                  rel="noreferrer" 
                   className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2"
                 >
                   <span className="text-xl">💬</span> Hubungi Pelapor via WA
@@ -674,11 +953,11 @@ export default function LayananWarga() {
               <p className="text-sm text-gray-500 mb-6">Berikan alasan mengapa permohonan surat ini ditolak (misal: Foto KTP buram, NIK tidak sesuai, dll) agar warga dapat memperbaikinya.</p>
               
               <textarea 
-                rows={4}
-                required
-                value={alasanTolak}
-                onChange={(e) => setAlasanTolak(e.target.value)}
-                placeholder="Tuliskan alasan penolakan secara jelas disini..."
+                rows={4} 
+                required 
+                value={alasanTolak} 
+                onChange={(e) => setAlasanTolak(e.target.value)} 
+                placeholder="Tuliskan alasan penolakan secara jelas disini..." 
                 className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-red-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed mb-6"
               ></textarea>
               
