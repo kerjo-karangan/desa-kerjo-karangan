@@ -55,7 +55,7 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
       />
       {gambarArray.length > 1 && (
         <>
-          {/* PERBAIKAN: opacity-100 agar tombol panah PERMANEN muncul di HP */}
+          {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
           <button 
             onClick={prevSlide} 
             className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 md:p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold border border-gray-200 z-10"
@@ -112,9 +112,15 @@ function KabarContent() {
     }
   }, [tabQuery]);
 
+  // Reset pagination ke halaman 1 jika user ganti tab, mencari, atau mengubah jumlah baris
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tabAktif, searchTerm, itemsPerPage]);
+
   useEffect(() => {
     const ambilData = async () => {
       try {
+        // Ambil Data Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const dataKabar: any[] = [];
@@ -123,6 +129,7 @@ function KabarContent() {
         });
         setDaftarBerita(dataKabar);
 
+        // Ambil Data Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const dataAgenda: any[] = [];
@@ -150,26 +157,46 @@ function KabarContent() {
     });
   };
 
+  // ==========================================
+  // LOGIKA FILTER DAN SORTING BERITA
+  // ==========================================
   const beritaTerfilter = daftarBerita.filter((b) => 
     b.judul.toLowerCase().includes(searchTerm.toLowerCase()) || 
     b.isi.toLowerCase().includes(searchTerm.toLowerCase())
   );
   
+  const indexOfLastBerita = currentPage * itemsPerPage;
+  const indexOfFirstBerita = indexOfLastBerita - itemsPerPage;
+  const currentBerita = beritaTerfilter.slice(indexOfFirstBerita, indexOfLastBerita);
+  const totalPagesBerita = Math.ceil(beritaTerfilter.length / itemsPerPage);
+
+  // ==========================================
+  // LOGIKA FILTER DAN SORTING AGENDA 
+  // (Pemisahan Agenda Terdekat & Kedaluwarsa)
+  // ==========================================
   const agendaTerfilter = daftarAgenda.filter((a) => 
     a.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
     a.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // LOGIKA PAGINATION
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentBerita = beritaTerfilter.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(beritaTerfilter.length / itemsPerPage);
+  const now = new Date();
+  // Agenda yang belum lewat (tanggal >= sekarang), diurutkan dari yang paling dekat
+  const agendaAkanDatang = agendaTerfilter
+    .filter(a => new Date(a.tanggal) >= now)
+    .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
-  // Reset pagination ke halaman 1 jika user melakukan pencarian baru atau ubah jumlah baris
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, itemsPerPage]);
+  // Agenda yang sudah lewat (tanggal < sekarang), diurutkan dari yang baru saja lewat
+  const agendaLewat = agendaTerfilter
+    .filter(a => new Date(a.tanggal) < now)
+    .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+
+  // Gabungkan keduanya: Yang Terdekat di atas, Yang Lewat di bawah
+  const agendaDisusun = [...agendaAkanDatang, ...agendaLewat];
+
+  const indexOfLastAgenda = currentPage * itemsPerPage;
+  const indexOfFirstAgenda = indexOfLastAgenda - itemsPerPage;
+  const currentAgenda = agendaDisusun.slice(indexOfFirstAgenda, indexOfLastAgenda);
+  const totalPagesAgenda = Math.ceil(agendaDisusun.length / itemsPerPage);
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -229,7 +256,9 @@ function KabarContent() {
           </button>
         </div>
 
-        {/* KONTEN BERITA */}
+        {/* ==========================================
+            KONTEN TAB BERITA 
+        ========================================== */}
         {(tabAktif === "berita" || !tabAktif) && (
           <div className="animate-fade-in">
             
@@ -306,8 +335,8 @@ function KabarContent() {
               </div>
             )}
 
-            {/* KOMPONEN PAGINATION */}
-            {totalPages > 1 && (
+            {/* KOMPONEN PAGINATION BERITA */}
+            {totalPagesBerita > 1 && (
               <div className="flex justify-center items-center gap-2 mt-12 mb-8 flex-wrap">
                 <button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
@@ -317,7 +346,7 @@ function KabarContent() {
                   &laquo; Prev
                 </button>
                 
-                {Array.from({ length: totalPages }, (_, i) => (
+                {Array.from({ length: totalPagesBerita }, (_, i) => (
                   <button 
                     key={i} 
                     onClick={() => setCurrentPage(i + 1)} 
@@ -332,8 +361,8 @@ function KabarContent() {
                 ))}
 
                 <button 
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPagesBerita))} 
+                  disabled={currentPage === totalPagesBerita}
                   className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
                 >
                   Next &raquo;
@@ -343,9 +372,30 @@ function KabarContent() {
           </div>
         )}
 
-        {/* KONTEN AGENDA */}
+        {/* ==========================================
+            KONTEN TAB AGENDA 
+        ========================================== */}
         {tabAktif === "agenda" && (
           <div className="animate-fade-in">
+            
+            {/* FITUR DROPDOWN TAMPILKAN BARIS AGENDA */}
+            {!loading && agendaDisusun.length > 0 && (
+              <div className="flex justify-end mb-6">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
+                  <span className="text-sm font-bold text-gray-600">Tampilkan:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block p-1.5 font-bold outline-none cursor-pointer"
+                  >
+                    <option value={10}>10 Baris</option>
+                    <option value={20}>20 Baris</option>
+                    <option value={50}>50 Baris</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
               <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-8 flex items-center gap-3 border-b border-gray-100 pb-6">
                 <span className="text-4xl">📅</span> Kalender Kegiatan Lengkap
@@ -354,7 +404,7 @@ function KabarContent() {
               <div className="space-y-6">
                 {loading ? (
                    <p className="text-gray-400 animate-pulse text-center py-10">Memuat jadwal kegiatan...</p>
-                ) : agendaTerfilter.length === 0 ? (
+                ) : agendaDisusun.length === 0 ? (
                   <div className="border-2 border-dashed border-gray-200 p-12 rounded-3xl text-center bg-gray-50 max-w-2xl mx-auto">
                     <span className="text-6xl text-gray-300 mb-4 block">🗓️</span>
                     <p className="text-gray-500 font-bold text-xl">
@@ -365,7 +415,7 @@ function KabarContent() {
                     </p>
                   </div>
                 ) : (
-                  agendaTerfilter.map((agenda) => {
+                  currentAgenda.map((agenda) => {
                     const tgl = new Date(agenda.tanggal);
                     const isLewat = tgl < new Date();
 
@@ -376,7 +426,7 @@ function KabarContent() {
                           <span className="text-3xl font-black leading-none my-1">{tgl.getDate()}</span>
                           <span className="text-xs font-bold">{tgl.getFullYear()}</span>
                         </div>
-                        <div className="flex flex-col justify-center">
+                        <div className="flex flex-col justify-center flex-grow">
                           <h4 className={`font-bold text-xl leading-tight transition-colors ${isLewat ? 'text-gray-500 line-through' : 'text-gray-900 group-hover:text-green-700'}`}>
                             {agenda.nama}
                           </h4>
@@ -387,7 +437,19 @@ function KabarContent() {
                             <p className="text-sm text-gray-600 font-medium flex items-center gap-2 bg-white px-3 py-1 rounded-md border border-gray-100 shadow-sm">
                               <span className="text-lg">📍</span> {agenda.lokasi}
                             </p>
+                            {isLewat && (
+                              <p className="text-xs text-red-500 font-bold flex items-center gap-1 bg-red-50 px-2 py-1 rounded-md border border-red-100">
+                                ⚠️ Telah Lewat
+                              </p>
+                            )}
                           </div>
+                          
+                          {/* FITUR BARU: Menampilkan Deskripsi Agenda */}
+                          {agenda.deskripsi && (
+                            <p className="text-sm text-gray-500 mt-4 italic leading-relaxed border-t border-gray-100 pt-3">
+                              "{agenda.deskripsi}"
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
@@ -395,6 +457,41 @@ function KabarContent() {
                 )}
               </div>
             </div>
+
+            {/* KOMPONEN PAGINATION AGENDA */}
+            {totalPagesAgenda > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-12 mb-8 flex-wrap">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  &laquo; Prev
+                </button>
+                
+                {Array.from({ length: totalPagesAgenda }, (_, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setCurrentPage(i + 1)} 
+                    className={`w-10 h-10 rounded-xl font-bold shadow-sm transition-colors ${
+                      currentPage === i + 1 
+                      ? "bg-green-600 text-white border-green-600" 
+                      : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPagesAgenda))} 
+                  disabled={currentPage === totalPagesAgenda}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  Next &raquo;
+                </button>
+              </div>
+            )}
           </div>
         )}
 

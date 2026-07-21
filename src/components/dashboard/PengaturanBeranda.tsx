@@ -6,6 +6,11 @@ import { collection, addDoc, doc, setDoc, getDoc, query, orderBy, getDocs, delet
 import { db } from "../../lib/firebase";
 
 export default function PengaturanBeranda({ userEmail }: { userEmail: string | null }) {
+  const getLocalDatetime = (d = new Date()) => {
+    const tzOffset = d.getTimezoneOffset() * 60000; 
+    return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+  };
+
   // ==========================================
   // STATE PENGATURAN TAMPILAN BERANDA (HERO)
   // ==========================================
@@ -21,6 +26,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   // ==========================================
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
+  const [tanggalKabar, setTanggalKabar] = useState(getLocalDatetime()); // State Tanggal Berita
   const [fotoKabarList, setFotoKabarList] = useState<FileList | null>(null);
   const [statusKabar, setStatusKabar] = useState("");
   const [isLoadingKabar, setIsLoadingKabar] = useState(false);
@@ -192,11 +198,14 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       }
       const gambarFinal = [...gambarLamaKabar, ...tautanGambarBaru];
       
+      const finalTanggalPosting = new Date(tanggalKabar).toISOString();
+
       if (editKabarId) {
         await updateDoc(doc(db, "kabar_desa", editKabarId), { 
           judul: judulKabar, 
           isi: isiKabar, 
-          gambar: gambarFinal 
+          gambar: gambarFinal,
+          tanggal_posting: finalTanggalPosting
         });
         setStatusKabar("✅ Diperbarui!");
       } else {
@@ -204,7 +213,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           judul: judulKabar, 
           isi: isiKabar, 
           gambar: gambarFinal, 
-          tanggal_posting: new Date().toISOString(), 
+          tanggal_posting: finalTanggalPosting, 
           penulis: userEmail, 
           is_featured: true, 
           is_pinned: false
@@ -227,6 +236,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     setEditKabarId(item.id); 
     setJudulKabar(item.judul); 
     setIsiKabar(item.isi);
+    setTanggalKabar(item.tanggal_posting ? getLocalDatetime(new Date(item.tanggal_posting)) : getLocalDatetime());
     setGambarLamaKabar(Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : []);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -239,6 +249,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     setEditKabarId(null); 
     setJudulKabar(""); 
     setIsiKabar(""); 
+    setTanggalKabar(getLocalDatetime());
     setGambarLamaKabar([]); 
     setFotoKabarList(null);
     const input = document.getElementById("inputFotoKabarBeranda") as HTMLInputElement;
@@ -289,7 +300,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         <form onSubmit={handleSimpanHero} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
-            {/* Form Teks */}
             <div className="space-y-5">
               <div>
                 <label className="block text-sm font-bold mb-2 text-gray-800">Judul Utama (Mendukung baris baru/Enter)</label>
@@ -313,7 +323,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               </div>
             </div>
 
-            {/* Form Gambar */}
             <div className="space-y-4">
               <label className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2">Gambar Background Beranda</label>
               
@@ -324,7 +333,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                     alt="Background Beranda" 
                     className="w-full h-full object-cover" 
                   />
-                  {/* PERBAIKAN: opacity-100 di HP, baru mode hover di laptop */}
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                     <button 
                       type="button" 
@@ -391,15 +399,27 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </div>
 
         <form onSubmit={handleSimpanKabar} className="space-y-5 mt-6">
-          <div>
-            <label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label>
-            <input 
-              type="text" 
-              required 
-              value={judulKabar} 
-              onChange={(e) => setJudulKabar(e.target.value)} 
-              className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold" 
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold mb-2 text-gray-800">Judul Berita Utama</label>
+              <input 
+                type="text" 
+                required 
+                value={judulKabar} 
+                onChange={(e) => setJudulKabar(e.target.value)} 
+                className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold" 
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-bold mb-2 text-gray-800">Tanggal Publikasi</label>
+              <input 
+                type="datetime-local" 
+                required 
+                value={tanggalKabar} 
+                onChange={(e) => setTanggalKabar(e.target.value)} 
+                className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold text-gray-700" 
+              />
+            </div>
           </div>
           
           {editKabarId && gambarLamaKabar.length > 0 && (
@@ -412,7 +432,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                       src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} 
                       className="w-full h-full object-cover" 
                     />
-                    {/* PERBAIKAN: opacity-100 di HP, hover di laptop */}
                     <button 
                       type="button" 
                       onClick={() => hapusGambarDariDaftarLamaKabar(idx)} 
@@ -498,7 +517,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               return (
                 <tr key={item.id} className={`border-b transition-colors ${isPinned ? 'bg-yellow-50/50 hover:bg-yellow-50' : 'hover:bg-gray-50'}`}>
                   <td className="py-4 px-4 font-medium text-gray-500 whitespace-nowrap">
-                    {new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric'})}
+                    {item.tanggal_posting ? new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric'}) : "-"}
                   </td>
                   <td className="py-4 px-4">
                     <div className="font-bold text-gray-900 text-base mb-1">

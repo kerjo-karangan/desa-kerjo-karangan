@@ -1,315 +1,501 @@
-// src/app/page.tsx
+// src/app/kabar/page.tsx
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { useEffect, useState, Suspense } from "react";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link"; 
 
-export default function Home() {
+// ==========================================
+// KOMPONEN PEMBUNGKUS UTAMA (MENGHINDARI ERROR SUSPENSE)
+// ==========================================
+export default function KabarDesa() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <KabarContent />
+    </Suspense>
+  );
+}
+
+// ==========================================
+// KOMPONEN SLIDER GAMBAR UNTUK BERITA DESA
+// ==========================================
+const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(() => {
+    if (gambarArray.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prevIndex) => (prevIndex === gambarArray.length - 1 ? 0 : prevIndex + 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [gambarArray.length]);
+
+  const prevSlide = () => {
+    setCurrentIndex(currentIndex === 0 ? gambarArray.length - 1 : currentIndex - 1);
+  };
+  
+  const nextSlide = () => {
+    setCurrentIndex(currentIndex === gambarArray.length - 1 ? 0 : currentIndex + 1);
+  };
+
+  if (gambarArray.length === 0) return null;
+
+  return (
+    <div className="relative w-full h-64 md:h-96 mb-6 group overflow-hidden rounded-2xl shadow-sm bg-gray-100 border border-gray-200">
+      <img 
+        src={gambarArray[currentIndex].startsWith("http") ? gambarArray[currentIndex] : `https://wsrv.nl/?url=${gambarArray[currentIndex]}`} 
+        alt="Dokumentasi Kabar Desa" 
+        className="w-full h-full object-cover transition-opacity duration-500"
+      />
+      {gambarArray.length > 1 && (
+        <>
+          {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
+          <button 
+            onClick={prevSlide} 
+            className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 md:p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold border border-gray-200 z-10"
+          >
+            &#10094;
+          </button>
+          
+          <button 
+            onClick={nextSlide} 
+            className="absolute top-1/2 right-3 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 md:p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold border border-gray-200 z-10"
+          >
+            &#10095;
+          </button>
+          
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center space-x-2 z-10">
+            {gambarArray.map((_, idx) => (
+              <span 
+                key={idx} 
+                className={`block w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-sm ${idx === currentIndex ? "bg-white w-6" : "bg-white/50"}`}
+              ></span>
+            ))}
+          </div>
+          
+          <div className="absolute top-3 right-3 bg-black bg-opacity-60 text-white text-[10px] font-bold px-3 py-1 rounded-full backdrop-blur-sm z-10 shadow-sm border border-white/20">
+            {currentIndex + 1} / {gambarArray.length}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// ==========================================
+// KOMPONEN ISI HALAMAN UTAMA (KABAR CONTENT)
+// ==========================================
+function KabarContent() {
+  const searchParams = useSearchParams();
+  const tabQuery = searchParams.get("tab");
+  
+  const [tabAktif, setTabAktif] = useState("berita");
+
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // STATE HERO BEBAS FLICKER
-  const [heroData, setHeroData] = useState({
-    judul: "",
-    sub: "",
-    bg: "https://i.ibb.co.com/YFJVHD07/2239715431.webp" 
-  });
-
-  const [currentSlide, setCurrentSlide] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  
+  // STATE PENCARIAN & PAGINATION DINAMIS
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // Default 10 baris
 
   useEffect(() => {
-    const ambilDataBeranda = async () => {
-      try {
-        // 1. Fetch Pengaturan Hero Beranda
-        const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
-        if (snapHero.exists() && snapHero.data()) {
-          setHeroData({
-            judul: snapHero.data().judul || "Selamat Datang di\nDesa Kerjo",
-            sub: snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
-            bg: snapHero.data().bg || "https://i.ibb.co.com/YFJVHD07/2239715431.webp"
-          });
-        }
+    if (tabQuery === "berita" || tabQuery === "agenda") {
+      setTabAktif(tabQuery);
+    }
+  }, [tabQuery]);
 
-        // 2. Fetch Berita
+  // Reset pagination ke halaman 1 jika user ganti tab, mencari, atau mengubah jumlah baris
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tabAktif, searchTerm, itemsPerPage]);
+
+  useEffect(() => {
+    const ambilData = async () => {
+      try {
+        // Ambil Data Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
-        const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        
-        // Memastikan berita yang dipin ada di atas (diutamakan)
-        const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
-        const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
-        const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
-        setDaftarBerita(kabarTampil);
+        const dataKabar: any[] = [];
+        snapKabar.forEach((doc) => { 
+          dataKabar.push({ id: doc.id, ...doc.data() }); 
+        });
+        setDaftarBerita(dataKabar);
 
-        // 3. Fetch Agenda
+        // Ambil Data Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
-        const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        
-        const now = new Date();
-        const agendaTampil = allAgenda.filter(item => {
-          if (!item.tanggal) return false;
-          const tglAgenda = new Date(item.tanggal);
-          return item.is_featured !== false && tglAgenda >= now;
-        }).slice(0, 10);
-        setDaftarAgenda(agendaTampil);
+        const dataAgenda: any[] = [];
+        snapAgenda.forEach(doc => {
+          dataAgenda.push({ id: doc.id, ...doc.data() });
+        });
+        setDaftarAgenda(dataAgenda);
 
       } catch (error) {
-        console.error("Gagal memuat data beranda", error);
+        console.error("Gagal mengambil data:", error);
       } finally {
         setLoading(false);
       }
     };
-    
-    ambilDataBeranda();
+    ambilData();
   }, []);
 
-  useEffect(() => {
-    if (!isAutoPlay || daftarBerita.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev === daftarBerita.length - 1 ? 0 : prev + 1));
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [isAutoPlay, daftarBerita.length]);
-
-  const prevSlide = () => {
-    setCurrentSlide(currentSlide === 0 ? daftarBerita.length - 1 : currentSlide - 1);
+  const formatTanggal = (isoString: string) => {
+    if (!isoString) return "";
+    return new Date(isoString).toLocaleDateString("id-ID", { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
+
+  // ==========================================
+  // LOGIKA FILTER DAN SORTING BERITA
+  // ==========================================
+  const beritaTerfilter = daftarBerita.filter((b) => 
+    b.judul.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    b.isi.toLowerCase().includes(searchTerm.toLowerCase())
+  );
   
-  const nextSlide = () => {
-    setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
-  };
+  const indexOfLastBerita = currentPage * itemsPerPage;
+  const indexOfFirstBerita = indexOfLastBerita - itemsPerPage;
+  const currentBerita = beritaTerfilter.slice(indexOfFirstBerita, indexOfLastBerita);
+  const totalPagesBerita = Math.ceil(beritaTerfilter.length / itemsPerPage);
 
-  // PENGAMANAN FATAL ERROR: Memastikan bg selalu string yang sah
-  let heroBgSafe = "https://i.ibb.co.com/YFJVHD07/2239715431.webp";
-  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
-    heroBgSafe = heroData.bg;
-  }
+  // ==========================================
+  // LOGIKA FILTER DAN SORTING AGENDA 
+  // (Pemisahan Agenda Terdekat & Kedaluwarsa)
+  // ==========================================
+  const agendaTerfilter = daftarAgenda.filter((a) => 
+    a.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const now = new Date();
+  // Agenda yang belum lewat (tanggal >= sekarang), diurutkan dari yang paling dekat
+  const agendaAkanDatang = agendaTerfilter
+    .filter(a => new Date(a.tanggal) >= now)
+    .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+
+  // Agenda yang sudah lewat (tanggal < sekarang), diurutkan dari yang baru saja lewat
+  const agendaLewat = agendaTerfilter
+    .filter(a => new Date(a.tanggal) < now)
+    .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+
+  // Gabungkan keduanya: Yang Terdekat di atas, Yang Lewat di bawah
+  const agendaDisusun = [...agendaAkanDatang, ...agendaLewat];
+
+  const indexOfLastAgenda = currentPage * itemsPerPage;
+  const indexOfFirstAgenda = indexOfLastAgenda - itemsPerPage;
+  const currentAgenda = agendaDisusun.slice(indexOfFirstAgenda, indexOfLastAgenda);
+  const totalPagesAgenda = Math.ceil(agendaDisusun.length / itemsPerPage);
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <main className="min-h-screen bg-gray-50 flex flex-col">
       
-      {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
-      <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
-            alt="Pemandangan Desa" 
-            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
-        </div>
-        
-        <div className="relative z-10 text-center px-4 max-w-4xl animate-fade-in mt-16">
-          <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-6 bg-white p-2 rounded-full shadow-2xl">
-            <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
-          </div>
-          <span className="bg-yellow-500 text-green-950 font-black px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-widest shadow-md inline-block mb-6">
-            Portal Informasi Publik
+      {/* HEADER SECTION */}
+      <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
+        <div className="absolute inset-0 bg-black opacity-10"></div>
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <span className="text-green-300 font-extrabold tracking-widest uppercase text-sm mb-2 block">
+            Pusat Informasi Terkini
           </span>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-lg leading-tight whitespace-pre-wrap transition-all duration-500">
-            {heroData.judul}
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
+            Kabar & Agenda Desa
           </h1>
-          <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md whitespace-pre-wrap transition-all duration-500">
-            {heroData.sub}
+          <p className="text-lg md:text-xl text-green-100 max-w-2xl mx-auto font-light">
+            Pantau terus perkembangan pembangunan, kegiatan kemasyarakatan, dan jadwal acara resmi dari aparat desa.
           </p>
         </div>
-      </section>
+      </div>
 
-      {/* 2. QUICK LINKS */}
-      <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">🏛️</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Profil & UMKM</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Jelajahi potensi wisata dan dukung produk lokal asli desa.</p>
-          </Link>
-          <Link href="/kabar" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📰</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Kabar Desa</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Pantau terus perkembangan berita dan kegiatan terkini.</p>
-          </Link>
-          <Link href="/transparansi" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📊</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Transparansi</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Akses grafik rincian APBDes dan laporan anggaran publik.</p>
-          </Link>
-          <Link href="/layanan" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📄</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Layanan Surat</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Urus surat pengantar, SKCK, SKTM, dll secara mandiri online.</p>
-          </Link>
+      <div className="container mx-auto px-4 py-12 max-w-5xl flex-grow">
+        
+        {/* KOTAK PENCARIAN PINTAR */}
+        <div className="mb-10 max-w-2xl mx-auto relative z-20">
+          <input 
+            type="text" 
+            placeholder="Ketik kata kunci pencarian berita atau kegiatan..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-14 pr-4 py-4 rounded-2xl border-2 border-green-200 outline-none focus:border-green-500 focus:ring-4 focus:ring-green-100 transition-all font-medium text-gray-800 shadow-md"
+          />
+          <span className="absolute left-5 top-1/2 transform -translate-y-1/2 text-2xl opacity-60">🔍</span>
         </div>
-      </section>
 
-      {/* 3. BERITA & AGENDA SLIDER */}
-      <section className="py-16 bg-white border-t border-gray-200">
-        <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
-          <div className="flex justify-between items-end mb-10">
-            <div>
-              <span className="text-green-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">Informasi Publik</span>
-              <h2 className="text-3xl md:text-5xl font-black text-gray-900">Kabar & Agenda</h2>
-            </div>
-            <Link href="/kabar" className="hidden md:inline-flex items-center gap-2 font-bold text-green-700 hover:text-green-800 bg-green-50 px-5 py-2.5 rounded-full transition-colors">
-              Lihat Semua Informasi <span className="text-xl">→</span>
-            </Link>
-          </div>
+        {/* TABS NAVIGASI */}
+        <div className="flex flex-wrap justify-center gap-2 md:gap-4 mb-10">
+          <button 
+            onClick={() => setTabAktif("berita")}
+            className={`px-6 py-3 md:py-4 rounded-xl font-bold text-sm md:text-base transition-all duration-300 shadow-sm flex items-center justify-center gap-2 ${
+              tabAktif === "berita" || !tabAktif 
+              ? "bg-green-600 text-white shadow-md transform -translate-y-1" 
+              : "bg-white text-gray-600 hover:bg-green-50 border border-gray-200"
+            }`}
+          >
+            <span className="text-xl">📰</span> Berita & Kegiatan
+          </button>
+          
+          <button 
+            onClick={() => setTabAktif("agenda")}
+            className={`px-6 py-3 md:py-4 rounded-xl font-bold text-sm md:text-base transition-all duration-300 shadow-sm flex items-center justify-center gap-2 ${
+              tabAktif === "agenda" 
+              ? "bg-green-600 text-white shadow-md transform -translate-y-1" 
+              : "bg-white text-gray-600 hover:bg-green-50 border border-gray-200"
+            }`}
+          >
+            <span className="text-xl">📅</span> Agenda Desa Terdekat
+          </button>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 flex flex-col h-full">
-              {loading ? (
-                 <div className="w-full h-96 bg-gray-100 rounded-3xl flex items-center justify-center shadow-inner">
-                   <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                 </div>
-              ) : daftarBerita.length === 0 ? (
-                <div className="w-full h-96 bg-gray-50 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center text-center p-10">
-                   <span className="text-5xl mb-4">📰</span>
-                   <p className="text-gray-500 font-medium text-lg">Belum ada berita yang ditampilkan di beranda.</p>
+        {/* ==========================================
+            KONTEN TAB BERITA 
+        ========================================== */}
+        {(tabAktif === "berita" || !tabAktif) && (
+          <div className="animate-fade-in">
+            
+            {/* FITUR DROPDOWN TAMPILKAN BARIS */}
+            {!loading && beritaTerfilter.length > 0 && (
+              <div className="flex justify-end mb-6">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
+                  <span className="text-sm font-bold text-gray-600">Tampilkan:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block p-1.5 font-bold outline-none cursor-pointer"
+                  >
+                    <option value={10}>10 Baris</option>
+                    <option value={20}>20 Baris</option>
+                    <option value={50}>50 Baris</option>
+                  </select>
                 </div>
-              ) : (
-                <div className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-lg group bg-black">
-                  {daftarBerita.map((berita, index) => {
-                    
-                    // PENGAMANAN FATAL ERROR (CRASH LAYAR HITAM): 
-                    // Memastikan variabel gambarSlide benar-benar sebuah string yang sah
-                    let gambarSlide = "";
-                    if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
-                      gambarSlide = berita.gambar[0];
-                    } else if (typeof berita.gambar === "string") {
-                      gambarSlide = berita.gambar;
-                    }
+              </div>
+            )}
+
+            {loading ? (
+              <div className="flex justify-center my-20">
+                <div className="w-12 h-12 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin"></div>
+              </div>
+            ) : beritaTerfilter.length === 0 ? (
+              <div className="bg-white p-12 rounded-3xl shadow-sm border border-gray-100 text-center max-w-3xl mx-auto">
+                <span className="text-6xl mb-4 block opacity-50">📭</span>
+                <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                  {searchTerm ? "Berita Tidak Ditemukan" : "Belum Ada Kabar Baru"}
+                </h3>
+                <p className="text-gray-500 font-medium">
+                  {searchTerm ? `Tidak ada artikel yang cocok dengan kata kunci "${searchTerm}".` : "Pemerintah desa belum mempublikasikan berita apapun saat ini."}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-10">
+                {currentBerita.map((berita) => {
+                  const gambarArray = Array.isArray(berita.gambar) ? berita.gambar : berita.gambar ? [berita.gambar] : [];
+                  
+                  return (
+                    <article key={berita.id} className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border border-gray-100 transition-all hover:shadow-lg group">
+                      <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-3 leading-tight group-hover:text-green-700 transition-colors">
+                        {berita.is_pinned && <span className="text-yellow-500 mr-2" title="Pinned Post">🔒</span>}
+                        {berita.judul}
+                      </h2>
+                      
+                      <div className="flex flex-wrap items-center gap-4 mb-6">
+                        <span className="bg-green-50 text-green-700 border border-green-200 px-3 py-1 rounded-lg text-sm font-bold flex items-center gap-2">
+                          📅 {formatTanggal(berita.tanggal_posting)}
+                        </span>
+                        <span className="text-gray-500 text-sm font-medium flex items-center gap-1">
+                          👤 Oleh: <span className="font-bold text-gray-700">{berita.penulis || "Admin"}</span>
+                        </span>
+                      </div>
+                      
+                      <ImageCarousel gambarArray={gambarArray} />
+                      
+                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap text-lg mt-4 text-justify line-clamp-4">
+                        {berita.isi}
+                      </p>
+                      
+                      <div className="mt-6 text-right border-t border-gray-100 pt-5">
+                        <Link 
+                          href={`/kabar/${berita.id}`} 
+                          className="inline-block bg-white text-green-700 border-2 border-green-600 hover:bg-green-600 hover:text-white font-black px-8 py-3 rounded-xl transition-all transform hover:-translate-y-1 shadow-sm"
+                        >
+                          Baca Artikel Selengkapnya →
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* KOMPONEN PAGINATION BERITA */}
+            {totalPagesBerita > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-12 mb-8 flex-wrap">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  &laquo; Prev
+                </button>
+                
+                {Array.from({ length: totalPagesBerita }, (_, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setCurrentPage(i + 1)} 
+                    className={`w-10 h-10 rounded-xl font-bold shadow-sm transition-colors ${
+                      currentPage === i + 1 
+                      ? "bg-green-600 text-white border-green-600" 
+                      : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPagesBerita))} 
+                  disabled={currentPage === totalPagesBerita}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  Next &raquo;
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==========================================
+            KONTEN TAB AGENDA 
+        ========================================== */}
+        {tabAktif === "agenda" && (
+          <div className="animate-fade-in">
+            
+            {/* FITUR DROPDOWN TAMPILKAN BARIS AGENDA */}
+            {!loading && agendaDisusun.length > 0 && (
+              <div className="flex justify-end mb-6">
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
+                  <span className="text-sm font-bold text-gray-600">Tampilkan:</span>
+                  <select 
+                    value={itemsPerPage} 
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-green-500 focus:border-green-500 block p-1.5 font-bold outline-none cursor-pointer"
+                  >
+                    <option value={10}>10 Baris</option>
+                    <option value={20}>20 Baris</option>
+                    <option value={50}>50 Baris</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white p-8 md:p-12 rounded-3xl shadow-sm border border-gray-100">
+              <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 mb-8 flex items-center gap-3 border-b border-gray-100 pb-6">
+                <span className="text-4xl">📅</span> Kalender Kegiatan Lengkap
+              </h2>
+              
+              <div className="space-y-6">
+                {loading ? (
+                   <p className="text-gray-400 animate-pulse text-center py-10">Memuat jadwal kegiatan...</p>
+                ) : agendaDisusun.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-200 p-12 rounded-3xl text-center bg-gray-50 max-w-2xl mx-auto">
+                    <span className="text-6xl text-gray-300 mb-4 block">🗓️</span>
+                    <p className="text-gray-500 font-bold text-xl">
+                      {searchTerm ? "Jadwal Tidak Ditemukan" : "Belum ada agenda desa yang dijadwalkan."}
+                    </p>
+                    <p className="text-gray-400 text-sm mt-2">
+                      {searchTerm && `Tidak ada kecocokan untuk kata kunci "${searchTerm}".`}
+                    </p>
+                  </div>
+                ) : (
+                  currentAgenda.map((agenda) => {
+                    const tgl = new Date(agenda.tanggal);
+                    const isLewat = tgl < new Date();
 
                     return (
-                      <div 
-                        key={berita.id} 
-                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
-                      >
-                        {gambarSlide ? (
-                          <img 
-                            src={gambarSlide.startsWith("http") ? gambarSlide : `https://wsrv.nl/?url=${gambarSlide}`} 
-                            alt={berita.judul} 
-                            className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-[10000ms] ease-out" 
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-800 flex items-center justify-center text-6xl opacity-80">📸</div>
-                        )}
-                        
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
-                        
-                        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 text-white">
-                          <div className="flex items-center gap-2 mb-3">
-                            {berita.is_pinned && (
-                              <span className="bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded-md shadow-sm">
-                                🔒 PINNED
-                              </span>
+                      <div key={agenda.id} className={`flex gap-6 group p-6 rounded-2xl border transition-all ${isLewat ? 'bg-gray-50 border-gray-200 opacity-60' : 'bg-white border-green-200 hover:border-green-400 hover:shadow-md'}`}>
+                        <div className={`flex-shrink-0 w-20 h-24 rounded-xl flex flex-col items-center justify-center border shadow-sm transition-colors ${isLewat ? 'bg-gray-200 border-gray-300 text-gray-500' : 'bg-green-50 border-green-300 text-green-800 group-hover:bg-green-600 group-hover:text-white'}`}>
+                          <span className="text-sm font-bold uppercase tracking-wider">{tgl.toLocaleDateString('id-ID', { month: 'short' })}</span>
+                          <span className="text-3xl font-black leading-none my-1">{tgl.getDate()}</span>
+                          <span className="text-xs font-bold">{tgl.getFullYear()}</span>
+                        </div>
+                        <div className="flex flex-col justify-center flex-grow">
+                          <h4 className={`font-bold text-xl leading-tight transition-colors ${isLewat ? 'text-gray-500 line-through' : 'text-gray-900 group-hover:text-green-700'}`}>
+                            {agenda.nama}
+                          </h4>
+                          <div className="flex flex-wrap gap-4 mt-3">
+                            <p className="text-sm text-gray-600 font-medium flex items-center gap-2 bg-white px-3 py-1 rounded-md border border-gray-100 shadow-sm">
+                              <span className="text-lg">🕒</span> {tgl.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                            </p>
+                            <p className="text-sm text-gray-600 font-medium flex items-center gap-2 bg-white px-3 py-1 rounded-md border border-gray-100 shadow-sm">
+                              <span className="text-lg">📍</span> {agenda.lokasi}
+                            </p>
+                            {isLewat && (
+                              <p className="text-xs text-red-500 font-bold flex items-center gap-1 bg-red-50 px-2 py-1 rounded-md border border-red-100">
+                                ⚠️ Telah Lewat
+                              </p>
                             )}
-                            <span className="bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-md shadow-sm">
-                              Berita Terbaru
-                            </span>
-                          </div>
-                          <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight drop-shadow-md line-clamp-2">
-                            {berita.judul}
-                          </h3>
-                          <div className="flex items-center gap-4 text-xs md:text-sm font-medium text-gray-300 mb-4">
-                            <span className="flex items-center gap-1"><span>📅</span> {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { day:'numeric', month:'long', year:'numeric'}) : ""}</span>
-                            <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
                           </div>
                           
-                          <Link href={`/kabar/${berita.id}`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
-                            Baca Selengkapnya
-                          </Link>
+                          {/* FITUR BARU: Menampilkan Deskripsi Agenda */}
+                          {agenda.deskripsi && (
+                            <p className="text-sm text-gray-500 mt-4 italic leading-relaxed border-t border-gray-100 pt-3">
+                              "{agenda.deskripsi}"
+                            </p>
+                          )}
                         </div>
                       </div>
                     );
-                  })}
-
-                  <button 
-                    onClick={prevSlide} 
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
-                  >
-                    &#10094;
-                  </button>
-                  <button 
-                    onClick={nextSlide} 
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
-                  >
-                    &#10095;
-                  </button>
-
-                  <button 
-                    onClick={() => setIsAutoPlay(!isAutoPlay)} 
-                    className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-full backdrop-blur-md z-20 text-xs font-bold flex items-center gap-1.5 transition-colors border border-white/20"
-                  >
-                    {isAutoPlay ? "⏸️ Pause Slide" : "▶️ Play Slide"}
-                  </button>
-
-                  <div className="absolute bottom-4 right-6 flex space-x-1.5 z-20">
-                    {daftarBerita.map((_, idx) => (
-                      <button 
-                        key={idx} 
-                        onClick={() => setCurrentSlide(idx)} 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentSlide ? "bg-yellow-400 w-6" : "bg-white/50 w-2 hover:bg-white"}`}
-                      ></button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="lg:col-span-1 bg-yellow-50 p-6 md:p-8 rounded-3xl border border-yellow-200 shadow-inner flex flex-col h-[400px] md:h-[500px]">
-              <h3 className="text-xl font-black text-yellow-900 mb-6 flex items-center gap-2 border-b border-yellow-300 pb-4">
-                <span className="text-2xl">📅</span> Agenda Terdekat
-              </h3>
-              
-              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                {loading ? (
-                  <p className="text-center text-gray-500 font-medium py-10 animate-pulse">Memuat agenda...</p>
-                ) : daftarAgenda.length === 0 ? (
-                  <div className="text-center py-10">
-                    <span className="text-4xl block mb-2 text-yellow-700 opacity-50">🗓️</span>
-                    <p className="text-sm font-medium text-yellow-800">Tidak ada agenda / jadwal kegiatan dalam waktu dekat.</p>
-                  </div>
-                ) : (
-                  daftarAgenda.map((agenda) => {
-                    if (!agenda.tanggal) return null;
-                    const tgl = new Date(agenda.tanggal);
-                    return (
-                      <div key={agenda.id} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100 flex gap-4 hover:border-yellow-400 transition-colors group">
-                        <div className="flex-shrink-0 w-14 h-16 bg-yellow-100 rounded-xl flex flex-col items-center justify-center text-yellow-800 border border-yellow-200">
-                          <span className="text-[10px] font-black uppercase">{tgl.toLocaleDateString('id-ID', { month: 'short' })}</span>
-                          <span className="text-xl font-black leading-none my-0.5">{tgl.getDate()}</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 group-hover:text-green-700 transition-colors">
-                            {agenda.nama}
-                          </h4>
-                          <div className="text-xs text-gray-500 mt-1.5 flex flex-col gap-0.5 font-medium">
-                            <span className="flex items-center gap-1"><span>🕒</span> {tgl.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })} WIB</span>
-                            <span className="flex items-center gap-1 truncate w-40"><span>📍</span> {agenda.lokasi}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )
                   })
                 )}
               </div>
-              <Link href="/kabar?tab=agenda" className="block text-center bg-yellow-200 hover:bg-yellow-300 text-yellow-900 font-bold py-3 mt-4 rounded-xl transition-colors text-sm">
-                Lihat Kalender Lengkap
-              </Link>
             </div>
-          </div>
 
-          <div className="mt-8 text-center md:hidden">
-            <Link href="/kabar" className="inline-flex items-center gap-2 font-bold text-green-700 bg-green-50 px-6 py-3 rounded-full transition-colors border border-green-200">
-              Lihat Semua Informasi
-            </Link>
+            {/* KOMPONEN PAGINATION AGENDA */}
+            {totalPagesAgenda > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-12 mb-8 flex-wrap">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  &laquo; Prev
+                </button>
+                
+                {Array.from({ length: totalPagesAgenda }, (_, i) => (
+                  <button 
+                    key={i} 
+                    onClick={() => setCurrentPage(i + 1)} 
+                    className={`w-10 h-10 rounded-xl font-bold shadow-sm transition-colors ${
+                      currentPage === i + 1 
+                      ? "bg-green-600 text-white border-green-600" 
+                      : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPagesAgenda))} 
+                  disabled={currentPage === totalPagesAgenda}
+                  className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
+                >
+                  Next &raquo;
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      </section>
+        )}
+
+      </div>
     </main>
   );
 }
