@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { collection, addDoc, getDocs, query, where, orderBy } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
 // Komponen Pembungkus Utama untuk keamanan Next.js
@@ -19,7 +19,14 @@ export default function LayananMandiri() {
 }
 
 function LayananContent() {
-  const [tabAktif, setTabAktif] = useState("buat"); // 'buat' atau 'lacak'
+  const [tabAktif, setTabAktif] = useState("buat");
+
+  // STATE HEADER HERO DINAMIS
+  const [heroData, setHeroData] = useState({
+    judul: "Layanan Surat Mandiri",
+    sub: "Ajukan surat administrasi (SKTM, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.",
+    bg: "" 
+  });
 
   // ==========================================
   // STATE MASTER SURAT (DARI ADMIN)
@@ -33,7 +40,7 @@ function LayananContent() {
   const [nik, setNik] = useState("");
   const [nama, setNama] = useState("");
   const [wa, setWa] = useState("");
-  const [jenisSuratId, setJenisSuratId] = useState(""); // Menyimpan ID surat yang dipilih
+  const [jenisSuratId, setJenisSuratId] = useState("");
   const [keperluan, setKeperluan] = useState("");
   const [fileBerkas, setFileBerkas] = useState<{ [key: string]: File }>({});
   
@@ -48,27 +55,37 @@ function LayananContent() {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Ambil Data Master Surat saat halaman dimuat
+  // Ambil Data dari Firebase
   useEffect(() => {
-    const fetchMaster = async () => {
+    const fetchAwalData = async () => {
       try {
+        // 1. Fetch Pengaturan Header
+        const snapHero = await getDoc(doc(db, "pengaturan_web", "layanan_hero"));
+        if (snapHero.exists() && snapHero.data()) {
+          setHeroData({
+            judul: snapHero.data().judul || "Layanan Surat Mandiri",
+            sub: snapHero.data().sub || "Ajukan surat administrasi (SKTM, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.",
+            bg: snapHero.data().bg || ""
+          });
+        }
+
+        // 2. Fetch Master Surat
         const qMaster = query(collection(db, "master_surat"));
         const snap = await getDocs(qMaster);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMasterSuratList(data);
+
       } catch (error) {
-        console.error("Gagal memuat daftar jenis surat:", error);
+        console.error("Gagal memuat data awal:", error);
       } finally {
         setLoadingMaster(false);
       }
     };
-    fetchMaster();
+    fetchAwalData();
   }, []);
 
-  // Mendapatkan Data Surat yang sedang dipilih user
   const selectedSurat = masterSuratList.find(s => s.id === jenisSuratId);
 
-  // Fungsi menyimpan file ke state lokal (berdasarkan nama syarat)
   const handleFileChange = (namaSyarat: string, file: File | null) => {
     if (file) {
       setFileBerkas(prev => ({ ...prev, [namaSyarat]: file }));
@@ -79,9 +96,6 @@ function LayananContent() {
     }
   };
 
-  // ==========================================
-  // FUNGSI UPLOAD GAMBAR API IMGBB (ANTI-BLOKIR BASE64)
-  // ==========================================
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -122,9 +136,6 @@ function LayananContent() {
     }
   };
 
-  // ==========================================
-  // FUNGSI SUBMIT PENGAJUAN
-  // ==========================================
   const handleSubmitPengajuan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSurat) {
@@ -132,7 +143,6 @@ function LayananContent() {
       return;
     }
 
-    // Validasi Wajib Upload Jika Tidak "Harus Datang Langsung"
     if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
       const syaratWajib = selectedSurat.persyaratan as string[];
       for (const syarat of syaratWajib) {
@@ -147,10 +157,8 @@ function LayananContent() {
     setStatusSubmit("Memproses data Anda...");
 
     try {
-      // Objek untuk menyimpan link gambar hasil upload
       const berkasTerunggah: { [key: string]: string } = {};
 
-      // Jika ada file yang harus diupload
       if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
         setStatusSubmit("Mengunggah berkas foto...");
         const syaratWajib = selectedSurat.persyaratan as string[];
@@ -168,11 +176,9 @@ function LayananContent() {
         }
       }
 
-      // Format Nomor WA
       let formattedWA = wa.replace(/\D/g, "");
       if (formattedWA.startsWith("0")) formattedWA = "62" + formattedWA.substring(1);
 
-      // Simpan ke Firestore Database Admin
       setStatusSubmit("Menyimpan pengajuan ke server desa...");
       await addDoc(collection(db, "layanan_surat"), {
         nik: nik,
@@ -180,7 +186,7 @@ function LayananContent() {
         wa: formattedWA,
         jenis_surat: selectedSurat.nama_surat,
         keperluan: keperluan,
-        berkas: berkasTerunggah, // Berisi link URL foto atau kosong jika datang langsung
+        berkas: berkasTerunggah, 
         status: "Menunggu",
         tanggal_pengajuan: new Date().toISOString(),
         alasan_penolakan: ""
@@ -188,14 +194,7 @@ function LayananContent() {
 
       setStatusSubmit("✅ Pengajuan Surat Berhasil! Silakan cek menu Lacak secara berkala.");
       
-      // Reset Form
-      setNik("");
-      setNama("");
-      setWa("");
-      setKeperluan("");
-      setFileBerkas({});
-      setJenisSuratId("");
-
+      setNik(""); setNama(""); setWa(""); setKeperluan(""); setFileBerkas({}); setJenisSuratId("");
       setTimeout(() => setStatusSubmit(""), 6000);
 
     } catch (error: any) {
@@ -205,9 +204,6 @@ function LayananContent() {
     }
   };
 
-  // ==========================================
-  // FUNGSI LACAK SURAT
-  // ==========================================
   const handleLacakSurat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchNik) return;
@@ -216,15 +212,9 @@ function LayananContent() {
     setHasSearched(true);
     
     try {
-      // Ambil surat berdasarkan NIK, urutkan dari yang terbaru
-      const q = query(
-        collection(db, "layanan_surat"), 
-        where("nik", "==", searchNik)
-      );
+      const q = query(collection(db, "layanan_surat"), where("nik", "==", searchNik));
       const snap = await getDocs(q);
       
-      // Firestore secara native tidak bisa gabung where dan orderBy jika tidak dibuat Index khusus.
-      // Jadi kita sort manual di sisi client agar lebih aman dan anti-error.
       const hasil = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
       const sortedHasil = hasil.sort((a, b) => new Date(b.tanggal_pengajuan).getTime() - new Date(a.tanggal_pengajuan).getTime());
       
@@ -243,21 +233,38 @@ function LayananContent() {
     }) + " WIB";
   };
 
+  // Mencegah Crash Hero Image
+  let heroBgSafe = "";
+  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
+    heroBgSafe = heroData.bg;
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
       
-      {/* HEADER SECTION */}
-      <div className="bg-yellow-600 text-yellow-50 py-16 md:py-24 relative overflow-hidden shadow-md">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <span className="text-yellow-100 font-extrabold tracking-widest uppercase text-sm mb-2 block">
+      {/* ==========================================
+          HEADER SECTION (HERO DINAMIS)
+      ========================================== */}
+      <div className="bg-yellow-700 text-yellow-50 py-16 md:py-24 relative overflow-hidden shadow-md">
+        <div className="absolute inset-0 z-0">
+          {heroBgSafe && (
+            <img 
+              src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
+              alt="Hero Background" 
+              className="w-full h-full object-cover opacity-30 mix-blend-overlay"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+        </div>
+        <div className="container mx-auto px-4 relative z-10 text-center animate-fade-in">
+          <span className="text-yellow-100 font-extrabold tracking-widest uppercase text-sm mb-3 inline-block bg-yellow-900/50 px-4 py-1.5 rounded-full border border-yellow-800">
             Akses Cepat & Mudah
           </span>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4 text-white">
-            Layanan Surat Mandiri
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4 text-white drop-shadow-lg whitespace-pre-wrap leading-tight">
+            {heroData.judul}
           </h1>
-          <p className="text-lg md:text-xl text-yellow-100 max-w-2xl mx-auto font-medium">
-            Ajukan surat administrasi (SKTM, Keterangan Usaha, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.
+          <p className="text-lg md:text-xl text-yellow-100 max-w-2xl mx-auto font-medium drop-shadow-md whitespace-pre-wrap">
+            {heroData.sub}
           </p>
         </div>
       </div>
@@ -265,13 +272,13 @@ function LayananContent() {
       <div className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
         
         {/* TABS NAVIGASI */}
-        <div className="flex justify-center gap-2 md:gap-4 mb-10">
+        <div className="flex justify-center gap-2 md:gap-4 mb-10 relative z-20 -mt-20">
           <button 
             onClick={() => setTabAktif("buat")}
-            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 shadow-sm flex items-center gap-2 ${
+            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 flex items-center gap-2 ${
               tabAktif === "buat" 
-              ? "bg-yellow-500 text-white shadow-md transform -translate-y-1" 
-              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200"
+              ? "bg-yellow-500 text-white shadow-xl transform -translate-y-2 border-2 border-yellow-400" 
+              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 shadow-sm"
             }`}
           >
             <span className="text-2xl">📝</span> Buat Surat
@@ -279,10 +286,10 @@ function LayananContent() {
           
           <button 
             onClick={() => setTabAktif("lacak")}
-            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 shadow-sm flex items-center gap-2 ${
+            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 flex items-center gap-2 ${
               tabAktif === "lacak" 
-              ? "bg-yellow-500 text-white shadow-md transform -translate-y-1" 
-              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200"
+              ? "bg-yellow-500 text-white shadow-xl transform -translate-y-2 border-2 border-yellow-400" 
+              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 shadow-sm"
             }`}
           >
             <span className="text-2xl">🔍</span> Cek Status
@@ -309,7 +316,6 @@ function LayananContent() {
             ) : (
               <form onSubmit={handleSubmitPengajuan} className="space-y-6">
                 
-                {/* 1. Pilih Jenis Surat */}
                 <div className="bg-yellow-50 p-6 rounded-3xl border border-yellow-200">
                   <label className="block text-sm font-bold mb-2 text-yellow-900">Pilih Jenis Surat yang Ingin Dibuat</label>
                   <select 
@@ -325,11 +331,9 @@ function LayananContent() {
                   </select>
                 </div>
 
-                {/* Tampilkan Form Lanjutan hanya jika Surat sudah dipilih */}
                 {selectedSurat && (
                   <div className="space-y-6 animate-fade-in">
                     
-                    {/* ALERT: JIKA HARUS DATANG LANGSUNG */}
                     {selectedSurat.harus_datang && (
                       <div className="bg-red-50 border border-red-200 p-6 rounded-3xl flex gap-4">
                         <span className="text-4xl">🏢</span>
@@ -350,7 +354,6 @@ function LayananContent() {
                       </div>
                     )}
 
-                    {/* IDENTITAS PEMOHON */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-3xl border border-gray-100">
                       <div className="md:col-span-2 border-b border-gray-200 pb-2 mb-2">
                         <h4 className="font-bold text-gray-800 flex items-center gap-2"><span className="text-xl">👤</span> Identitas Diri</h4>
@@ -405,7 +408,6 @@ function LayananContent() {
                       </div>
                     </div>
 
-                    {/* KOLOM UPLOAD FILE (HILANG JIKA "HARUS DATANG") */}
                     {!selectedSurat.harus_datang && selectedSurat.persyaratan && selectedSurat.persyaratan.length > 0 && (
                       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-200">
                         <div className="border-b border-blue-200 pb-2 mb-6">
@@ -500,7 +502,6 @@ function LayananContent() {
                     {hasilLacak.map((surat) => (
                       <div key={surat.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
                         
-                        {/* Status Label dinamis berdasarkan Admin */}
                         <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl font-black text-[10px] uppercase tracking-widest text-white shadow-sm
                           ${surat.status === "Selesai" ? "bg-green-500" :
                             surat.status === "Diproses" ? "bg-blue-500" :
@@ -518,7 +519,6 @@ function LayananContent() {
                           <span className="font-bold text-gray-900 block mb-1">Keperluan:</span> {surat.keperluan}
                         </p>
 
-                        {/* Jika Ditolak oleh Admin, Tampilkan Alasan */}
                         {surat.status === "Ditolak" && surat.alasan_penolakan && (
                           <div className="mt-4 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-start gap-3">
                             <span className="text-xl">⚠️</span>
@@ -530,7 +530,6 @@ function LayananContent() {
                           </div>
                         )}
                         
-                        {/* Jika Selesai */}
                         {surat.status === "Selesai" && (
                           <div className="mt-4 bg-green-50 border border-green-200 p-4 rounded-2xl">
                             <p className="text-xs font-bold text-green-800 text-center">✅ Surat Anda telah selesai dicetak. Silakan ambil di Kantor Balai Desa pada jam kerja.</p>

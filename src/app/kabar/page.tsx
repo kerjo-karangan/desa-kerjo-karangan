@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link"; 
@@ -96,11 +96,18 @@ function KabarContent() {
   
   const [tabAktif, setTabAktif] = useState("berita");
 
+  // STATE HEADER HERO DINAMIS
+  const [heroData, setHeroData] = useState({
+    judul: "Kabar & Agenda Desa",
+    sub: "Pantau terus perkembangan pembangunan, kegiatan kemasyarakatan, dan jadwal acara resmi dari aparat desa.",
+    bg: "https://i.ibb.co.com/YFJVHD07/2239715431.webp" 
+  });
+
   const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
   const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // STATE PENCARIAN & PAGINATION DINAMIS
+  // STATE PENCARIAN & PAGINATION
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10); 
@@ -111,7 +118,6 @@ function KabarContent() {
     }
   }, [tabQuery]);
 
-  // Reset pagination ke halaman 1 jika user ganti tab, mencari, atau mengubah jumlah baris
   useEffect(() => {
     setCurrentPage(1);
   }, [tabAktif, searchTerm, itemsPerPage]);
@@ -119,6 +125,17 @@ function KabarContent() {
   useEffect(() => {
     const ambilData = async () => {
       try {
+        // 1. Ambil Data Header Hero
+        const snapHero = await getDoc(doc(db, "pengaturan_web", "kabar_hero"));
+        if (snapHero.exists() && snapHero.data()) {
+          setHeroData({
+            judul: snapHero.data().judul || "Kabar & Agenda Desa",
+            sub: snapHero.data().sub || "Pantau terus perkembangan pembangunan, kegiatan kemasyarakatan, dan jadwal acara resmi dari aparat desa.",
+            bg: snapHero.data().bg || "https://i.ibb.co.com/YFJVHD07/2239715431.webp"
+          });
+        }
+
+        // 2. Ambil Data Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const dataKabar: any[] = [];
@@ -127,6 +144,7 @@ function KabarContent() {
         });
         setDaftarBerita(dataKabar);
 
+        // 3. Ambil Data Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const dataAgenda: any[] = [];
@@ -185,21 +203,36 @@ function KabarContent() {
   const currentAgenda = agendaDisusun.slice(indexOfFirstAgenda, indexOfLastAgenda);
   const totalPagesAgenda = Math.ceil(agendaDisusun.length / itemsPerPage);
 
+  // Mencegah Error jika URL kosong
+  let heroBgSafe = "https://i.ibb.co.com/YFJVHD07/2239715431.webp";
+  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
+    heroBgSafe = heroData.bg;
+  }
+
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col">
+    <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
       
-      {/* HEADER SECTION */}
-      <div className="bg-green-800 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
-        <div className="absolute inset-0 bg-black opacity-10"></div>
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <span className="text-green-300 font-extrabold tracking-widest uppercase text-sm mb-2 block">
+      {/* ==========================================
+          HEADER SECTION (HERO DINAMIS)
+      ========================================== */}
+      <div className="bg-green-900 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
+            alt="Hero Background" 
+            className="w-full h-full object-cover opacity-30 mix-blend-overlay"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+        </div>
+        <div className="container mx-auto px-4 relative z-10 text-center animate-fade-in">
+          <span className="text-green-300 font-extrabold tracking-widest uppercase text-sm mb-3 inline-block bg-green-900/50 px-4 py-1.5 rounded-full border border-green-800">
             Pusat Informasi Terkini
           </span>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-            Kabar & Agenda Desa
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4 drop-shadow-lg whitespace-pre-wrap leading-tight">
+            {heroData.judul}
           </h1>
-          <p className="text-lg md:text-xl text-green-100 max-w-2xl mx-auto font-light">
-            Pantau terus perkembangan pembangunan, kegiatan kemasyarakatan, dan jadwal acara resmi dari aparat desa.
+          <p className="text-lg md:text-xl text-green-50 max-w-2xl mx-auto font-medium drop-shadow-md whitespace-pre-wrap">
+            {heroData.sub}
           </p>
         </div>
       </div>
@@ -431,7 +464,6 @@ function KabarContent() {
                             )}
                           </div>
                           
-                          {/* Menampilkan Deskripsi Agenda Jika Ada */}
                           {agenda.deskripsi && (
                             <p className="text-sm text-gray-500 mt-4 italic leading-relaxed border-t border-gray-100 pt-3">
                               "{agenda.deskripsi}"
