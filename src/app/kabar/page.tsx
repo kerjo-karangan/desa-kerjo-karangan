@@ -55,7 +55,6 @@ const ImageCarousel = ({ gambarArray }: { gambarArray: string[] }) => {
       />
       {gambarArray.length > 1 && (
         <>
-          {/* PERBAIKAN: opacity-100 di HP, baru opacity-0 saat hover di Desktop */}
           <button 
             onClick={prevSlide} 
             className="absolute top-1/2 left-3 transform -translate-y-1/2 bg-white bg-opacity-80 text-gray-900 rounded-full p-2.5 md:p-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all hover:bg-opacity-100 hover:scale-110 shadow-lg font-bold border border-gray-200 z-10"
@@ -104,7 +103,7 @@ function KabarContent() {
   // STATE PENCARIAN & PAGINATION DINAMIS
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); // Default 10 baris
+  const [itemsPerPage, setItemsPerPage] = useState(10); 
 
   useEffect(() => {
     if (tabQuery === "berita" || tabQuery === "agenda") {
@@ -120,7 +119,6 @@ function KabarContent() {
   useEffect(() => {
     const ambilData = async () => {
       try {
-        // Ambil Data Berita
         const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
         const snapKabar = await getDocs(qKabar);
         const dataKabar: any[] = [];
@@ -129,7 +127,6 @@ function KabarContent() {
         });
         setDaftarBerita(dataKabar);
 
-        // Ambil Data Agenda
         const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
         const snapAgenda = await getDocs(qAgenda);
         const dataAgenda: any[] = [];
@@ -157,9 +154,6 @@ function KabarContent() {
     });
   };
 
-  // ==========================================
-  // LOGIKA FILTER DAN SORTING BERITA
-  // ==========================================
   const beritaTerfilter = daftarBerita.filter((b) => 
     b.judul.toLowerCase().includes(searchTerm.toLowerCase()) || 
     b.isi.toLowerCase().includes(searchTerm.toLowerCase())
@@ -170,27 +164,20 @@ function KabarContent() {
   const currentBerita = beritaTerfilter.slice(indexOfFirstBerita, indexOfLastBerita);
   const totalPagesBerita = Math.ceil(beritaTerfilter.length / itemsPerPage);
 
-  // ==========================================
-  // LOGIKA FILTER DAN SORTING AGENDA 
-  // (Pemisahan Agenda Terdekat & Kedaluwarsa)
-  // ==========================================
   const agendaTerfilter = daftarAgenda.filter((a) => 
     a.nama.toLowerCase().includes(searchTerm.toLowerCase()) || 
     a.lokasi.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const now = new Date();
-  // Agenda yang belum lewat (tanggal >= sekarang), diurutkan dari yang paling dekat
   const agendaAkanDatang = agendaTerfilter
     .filter(a => new Date(a.tanggal) >= now)
     .sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
 
-  // Agenda yang sudah lewat (tanggal < sekarang), diurutkan dari yang baru saja lewat
   const agendaLewat = agendaTerfilter
     .filter(a => new Date(a.tanggal) < now)
     .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
 
-  // Gabungkan keduanya: Yang Terdekat di atas, Yang Lewat di bawah
   const agendaDisusun = [...agendaAkanDatang, ...agendaLewat];
 
   const indexOfLastAgenda = currentPage * itemsPerPage;
@@ -444,7 +431,7 @@ function KabarContent() {
                             )}
                           </div>
                           
-                          {/* FITUR BARU: Menampilkan Deskripsi Agenda */}
+                          {/* Menampilkan Deskripsi Agenda Jika Ada */}
                           {agenda.deskripsi && (
                             <p className="text-sm text-gray-500 mt-4 italic leading-relaxed border-t border-gray-100 pt-3">
                               "{agenda.deskripsi}"
