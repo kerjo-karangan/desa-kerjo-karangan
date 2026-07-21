@@ -2,218 +2,701 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, doc, query, orderBy, getDocs, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, deleteDoc, updateDoc, query, orderBy, addDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// MENERIMA PROP activeSubMenu DARI page.tsx
-export default function LayananWarga({ activeSubMenu }: { activeSubMenu?: string }) {
-  const [daftarSurat, setDaftarSurat] = useState<any[]>([]);
-  const [daftarPengaduan, setDaftarPengaduan] = useState<any[]>([]);
+export default function LayananWarga() {
+  const [tabAktif, setTabAktif] = useState("antrean"); // 'antrean', 'master', 'pengaduan'
+
+  // ==========================================
+  // STATE MASTER SURAT (JENIS SURAT)
+  // ==========================================
+  const [masterSuratList, setMasterSuratList] = useState<any[]>([]);
+  const [editMasterId, setEditMasterId] = useState<string | null>(null);
+  const [namaSurat, setNamaSurat] = useState("");
+  const [harusDatang, setHarusDatang] = useState(false);
+  const [persyaratan, setPersyaratan] = useState<string[]>([""]); // Default 1 input kosong
+  const [isLoadingMaster, setIsLoadingMaster] = useState(false);
+
+  // ==========================================
+  // STATE ANTREAN SURAT
+  // ==========================================
+  const [antreanSurat, setAntreanSurat] = useState<any[]>([]);
+  const [batasHapusSurat, setBatasHapusSurat] = useState("30");
+  const [isCleaningSurat, setIsCleaningSurat] = useState(false);
   
-  const [editSuratId, setEditSuratId] = useState<string | null>(null);
-  const [editSuratNama, setEditSuratNama] = useState("");
-  const [editSuratNik, setEditSuratNik] = useState("");
-  const [editSuratJenis, setEditSuratJenis] = useState("");
-  const [editSuratKeperluan, setEditSuratKeperluan] = useState("");
-  const [isLoadingSuratAdmin, setIsLoadingSuratAdmin] = useState(false);
+  // Modal Penolakan Surat
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [suratToReject, setSuratToReject] = useState<string | null>(null);
+  const [alasanTolak, setAlasanTolak] = useState("");
 
-  const ambilDataLayanan = async () => {
+  // ==========================================
+  // STATE PENGADUAN
+  // ==========================================
+  const [daftarPengaduan, setDaftarPengaduan] = useState<any[]>([]);
+  const [pengaduanTerpilih, setPengaduanTerpilih] = useState<any | null>(null);
+
+  const [loadingData, setLoadingData] = useState(true);
+
+  // ==========================================
+  // FUNGSI FETCH DATA
+  // ==========================================
+  const ambilSemuaData = async () => {
+    setLoadingData(true);
     try {
-      const qSurat = query(collection(db, "layanan_surat"), orderBy("tanggal_pengajuan", "desc"));
-      setDaftarSurat((await getDocs(qSurat)).docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // Fetch Master Surat
+      const qMaster = query(collection(db, "master_surat"));
+      const snapMaster = await getDocs(qMaster);
+      setMasterSuratList(snapMaster.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      const qPengaduan = query(collection(db, "pengaduan_warga"), orderBy("tanggal_laporan", "desc"));
-      setDaftarPengaduan((await getDocs(qPengaduan)).docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // Fetch Antrean Surat
+      const qSurat = query(collection(db, "layanan_surat"), orderBy("tanggal_pengajuan", "desc"));
+      const snapSurat = await getDocs(qSurat);
+      setAntreanSurat(snapSurat.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+      // Fetch Pengaduan
+      const qAduan = query(collection(db, "pengaduan_masyarakat"), orderBy("tanggal", "desc"));
+      const snapAduan = await getDocs(qAduan);
+      setDaftarPengaduan(snapAduan.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
-      console.error("Gagal mengambil data layanan", error);
+      console.error("Gagal mengambil data:", error);
+    } finally {
+      setLoadingData(false);
     }
   };
 
   useEffect(() => {
-    ambilDataLayanan();
+    ambilSemuaData();
   }, []);
 
-  const ubahStatusSurat = async (id: string, statusBaru: string) => {
+  // Format Nomor WA
+  const formatWA = (no: string) => {
+    if (!no) return "";
+    let formatted = no.replace(/\D/g, "");
+    if (formatted.startsWith("0")) formatted = "62" + formatted.substring(1);
+    return formatted;
+  };
+
+  const formatTanggal = (isoString: string) => {
+    if (!isoString) return "-";
+    return new Date(isoString).toLocaleString("id-ID", {
+      day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+    }) + " WIB";
+  };
+
+  // ==========================================
+  // LOGIKA MASTER SURAT (JENIS SURAT)
+  // ==========================================
+  const handlePersyaratanChange = (index: number, value: string) => {
+    const newPersyaratan = [...persyaratan];
+    newPersyaratan[index] = value;
+    setPersyaratan(newPersyaratan);
+  };
+
+  const tambahPersyaratanField = () => {
+    setPersyaratan([...persyaratan, ""]);
+  };
+
+  const hapusPersyaratanField = (index: number) => {
+    const newPersyaratan = persyaratan.filter((_, i) => i !== index);
+    setPersyaratan(newPersyaratan.length ? newPersyaratan : [""]);
+  };
+
+  const simpanMasterSurat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoadingMaster(true);
     try {
-      await updateDoc(doc(db, "layanan_surat", id), { status_berkas: statusBaru });
-      ambilDataLayanan();
+      // Bersihkan syarat yang kosong
+      const cleanPersyaratan = persyaratan.filter(p => p.trim() !== "");
+      
+      const payload = {
+        nama_surat: namaSurat,
+        harus_datang: harusDatang,
+        persyaratan: cleanPersyaratan
+      };
+
+      if (editMasterId) {
+        await updateDoc(doc(db, "master_surat", editMasterId), payload);
+        alert("✅ Jenis Surat diperbarui!");
+      } else {
+        await addDoc(collection(db, "master_surat"), payload);
+        alert("✅ Jenis Surat ditambahkan!");
+      }
+      batalEditMaster();
+      ambilSemuaData();
     } catch (error) {
-      alert("Gagal merubah status surat.");
+      alert("❌ Gagal menyimpan Jenis Surat.");
+    } finally {
+      setIsLoadingMaster(false);
     }
   };
 
-  const mulaiEditSurat = (item: any) => {
-    setEditSuratId(item.id);
-    setEditSuratNama(item.nama);
-    setEditSuratNik(item.nik);
-    setEditSuratJenis(item.jenis_surat);
-    setEditSuratKeperluan(item.keperluan);
+  const mulaiEditMaster = (item: any) => {
+    setEditMasterId(item.id);
+    setNamaSurat(item.nama_surat);
+    setHarusDatang(item.harus_datang || false);
+    setPersyaratan(item.persyaratan && item.persyaratan.length > 0 ? item.persyaratan : [""]);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const batalEditSurat = () => {
-    setEditSuratId(null);
-    setEditSuratNama("");
-    setEditSuratNik("");
-    setEditSuratJenis("");
-    setEditSuratKeperluan("");
+  const batalEditMaster = () => {
+    setEditMasterId(null);
+    setNamaSurat("");
+    setHarusDatang(false);
+    setPersyaratan([""]);
   };
 
-  const simpanEditSurat = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoadingSuratAdmin(true);
-    try {
-      if (editSuratId) {
-        await updateDoc(doc(db, "layanan_surat", editSuratId), {
-          nama: editSuratNama,
-          nik: editSuratNik,
-          jenis_surat: editSuratJenis,
-          keperluan: editSuratKeperluan,
-        });
-        alert("✅ Data permohonan surat berhasil diperbaiki.");
-        batalEditSurat();
-        ambilDataLayanan();
-      }
-    } catch (error) {
-      alert("❌ Gagal memperbaiki data surat.");
-    } finally {
-      setIsLoadingSuratAdmin(false);
+  const hapusMasterSurat = async (id: string) => {
+    if (confirm("Yakin menghapus Jenis Surat ini? Ini tidak akan menghapus riwayat surat warga yang sudah dibuat.")) {
+      await deleteDoc(doc(db, "master_surat", id));
+      ambilSemuaData();
     }
   };
 
+  // ==========================================
+  // LOGIKA ANTREAN SURAT
+  // ==========================================
   const hapusSurat = async (id: string) => {
-    if (confirm("Yakin ingin menghapus berkas pengajuan ini secara permanen?")) {
+    if (confirm("Yakin hapus data antrean surat ini permanen?")) {
       await deleteDoc(doc(db, "layanan_surat", id));
-      ambilDataLayanan();
+      ambilSemuaData();
     }
   };
 
-  const hapusPengaduan = async (id: string) => {
-    if (confirm("Yakin hapus pengaduan ini?")) {
-      await deleteDoc(doc(db, "pengaduan_warga", id));
-      ambilDataLayanan();
+  const ubahStatusSurat = async (id: string, statusBaru: string) => {
+    if (statusBaru === "Ditolak") {
+      setSuratToReject(id);
+      setAlasanTolak("");
+      setRejectModalOpen(true);
+      return; // Berhenti disini, biarkan pop-up yang handle proses selanjutnya
+    }
+
+    try {
+      // Jika statusnya bukan ditolak (misal: dikembalikan ke belum diproses), bersihkan alasan penolakan
+      await updateDoc(doc(db, "layanan_surat", id), { 
+        status: statusBaru,
+        alasan_penolakan: "" // Reset jika sebelumnya pernah ditolak
+      });
+      ambilSemuaData();
+    } catch (error) {
+      alert("Gagal merubah status.");
     }
   };
+
+  const konfirmasiPenolakan = async () => {
+    if (!suratToReject) return;
+    if (!alasanTolak.trim()) {
+      alert("Alasan penolakan wajib diisi agar warga tahu kesalahannya!");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "layanan_surat", suratToReject), {
+        status: "Ditolak",
+        alasan_penolakan: alasanTolak
+      });
+      setRejectModalOpen(false);
+      setSuratToReject(null);
+      setAlasanTolak("");
+      ambilSemuaData();
+    } catch (error) {
+      alert("Gagal menyimpan penolakan.");
+    }
+  };
+
+  const pembersihanSuratOtomatis = async () => {
+    if (!confirm(`Tindakan ini akan menghapus riwayat surat yang usianya melebihi ${batasHapusSurat} hari. Lanjutkan?`)) return;
+    
+    setIsCleaningSurat(true);
+    try {
+      const limitDate = new Date();
+      limitDate.setDate(limitDate.getDate() - parseInt(batasHapusSurat));
+      
+      let countDeleted = 0;
+      const deletePromises = [];
+
+      for (const surat of antreanSurat) {
+        const tglSurat = new Date(surat.tanggal_pengajuan);
+        if (tglSurat < limitDate) {
+          deletePromises.push(deleteDoc(doc(db, "layanan_surat", surat.id)));
+          countDeleted++;
+        }
+      }
+
+      await Promise.all(deletePromises);
+      alert(`✅ Berhasil menghapus ${countDeleted} data antrean surat usang.`);
+      ambilSemuaData();
+    } catch (error) {
+      alert("❌ Gagal melakukan pembersihan otomatis.");
+    } finally {
+      setIsCleaningSurat(false);
+    }
+  };
+
+  // ==========================================
+  // LOGIKA KOTAK PENGADUAN
+  // ==========================================
+  const hapusPengaduan = async (id: string) => {
+    if (confirm("Hapus laporan pengaduan ini?")) {
+      await deleteDoc(doc(db, "pengaduan_masyarakat", id));
+      ambilSemuaData();
+    }
+  };
+
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
+    <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {/* 1. ANTREAN SURAT MASUK */}
-      {(!activeSubMenu || activeSubMenu === "layanan" || activeSubMenu === "layan-surat") && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 mb-8">
-          <h3 className="text-2xl font-bold mb-2">📄 Antrean Surat Masuk</h3>
-          <p className="text-gray-500 text-sm mb-6">Pantau dan proses permohonan surat warga yang masuk melalui sistem Layanan Mandiri.</p>
+      {/* TABS NAVIGASI */}
+      <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+        <button 
+          onClick={() => setTabAktif("antrean")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "antrean" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
+        >
+          <span className="text-xl">📄</span> Antrean Surat
+        </button>
+        <button 
+          onClick={() => setTabAktif("master")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "master" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
+        >
+          <span className="text-xl">⚙️</span> Daftar Jenis Surat
+        </button>
+        <button 
+          onClick={() => setTabAktif("pengaduan")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${tabAktif === "pengaduan" ? "bg-red-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
+        >
+          <span className="text-xl">📥</span> Kotak Pengaduan
+        </button>
+      </div>
 
-          {editSuratId && (
-            <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200 mb-6 shadow-inner">
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold text-yellow-900 text-lg">✏️ Koreksi Data Pengajuan (Resi: {editSuratNik})</h4>
-                <button onClick={batalEditSurat} className="bg-gray-300 hover:bg-gray-400 text-xs font-bold px-4 py-2 rounded-lg transition-colors">Batal Koreksi</button>
+      {loadingData ? (
+        <div className="flex justify-center py-20"><div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div></div>
+      ) : (
+        <>
+          {/* ==========================================
+              TAB 1: ANTREAN SURAT
+          ========================================== */}
+          {tabAktif === "antrean" && (
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">📄 Antrean Layanan Surat</h3>
+                  <p className="text-sm text-gray-500 mt-1">Periksa berkas, ubah status, dan hubungi warga terkait.</p>
+                </div>
+                
+                {/* AUTO-CLEAN SURAT */}
+                <div className="flex flex-wrap items-center gap-2 bg-red-50 p-2 rounded-xl border border-red-200 w-full md:w-auto">
+                  <span className="text-xs font-bold text-red-800 ml-2">🧹 Auto-Clean:</span>
+                  <select 
+                    value={batasHapusSurat} 
+                    onChange={(e) => setBatasHapusSurat(e.target.value)}
+                    className="text-xs font-bold p-1.5 rounded-lg outline-none border border-red-300"
+                  >
+                    <option value="7">7 Hari</option>
+                    <option value="14">14 Hari</option>
+                    <option value="30">1 Bulan</option>
+                    <option value="90">3 Bulan</option>
+                  </select>
+                  <button 
+                    onClick={pembersihanSuratOtomatis}
+                    disabled={isCleaningSurat}
+                    className="text-xs font-bold text-white bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {isCleaningSurat ? "Memproses..." : "Bersihkan"}
+                  </button>
+                </div>
               </div>
-              <form onSubmit={simpanEditSurat} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div><label className="text-xs font-bold text-gray-700">Nama Pemohon</label><input type="text" value={editSuratNama} onChange={(e) => setEditSuratNama(e.target.value)} className="w-full p-3 border border-yellow-300 rounded-xl outline-none focus:ring-2 bg-white" /></div>
-                <div><label className="text-xs font-bold text-gray-700">Nomor NIK</label><input type="text" value={editSuratNik} onChange={(e) => setEditSuratNik(e.target.value)} className="w-full p-3 border border-yellow-300 rounded-xl outline-none focus:ring-2 bg-white font-mono" /></div>
-                <div><label className="text-xs font-bold text-gray-700">Jenis Surat</label><input type="text" value={editSuratJenis} onChange={(e) => setEditSuratJenis(e.target.value)} className="w-full p-3 border border-yellow-300 rounded-xl outline-none focus:ring-2 bg-white" /></div>
-                <div><label className="text-xs font-bold text-gray-700">Keperluan</label><input type="text" value={editSuratKeperluan} onChange={(e) => setEditSuratKeperluan(e.target.value)} className="w-full p-3 border border-yellow-300 rounded-xl outline-none focus:ring-2 bg-white" /></div>
-                <button type="submit" disabled={isLoadingSuratAdmin} className="md:col-span-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-xl shadow-md transition-colors">{isLoadingSuratAdmin ? "Menyimpan Perubahan..." : "Simpan Data Koreksi"}</button>
-              </form>
+
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
+                <table className="min-w-full text-sm text-left">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="py-4 px-4 font-bold text-gray-600">Waktu & Data Diri</th>
+                      <th className="py-4 px-4 font-bold text-gray-600">Keperluan & Jenis Surat</th>
+                      <th className="py-4 px-4 font-bold text-gray-600">Berkas Lampiran</th>
+                      <th className="py-4 px-4 text-center font-bold text-gray-600">Status & Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {antreanSurat.map((surat) => (
+                      <tr key={surat.id} className="border-b hover:bg-yellow-50/50 transition-colors">
+                        <td className="py-4 px-4 align-top">
+                          <div className="text-xs font-bold text-gray-400 mb-1">{formatTanggal(surat.tanggal_pengajuan)}</div>
+                          <div className="font-black text-gray-900 text-lg uppercase leading-tight">{surat.nama}</div>
+                          <div className="text-sm font-mono text-gray-600 mb-2">NIK: {surat.nik}</div>
+                          
+                          {/* TOMBOL WA PRIVAT ADMIN */}
+                          <a 
+                            href={`https://wa.me/${formatWA(surat.wa)}?text=Halo%20Sdr/i%20${surat.nama},%20ini%20dari%20Admin%20Layanan%20Desa%20Kerjo%20terkait%20pengajuan%20surat%20Anda.`}
+                            target="_blank" rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 bg-green-50 hover:bg-green-600 text-green-700 hover:text-white border border-green-200 font-bold px-3 py-1 rounded-lg text-xs transition-colors"
+                          >
+                            <span className="text-base">💬</span> Chat Warga
+                          </a>
+                        </td>
+                        <td className="py-4 px-4 align-top">
+                          <div className="bg-yellow-100 text-yellow-800 font-black text-xs px-2 py-1 rounded inline-block mb-2 uppercase tracking-widest border border-yellow-200">
+                            {surat.jenis_surat}
+                          </div>
+                          <p className="text-sm text-gray-600 leading-relaxed max-w-xs line-clamp-3 hover:line-clamp-none">
+                            <strong>Keperluan:</strong> {surat.keperluan}
+                          </p>
+                        </td>
+                        <td className="py-4 px-4 align-top">
+                          {surat.berkas && Object.keys(surat.berkas).length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              {Object.keys(surat.berkas).map((key, idx) => (
+                                <a 
+                                  key={idx} 
+                                  href={surat.berkas[key]} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-600 hover:text-white px-2 py-1 rounded flex justify-between items-center transition-colors"
+                                  title="Lihat Berkas"
+                                >
+                                  <span className="truncate w-32">{key}</span> <span>👁️</span>
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400 font-bold bg-gray-100 px-3 py-2 rounded-lg border border-gray-200 text-center">
+                              Mode Datang Langsung / Tanpa Berkas Digital
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-4 text-center align-top">
+                          {/* KONTROL STATUS (Bisa Diubah-ubah Terus) */}
+                          <div className="flex flex-col gap-2 items-center">
+                            <select 
+                              value={surat.status || "Menunggu"} 
+                              onChange={(e) => ubahStatusSurat(surat.id, e.target.value)}
+                              className={`text-xs font-bold px-3 py-2 rounded-lg outline-none w-32 border-2 cursor-pointer shadow-sm ${
+                                surat.status === "Selesai" ? "bg-green-50 text-green-700 border-green-500" :
+                                surat.status === "Diproses" ? "bg-blue-50 text-blue-700 border-blue-500" :
+                                surat.status === "Ditolak" ? "bg-red-50 text-red-700 border-red-500" :
+                                "bg-yellow-50 text-yellow-700 border-yellow-500"
+                              }`}
+                            >
+                              <option value="Menunggu">🟠 Menunggu</option>
+                              <option value="Diproses">🔵 Diproses</option>
+                              <option value="Selesai">🟢 Selesai</option>
+                              <option value="Ditolak">🔴 Ditolak</option>
+                            </select>
+
+                            {/* Info Penolakan jika ada */}
+                            {surat.status === "Ditolak" && surat.alasan_penolakan && (
+                              <div className="text-[10px] text-red-600 font-medium italic w-32 leading-tight bg-red-50 p-1.5 rounded border border-red-100">
+                                "{surat.alasan_penolakan}"
+                              </div>
+                            )}
+
+                            <button 
+                              onClick={() => hapusSurat(surat.id)} 
+                              className="mt-2 text-[10px] text-red-500 hover:text-red-700 font-bold underline"
+                            >
+                              Hapus Data
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {antreanSurat.length === 0 && (
+                      <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Belum ada antrean surat masuk.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          <div className="overflow-x-auto border border-gray-100 rounded-2xl shadow-sm">
-            <table className="min-w-full text-sm text-left">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="py-4 px-4 font-bold text-gray-600">Resi & Tanggal</th>
-                  <th className="py-4 px-4 font-bold text-gray-600">Identitas Pemohon</th>
-                  <th className="py-4 px-4 font-bold text-gray-600">Jenis Surat & Lampiran Berkas</th>
-                  <th className="py-4 px-4 font-bold text-gray-600 text-center">Status</th>
-                  <th className="py-4 px-4 font-bold text-gray-600 text-center">Tindakan Admin</th>
-                </tr>
-              </thead>
-              <tbody>
-                {daftarSurat.map((surat) => (
-                  <tr key={surat.id} className="border-b hover:bg-gray-50">
-                    <td className="py-4 px-4">
-                      <span className="block font-mono font-bold text-blue-700 text-base">{surat.resi}</span>
-                      <span className="text-xs text-gray-500 font-medium">{new Date(surat.tanggal_pengajuan).toLocaleDateString("id-ID")}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="block font-bold text-gray-900 text-base">{surat.nama}</span>
-                      <span className="text-xs text-gray-500 font-mono tracking-wide">NIK: {surat.nik}</span>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className="block font-bold text-green-700 mb-1">{surat.jenis_surat}</span>
-                      <span className="text-xs text-gray-600 max-w-xs block mb-3 italic">"{surat.keperluan}"</span>
-                      {surat.berkas_syarat && surat.berkas_syarat.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {surat.berkas_syarat.map((url: string, i: number) => (
-                            <a key={i} href={`https://wsrv.nl/?url=${url}`} target="_blank" rel="noopener noreferrer" className="bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold px-3 py-1.5 rounded-md hover:bg-blue-600 hover:text-white transition-colors flex items-center gap-1 shadow-sm">
-                              <span>🖼️</span> Buka Berkas {i + 1}
-                            </a>
-                          ))}
+          {/* ==========================================
+              TAB 2: MASTER SURAT (PENGATURAN JENIS SURAT)
+          ========================================== */}
+          {tabAktif === "master" && (
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-gray-100 pb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">⚙️ Master Daftar Surat</h3>
+                  <p className="text-sm text-gray-500 mt-1">Buat jenis surat, atur persyaratan wajib, dan tentukan opsi "Datang Langsung".</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                {/* Form Input Master Surat */}
+                <div className="lg:col-span-1 bg-blue-50 p-6 rounded-2xl border border-blue-200 shadow-inner h-fit">
+                  <div className="flex justify-between items-center mb-5">
+                    <h4 className="font-bold text-blue-900">{editMasterId ? "✏️ Edit Surat" : "Buat Jenis Surat Baru"}</h4>
+                    {editMasterId && <button onClick={batalEditMaster} className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded font-bold transition-colors">Batal</button>}
+                  </div>
+                  
+                  <form onSubmit={simpanMasterSurat} className="space-y-5">
+                    <div>
+                      <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama/Jenis Surat</label>
+                      <input 
+                        type="text" 
+                        required 
+                        value={namaSurat} 
+                        onChange={(e) => setNamaSurat(e.target.value)} 
+                        placeholder="Misal: Surat Keterangan Usaha"
+                        className="w-full p-3 rounded-xl border border-blue-300 outline-none focus:ring-2 focus:ring-blue-600 bg-white" 
+                      />
+                    </div>
+                    
+                    <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
+                      <label className="flex items-start gap-3 cursor-pointer group">
+                        <div className="pt-0.5">
+                          <input 
+                            type="checkbox" 
+                            checked={harusDatang} 
+                            onChange={(e) => setHarusDatang(e.target.checked)} 
+                            className="w-5 h-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                          />
                         </div>
+                        <div>
+                          <span className="block text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors">Harus Datang Langsung</span>
+                          <span className="block text-xs text-gray-500 mt-0.5 leading-snug">Jika dicentang, warga tidak perlu mengunggah foto berkas. Warga hanya mengisi NIK & keperluan, lalu membawa berkas fisik ke kantor desa.</span>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm">
+                      <label className="block text-xs font-bold mb-3 text-gray-800 border-b border-gray-100 pb-2">Daftar Persyaratan Berkas</label>
+                      <div className="space-y-3">
+                        {persyaratan.map((syarat, index) => (
+                          <div key={index} className="flex gap-2 items-center">
+                            <span className="text-xs font-bold text-gray-400 w-4">{index + 1}.</span>
+                            <input 
+                              type="text" 
+                              required 
+                              value={syarat} 
+                              onChange={(e) => handlePersyaratanChange(index, e.target.value)} 
+                              placeholder="Misal: Foto KTP Asli"
+                              className="w-full p-2.5 text-sm rounded-lg border border-gray-300 outline-none focus:border-blue-500 bg-gray-50 focus:bg-white" 
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => hapusPersyaratanField(index)}
+                              className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition-colors font-black"
+                              title="Hapus Syarat"
+                            >
+                              X
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={tambahPersyaratanField}
+                        className="mt-4 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 rounded-lg border border-blue-200 border-dashed text-xs transition-colors"
+                      >
+                        + Tambah Kolom Persyaratan Baru
+                      </button>
+                    </div>
+                    
+                    <button 
+                      type="submit" 
+                      disabled={isLoadingMaster} 
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition-colors"
+                    >
+                      {isLoadingMaster ? "Menyimpan..." : editMasterId ? "Simpan Perubahan Master" : "Tambahkan ke Daftar"}
+                    </button>
+                  </form>
+                </div>
+
+                {/* Tabel Master Surat */}
+                <div className="lg:col-span-2 overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white p-4">
+                  <table className="min-w-full text-sm text-left">
+                    <thead className="bg-gray-50 border-b">
+                      <tr>
+                        <th className="py-3 px-4 font-bold text-gray-600 w-1/3">Jenis Surat</th>
+                        <th className="py-3 px-4 font-bold text-gray-600">Ketentuan Persyaratan</th>
+                        <th className="py-3 px-4 font-bold text-gray-600 text-center">Tipe Proses</th>
+                        <th className="py-3 px-4 text-center font-bold text-gray-600">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {masterSuratList.map((item) => (
+                        <tr key={item.id} className="border-b hover:bg-blue-50/50 transition-colors">
+                          <td className="py-4 px-4 align-top">
+                            <div className="font-bold text-gray-900 text-base leading-tight">{item.nama_surat}</div>
+                          </td>
+                          <td className="py-4 px-4 align-top">
+                            {item.persyaratan && item.persyaratan.length > 0 ? (
+                              <ul className="list-disc pl-4 text-xs text-gray-600 space-y-1">
+                                {item.persyaratan.map((p: string, idx: number) => (
+                                  <li key={idx}>{p}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Tidak ada syarat khusus</span>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 align-top text-center">
+                            {item.harus_datang ? (
+                              <span className="bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest block shadow-sm">
+                                🏢 Wajib Datang
+                              </span>
+                            ) : (
+                              <span className="bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest block shadow-sm">
+                                📱 Full Online
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-4 px-4 text-center align-top">
+                            <div className="flex flex-col gap-2 items-center">
+                              <button onClick={() => mulaiEditMaster(item)} className="w-full max-w-[80px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors">Edit</button>
+                              <button onClick={() => hapusMasterSurat(item.id)} className="w-full max-w-[80px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-2 py-1.5 rounded-lg transition-colors">Hapus</button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {masterSuratList.length === 0 && (
+                        <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Belum ada Jenis Surat yang didaftarkan.</td></tr>
                       )}
-                    </td>
-                    <td className="py-4 px-4 text-center">
-                      <span className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        surat.status_berkas === "Diajukan" ? "bg-red-100 text-red-700 border border-red-200" : surat.status_berkas === "Verifikasi" ? "bg-yellow-100 text-yellow-700 border border-yellow-200" : "bg-green-100 text-green-700 border border-green-200"
-                      }`}>
-                        {surat.status_berkas}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 flex flex-col gap-2 justify-center">
-                      {surat.status_berkas === "Diajukan" && (<button onClick={() => ubahStatusSurat(surat.id, "Verifikasi")} className="bg-yellow-400 font-bold px-3 py-2 rounded-lg text-xs hover:bg-yellow-500 shadow-sm">Verifikasi Berkas</button>)}
-                      {surat.status_berkas === "Verifikasi" && (<button onClick={() => ubahStatusSurat(surat.id, "Selesai")} className="bg-green-500 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-green-600 shadow-sm">Tandai Selesai</button>)}
-                      <button onClick={() => mulaiEditSurat(surat)} className="bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-800 font-bold px-3 py-2 rounded-lg text-xs shadow-sm">Koreksi Teks</button>
-                      <button onClick={() => hapusSurat(surat.id)} className="text-red-500 font-bold text-xs mt-1 hover:underline">Hapus Permanen</button>
-                    </td>
-                  </tr>
-                ))}
-                {daftarSurat.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-10 text-gray-500 font-medium">Belum ada permohonan surat masuk.</td></tr>
-                )}
-              </tbody>
-            </table>
+                    </tbody>
+                  </table>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* ==========================================
+              TAB 3: KOTAK PENGADUAN
+          ========================================== */}
+          {tabAktif === "pengaduan" && (
+            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-red-600 animate-fade-in">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">📥 Kotak Pengaduan Masyarakat</h3>
+              
+              <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
+                <table className="min-w-full text-sm text-left">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="py-4 px-4 font-bold text-gray-600">Pelapor & Waktu</th>
+                      <th className="py-4 px-4 font-bold text-gray-600">Judul Pengaduan</th>
+                      <th className="py-4 px-4 font-bold text-gray-600">Isi Laporan Singkat</th>
+                      <th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {daftarPengaduan.map((aduan) => (
+                      <tr key={aduan.id} className="border-b hover:bg-red-50/50 transition-colors">
+                        <td className="py-4 px-4 align-top">
+                          <div className="font-bold text-gray-900 text-base">{aduan.nama}</div>
+                          <div className="text-xs text-gray-500 mb-1">{formatTanggal(aduan.tanggal)}</div>
+                          <a href={`https://wa.me/${formatWA(aduan.wa)}`} target="_blank" rel="noreferrer" className="text-[10px] bg-green-50 text-green-700 border border-green-200 font-bold px-2 py-0.5 rounded flex items-center gap-1 w-max hover:bg-green-600 hover:text-white transition-colors">
+                            <span>💬</span> WA Pelapor
+                          </a>
+                        </td>
+                        <td className="py-4 px-4 align-top">
+                          <div className="font-bold text-red-800 text-sm uppercase tracking-wide bg-red-50 px-2 py-1 rounded inline-block border border-red-100">
+                            {aduan.kategori}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 align-top">
+                          <p className="text-sm text-gray-600 line-clamp-2 max-w-sm italic mb-2">"{aduan.pesan}"</p>
+                          <button 
+                            onClick={() => setPengaduanTerpilih(aduan)}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+                          >
+                            📖 Baca Laporan Lengkap
+                          </button>
+                        </td>
+                        <td className="py-4 px-4 text-center align-top">
+                          <button onClick={() => hapusPengaduan(aduan.id)} className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-4 py-2 rounded-lg transition-colors">Hapus Aduan</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {daftarPengaduan.length === 0 && (
+                      <tr><td colSpan={4} className="text-center py-10 text-gray-500 font-medium">Kotak pengaduan kosong.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ==========================================
+          MODAL: BACA PENGADUAN LENGKAP
+      ========================================== */}
+      {pengaduanTerpilih && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+            <div className="bg-red-600 text-white p-6 flex justify-between items-center">
+              <h3 className="text-xl font-black flex items-center gap-2"><span>📥</span> Detail Pengaduan</h3>
+              <button onClick={() => setPengaduanTerpilih(null)} className="text-white hover:bg-red-700 bg-red-500 w-8 h-8 rounded-full font-black flex items-center justify-center transition-colors">X</button>
+            </div>
+            <div className="p-6 md:p-8 overflow-y-auto">
+              <div className="flex flex-wrap gap-4 mb-6 text-sm">
+                <div className="bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+                  <span className="block text-xs text-gray-500 font-bold mb-0.5">Nama Pelapor:</span>
+                  <span className="font-black text-gray-900 text-lg">{pengaduanTerpilih.nama}</span>
+                </div>
+                <div className="bg-gray-50 px-4 py-2 rounded-xl border border-gray-200">
+                  <span className="block text-xs text-gray-500 font-bold mb-0.5">Waktu Laporan:</span>
+                  <span className="font-bold text-gray-700">{formatTanggal(pengaduanTerpilih.tanggal)}</span>
+                </div>
+                <div className="bg-red-50 px-4 py-2 rounded-xl border border-red-200">
+                  <span className="block text-xs text-red-500 font-bold mb-0.5">Kategori:</span>
+                  <span className="font-black text-red-800 uppercase">{pengaduanTerpilih.kategori}</span>
+                </div>
+              </div>
+              <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200 relative">
+                <span className="absolute top-4 left-4 text-4xl opacity-10">📝</span>
+                <p className="text-gray-800 text-base leading-loose whitespace-pre-wrap relative z-10 font-medium">
+                  {pengaduanTerpilih.pesan}
+                </p>
+              </div>
+              <div className="mt-6 flex justify-end">
+                <a 
+                  href={`https://wa.me/${formatWA(pengaduanTerpilih.wa)}`} target="_blank" rel="noreferrer"
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl shadow-md transition-colors flex items-center gap-2"
+                >
+                  <span className="text-xl">💬</span> Hubungi Pelapor via WA
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* 2. KOTAK PENGADUAN WARGA */}
-      {(!activeSubMenu || activeSubMenu === "layanan" || activeSubMenu === "layan-pengaduan") && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-red-500">
-          <h3 className="text-2xl font-bold mt-4 mb-2">📢 Kotak Pengaduan Warga</h3>
-          <p className="text-gray-500 text-sm mb-6">Daftar laporan dan aspirasi dari warga. Tanggapi dengan cepat untuk pelayanan prima.</p>
-          
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            {daftarPengaduan.map((lap) => (
-              <div key={lap.id} className="border border-gray-200 p-6 rounded-2xl flex justify-between bg-gray-50 relative hover:shadow-md transition-shadow">
-                <button onClick={() => hapusPengaduan(lap.id)} className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-lg bg-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center border border-gray-200" title="Hapus Pengaduan">✖</button>
-                <div className="flex gap-5 w-full">
-                  {lap.foto_bukti ? (
-                    <a href={`https://wsrv.nl/?url=${lap.foto_bukti}`} target="_blank" rel="noreferrer" className="w-24 h-24 rounded-xl overflow-hidden border-2 border-white shadow-sm block hover:opacity-80 flex-shrink-0">
-                      <img src={`https://wsrv.nl/?url=${lap.foto_bukti}`} alt="Bukti Laporan" className="w-full h-full object-cover" />
-                    </a>
-                  ) : (
-                    <div className="w-24 h-24 rounded-xl bg-gray-200 flex items-center justify-center text-3xl flex-shrink-0 border-2 border-white shadow-sm opacity-50">📷</div>
-                  )}
-                  <div className="flex-1 pr-6">
-                    <h4 className="font-bold text-gray-900 text-lg leading-tight mb-1">{lap.judul}</h4>
-                    <span className="text-xs font-bold text-gray-500 flex items-center gap-1">
-                      <span>📅</span> {new Date(lap.tanggal_laporan).toLocaleDateString("id-ID")} • 
-                      <span className={`${lap.anonim ? "text-purple-600" : "text-blue-600"}`}>{lap.anonim ? "👤 Pelapor Anonim" : "Terverifikasi"}</span>
-                    </span>
-                    <p className="text-sm text-gray-700 mt-3 leading-relaxed border-t border-gray-200 pt-2">{lap.isi}</p>
-                  </div>
-                </div>
+      {/* ==========================================
+          MODAL: ALASAN PENOLAKAN SURAT
+      ========================================== */}
+      {rejectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl border-t-8 border-red-600">
+            <div className="p-6 md:p-8">
+              <h3 className="text-2xl font-black text-gray-900 mb-2">🔴 Tolak Pengajuan Surat</h3>
+              <p className="text-sm text-gray-500 mb-6">Berikan alasan mengapa permohonan surat ini ditolak (misal: Foto KTP buram, NIK tidak sesuai, dll) agar warga dapat memperbaikinya.</p>
+              
+              <textarea 
+                rows={4}
+                required
+                value={alasanTolak}
+                onChange={(e) => setAlasanTolak(e.target.value)}
+                placeholder="Tuliskan alasan penolakan secara jelas disini..."
+                className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-red-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed mb-6"
+              ></textarea>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => { setRejectModalOpen(false); setSuratToReject(null); setAlasanTolak(""); }} 
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={konfirmasiPenolakan} 
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-md transition-colors"
+                >
+                  Kirim Penolakan
+                </button>
               </div>
-            ))}
-            {daftarPengaduan.length === 0 && (
-              <div className="col-span-1 xl:col-span-2 text-center py-12 border-2 border-dashed border-gray-300 rounded-2xl text-gray-500 font-medium bg-gray-50">
-                <span className="text-5xl block mb-3 opacity-50">📭</span>
-                Kotak pengaduan saat ini masih kosong.
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
