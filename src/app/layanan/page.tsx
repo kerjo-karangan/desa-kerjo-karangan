@@ -2,10 +2,17 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { collection, addDoc, getDocs, query, where, doc, getDoc } from "firebase/firestore";
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  where, 
+  doc, 
+  getDoc 
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// Komponen Pembungkus Utama untuk keamanan Next.js
 export default function LayananMandiri() {
   return (
     <Suspense fallback={
@@ -21,22 +28,15 @@ export default function LayananMandiri() {
 function LayananContent() {
   const [tabAktif, setTabAktif] = useState("buat");
 
-  // STATE HEADER HERO DINAMIS
   const [heroData, setHeroData] = useState({
     judul: "Layanan Surat Mandiri",
     sub: "Ajukan surat administrasi (SKTM, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.",
     bg: "" 
   });
 
-  // ==========================================
-  // STATE MASTER SURAT (DARI ADMIN)
-  // ==========================================
   const [masterSuratList, setMasterSuratList] = useState<any[]>([]);
   const [loadingMaster, setLoadingMaster] = useState(true);
 
-  // ==========================================
-  // STATE FORMULIR PENGAJUAN SURAT
-  // ==========================================
   const [nik, setNik] = useState("");
   const [nama, setNama] = useState("");
   const [wa, setWa] = useState("");
@@ -47,19 +47,14 @@ function LayananContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusSubmit, setStatusSubmit] = useState("");
 
-  // ==========================================
-  // STATE LACAK SURAT
-  // ==========================================
   const [searchNik, setSearchNik] = useState("");
   const [hasilLacak, setHasilLacak] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
-  // Ambil Data dari Firebase
   useEffect(() => {
     const fetchAwalData = async () => {
       try {
-        // 1. Fetch Pengaturan Header
         const snapHero = await getDoc(doc(db, "pengaturan_web", "layanan_hero"));
         if (snapHero.exists() && snapHero.data()) {
           setHeroData({
@@ -69,7 +64,6 @@ function LayananContent() {
           });
         }
 
-        // 2. Fetch Master Surat
         const qMaster = query(collection(db, "master_surat"));
         const snap = await getDocs(qMaster);
         const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -100,39 +94,25 @@ function LayananContent() {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-        if ((encoded.length % 4) > 0) { encoded += '='.repeat(4 - (encoded.length % 4)); }
-        resolve(encoded);
-      };
+      reader.onload = () => resolve(reader.result?.toString() || '');
       reader.onerror = error => reject(error);
     });
   };
 
-  const uploadFotoKeImgBB = async (file: File) => {
+  const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const base64Data = await fileToBase64(file);
-      const formData = new FormData();
-      formData.append("image", base64Data);
-      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-      
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
+      const res = await fetch("/api/cloudinary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64Data }),
+      });
       const data = await res.json();
-      if (data.success) return data.data.url;
-      throw new Error("Jalur utama gagal");
+      if (data.success) return data.url;
+      throw new Error(data.error);
     } catch (error) {
-      try {
-        const base64Data = await fileToBase64(file);
-        const formData = new FormData();
-        formData.append("image", base64Data);
-        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-        const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
-        
-        const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
-        const dataCdn = await resCdn.json();
-        if (dataCdn.success) return dataCdn.data.url;
-        return null;
-      } catch (errCdn) { return null; }
+      console.error("Upload error:", error);
+      return null;
     }
   };
 
@@ -154,19 +134,19 @@ function LayananContent() {
     }
 
     setIsSubmitting(true);
-    setStatusSubmit("Memproses data Anda...");
+    setStatusSubmit("Memproses pengajuan Anda...");
 
     try {
       const berkasTerunggah: { [key: string]: string } = {};
 
       if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
-        setStatusSubmit("Mengunggah berkas foto...");
+        setStatusSubmit("Mengunggah berkas ke server Cloudinary...");
         const syaratWajib = selectedSurat.persyaratan as string[];
         
         for (const syarat of syaratWajib) {
           const file = fileBerkas[syarat];
           if (file) {
-            const linkGambar = await uploadFotoKeImgBB(file);
+            const linkGambar = await uploadFotoKeCloudinary(file);
             if (linkGambar) {
               berkasTerunggah[syarat] = linkGambar;
             } else {
@@ -180,6 +160,7 @@ function LayananContent() {
       if (formattedWA.startsWith("0")) formattedWA = "62" + formattedWA.substring(1);
 
       setStatusSubmit("Menyimpan pengajuan ke server desa...");
+      
       await addDoc(collection(db, "layanan_surat"), {
         nik: nik,
         nama: nama,
@@ -194,7 +175,13 @@ function LayananContent() {
 
       setStatusSubmit("✅ Pengajuan Surat Berhasil! Silakan cek menu Lacak secara berkala.");
       
-      setNik(""); setNama(""); setWa(""); setKeperluan(""); setFileBerkas({}); setJenisSuratId("");
+      setNik(""); 
+      setNama(""); 
+      setWa(""); 
+      setKeperluan(""); 
+      setFileBerkas({}); 
+      setJenisSuratId("");
+      
       setTimeout(() => setStatusSubmit(""), 6000);
 
     } catch (error: any) {
@@ -212,11 +199,16 @@ function LayananContent() {
     setHasSearched(true);
     
     try {
-      const q = query(collection(db, "layanan_surat"), where("nik", "==", searchNik));
+      const q = query(
+        collection(db, "layanan_surat"), 
+        where("nik", "==", searchNik)
+      );
       const snap = await getDocs(q);
       
       const hasil = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const sortedHasil = hasil.sort((a, b) => new Date(b.tanggal_pengajuan).getTime() - new Date(a.tanggal_pengajuan).getTime());
+      const sortedHasil = hasil.sort((a, b) => 
+        new Date(b.tanggal_pengajuan).getTime() - new Date(a.tanggal_pengajuan).getTime()
+      );
       
       setHasilLacak(sortedHasil);
     } catch (error) {
@@ -229,11 +221,14 @@ function LayananContent() {
   const formatTanggalLacak = (isoString: string) => {
     if (!isoString) return "-";
     return new Date(isoString).toLocaleString("id-ID", {
-      day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit"
+      day: "numeric", 
+      month: "long", 
+      year: "numeric", 
+      hour: "2-digit", 
+      minute: "2-digit"
     }) + " WIB";
   };
 
-  // Mencegah Crash Hero Image
   let heroBgSafe = "";
   if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
     heroBgSafe = heroData.bg;
@@ -242,9 +237,6 @@ function LayananContent() {
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
       
-      {/* ==========================================
-          HEADER SECTION (HERO DINAMIS)
-      ========================================== */}
       <div className="bg-yellow-700 text-yellow-50 py-16 md:py-24 relative overflow-hidden shadow-md">
         <div className="absolute inset-0 z-0">
           {heroBgSafe && (
@@ -271,7 +263,6 @@ function LayananContent() {
 
       <div className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
         
-        {/* TABS NAVIGASI */}
         <div className="flex justify-center gap-2 md:gap-4 mb-10 relative z-20 -mt-20">
           <button 
             onClick={() => setTabAktif("buat")}
@@ -296,9 +287,6 @@ function LayananContent() {
           </button>
         </div>
 
-        {/* ==========================================
-            KONTEN TAB: BUAT SURAT BARU
-        ========================================== */}
         {tabAktif === "buat" && (
           <div className="bg-white p-6 md:p-12 rounded-[40px] shadow-sm border border-gray-100 animate-fade-in border-t-8 border-t-yellow-400">
             <div className="text-center mb-10">
@@ -307,7 +295,9 @@ function LayananContent() {
             </div>
 
             {loadingMaster ? (
-              <div className="flex justify-center py-20"><div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div></div>
+              <div className="flex justify-center py-20">
+                <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
             ) : masterSuratList.length === 0 ? (
               <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
                 <span className="text-6xl opacity-50 block mb-4">📭</span>
@@ -317,7 +307,9 @@ function LayananContent() {
               <form onSubmit={handleSubmitPengajuan} className="space-y-6">
                 
                 <div className="bg-yellow-50 p-6 rounded-3xl border border-yellow-200">
-                  <label className="block text-sm font-bold mb-2 text-yellow-900">Pilih Jenis Surat yang Ingin Dibuat</label>
+                  <label className="block text-sm font-bold mb-2 text-yellow-900">
+                    Pilih Jenis Surat yang Ingin Dibuat
+                  </label>
                   <select 
                     required 
                     value={jenisSuratId} 
@@ -356,7 +348,9 @@ function LayananContent() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-3xl border border-gray-100">
                       <div className="md:col-span-2 border-b border-gray-200 pb-2 mb-2">
-                        <h4 className="font-bold text-gray-800 flex items-center gap-2"><span className="text-xl">👤</span> Identitas Diri</h4>
+                        <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                          <span className="text-xl">👤</span> Identitas Diri
+                        </h4>
                       </div>
                       
                       <div className="md:col-span-2">
@@ -411,7 +405,9 @@ function LayananContent() {
                     {!selectedSurat.harus_datang && selectedSurat.persyaratan && selectedSurat.persyaratan.length > 0 && (
                       <div className="bg-blue-50 p-6 rounded-3xl border border-blue-200">
                         <div className="border-b border-blue-200 pb-2 mb-6">
-                          <h4 className="font-bold text-blue-900 flex items-center gap-2"><span className="text-xl">📸</span> Foto Persyaratan</h4>
+                          <h4 className="font-bold text-blue-900 flex items-center gap-2">
+                            <span className="text-xl">📸</span> Foto Persyaratan
+                          </h4>
                           <p className="text-xs text-blue-700 mt-1 font-medium">Unggah foto dokumen dengan jelas agar admin dapat memverifikasinya.</p>
                         </div>
                         
@@ -460,9 +456,6 @@ function LayananContent() {
           </div>
         )}
 
-        {/* ==========================================
-            KONTEN TAB: LACAK SURAT
-        ========================================== */}
         {tabAktif === "lacak" && (
           <div className="bg-white p-6 md:p-12 rounded-[40px] shadow-sm border border-gray-100 animate-fade-in border-t-8 border-t-gray-800">
             <div className="text-center mb-10">
@@ -490,7 +483,9 @@ function LayananContent() {
 
             {hasSearched && (
               <div className="space-y-6">
-                <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-3">Hasil Pelacakan untuk NIK: <span className="font-mono text-gray-500">{searchNik}</span></h3>
+                <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-3">
+                  Hasil Pelacakan untuk NIK: <span className="font-mono text-gray-500">{searchNik}</span>
+                </h3>
                 
                 {hasilLacak.length === 0 ? (
                   <div className="text-center py-10 bg-red-50 rounded-3xl border border-red-100">
@@ -511,9 +506,15 @@ function LayananContent() {
                           {surat.status || "Menunggu"}
                         </div>
 
-                        <div className="text-xs font-bold text-gray-400 mb-2">{formatTanggalLacak(surat.tanggal_pengajuan)}</div>
-                        <h4 className="text-xl font-black text-gray-900 leading-tight w-3/4 mb-1">{surat.jenis_surat}</h4>
-                        <p className="text-sm font-bold text-gray-500 mb-4 uppercase">{surat.nama}</p>
+                        <div className="text-xs font-bold text-gray-400 mb-2">
+                          {formatTanggalLacak(surat.tanggal_pengajuan)}
+                        </div>
+                        <h4 className="text-xl font-black text-gray-900 leading-tight w-3/4 mb-1">
+                          {surat.jenis_surat}
+                        </h4>
+                        <p className="text-sm font-bold text-gray-500 mb-4 uppercase">
+                          {surat.nama}
+                        </p>
                         
                         <p className="text-sm text-gray-700 leading-relaxed border-t border-gray-100 pt-3">
                           <span className="font-bold text-gray-900 block mb-1">Keperluan:</span> {surat.keperluan}

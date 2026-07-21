@@ -2,10 +2,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, addDoc, doc, query, orderBy, getDocs, deleteDoc, updateDoc, setDoc, getDoc } from "firebase/firestore";
+import { 
+  collection, 
+  addDoc, 
+  doc, 
+  query, 
+  orderBy, 
+  getDocs, 
+  deleteDoc, 
+  updateDoc, 
+  setDoc, 
+  getDoc 
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// Mendefinisikan Tipe Data Props agar TypeScript tidak memunculkan Error Garis Merah
 interface TransparansiProps {
   activeSubMenu?: string;
   userEmail?: string | null;
@@ -13,15 +23,11 @@ interface TransparansiProps {
 
 export default function Transparansi({ activeSubMenu, userEmail }: TransparansiProps) {
   
-  // Fungsi Helper untuk Waktu Lokal
   const getLocalDatetime = (d = new Date()) => {
     const tzOffset = d.getTimezoneOffset() * 60000; 
     return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
   };
 
-  // ==========================================
-  // STATE PENGATURAN HEADER/HERO TRANSPARANSI
-  // ==========================================
   const [heroJudul, setHeroJudul] = useState("");
   const [heroSub, setHeroSub] = useState("");
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
@@ -29,10 +35,6 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
-  // ==========================================
-  // STATE DOKUMEN TRANSPARANSI
-  // ==========================================
-  // Menentukan default kategori berdasarkan tab yang aktif di Sidebar
   const defaultKategori = activeSubMenu === "trans-regulasi" ? "Regulasi & Perdes" : "APBDes";
   
   const [kategoriDokumen, setKategoriDokumen] = useState(defaultKategori); 
@@ -49,7 +51,6 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
   const [isLoading, setIsLoading] = useState(false);
   const [editDokumenId, setEditDokumenId] = useState<string | null>(null);
 
-  // Jika user berpindah tab via Sidebar, update default kategorinya
   useEffect(() => {
     if (activeSubMenu === "trans-regulasi") {
       setKategoriDokumen("Regulasi & Perdes");
@@ -58,17 +59,12 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     }
   }, [activeSubMenu]);
 
-  // ==========================================
-  // FUNGSI PENGAMBILAN DATA
-  // ==========================================
   const ambilData = async () => {
     try {
-      // Fetch Dokumen Transparansi
       const qDokumen = query(collection(db, "transparansi_desa"), orderBy("tanggal_posting", "desc"));
       const snapDokumen = await getDocs(qDokumen);
       setDaftarDokumen(snapDokumen.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
 
-      // Fetch Pengaturan Header
       const snapHero = await getDoc(doc(db, "pengaturan_web", "transparansi_hero"));
       if (snapHero.exists() && snapHero.data()) {
         setHeroJudul(snapHero.data().judul || "Transparansi Desa");
@@ -84,50 +80,45 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     ambilData();
   }, []);
 
-  // ==========================================
-  // FUNGSI UPLOAD GAMBAR BASE64 IMGBB
-  // ==========================================
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = () => {
-        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-        if ((encoded.length % 4) > 0) { encoded += '='.repeat(4 - (encoded.length % 4)); }
-        resolve(encoded);
-      };
+      reader.onload = () => resolve(reader.result?.toString() || '');
       reader.onerror = error => reject(error);
     });
   };
 
-  const uploadFotoKeImgBB = async (file: File) => {
+  const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const base64Data = await fileToBase64(file);
-      const formData = new FormData();
-      formData.append("image", base64Data);
-      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-      
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { method: "POST", body: formData });
+      const res = await fetch("/api/cloudinary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64Data }),
+      });
       const data = await res.json();
-      if (data.success) return data.data.url;
-      throw new Error("Jalur utama gagal");
+      if (data.success) return data.url;
+      throw new Error(data.error);
     } catch (error) {
-      try {
-        const base64Data = await fileToBase64(file);
-        const formData = new FormData(); formData.append("image", base64Data);
-        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-        const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
-        const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
-        const dataCdn = await resCdn.json();
-        if (dataCdn.success) return dataCdn.data.url;
-        return null;
-      } catch (errCdn) { return null; }
+      console.error("Upload error:", error);
+      return null;
     }
   };
 
-  // ==========================================
-  // MANAJEMEN SIMPAN HEADER / HERO
-  // ==========================================
+  const hapusFotoDiCloudinary = async (url: string) => {
+    if (!url || !url.includes("cloudinary.com")) return;
+    try {
+      await fetch("/api/cloudinary", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
+  };
+
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingHero(true);
@@ -137,13 +128,15 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
       let imageUrl = heroBgLama;
       
       if (heroBgList && heroBgList.length > 0) {
-        setStatusHero("Mengunggah gambar background...");
-        const newBg = await uploadFotoKeImgBB(heroBgList[0]);
+        setStatusHero("Mengunggah gambar ke Cloudinary...");
+        const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
         if (newBg) {
+          if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
           imageUrl = newBg;
         } else {
-          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil.");
-          setIsLoadingHero(false); return; 
+          setStatusHero("❌ Gagal mengunggah gambar.");
+          setIsLoadingHero(false); 
+          return; 
         }
       }
 
@@ -155,7 +148,8 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
       });
 
       setStatusHero("✅ Pengaturan Header Transparansi berhasil diperbarui!");
-      setHeroBgLama(imageUrl); setHeroBgList(null);
+      setHeroBgLama(imageUrl); 
+      setHeroBgList(null);
       const input = document.getElementById("inputBgTransparansi") as HTMLInputElement;
       if (input) input.value = "";
       setTimeout(() => setStatusHero(""), 4000);
@@ -166,9 +160,28 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     }
   };
 
-  // ==========================================
-  // MANAJEMEN SIMPAN DOKUMEN
-  // ==========================================
+  const handleHapusBackgroundHero = async () => {
+    if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
+    setIsLoadingHero(true);
+    setStatusHero("Menghapus gambar...");
+    try {
+      if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
+      await setDoc(doc(db, "pengaturan_web", "transparansi_hero"), {
+        judul: heroJudul,
+        sub: heroSub,
+        bg: "",
+        terakhir_diperbarui: new Date().toISOString()
+      });
+      setHeroBgLama("");
+      setStatusHero("✅ Background dihapus.");
+      setTimeout(() => setStatusHero(""), 4000);
+    } catch (error) {
+      setStatusHero("❌ Gagal menghapus background.");
+    } finally {
+      setIsLoadingHero(false);
+    }
+  };
+
   const handleSimpanDokumen = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -178,12 +191,13 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
       let urlGambarAkhir = gambarLama;
       
       if (fotoDokumenList && fotoDokumenList.length > 0) {
-        setStatusProses(`Mengunggah foto sampul dokumen...`);
-        const hasilUpload = await uploadFotoKeImgBB(fotoDokumenList[0]);
+        setStatusProses(`Mengunggah foto sampul ke Cloudinary...`);
+        const hasilUpload = await uploadFotoKeCloudinary(fotoDokumenList[0]);
         if (hasilUpload) {
+          if (gambarLama) await hapusFotoDiCloudinary(gambarLama);
           urlGambarAkhir = hasilUpload;
         } else {
-          setStatusProses("❌ Gagal unggah gambar. Coba lagi.");
+          setStatusProses("❌ Gagal unggah gambar.");
           setIsLoading(false);
           return;
         }
@@ -230,6 +244,15 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const handleHapusSampulLama = async () => {
+    if (!confirm("Yakin hapus foto sampul ini dari Cloudinary?")) return;
+    if (gambarLama) await hapusFotoDiCloudinary(gambarLama);
+    setGambarLama("");
+    if (editDokumenId) {
+      await updateDoc(doc(db, "transparansi_desa", editDokumenId), { gambar: "" });
+    }
+  };
+
   const batalEditDokumen = () => {
     setEditDokumenId(null); 
     setKategoriDokumen(activeSubMenu === "trans-regulasi" ? "Regulasi & Perdes" : "APBDes");
@@ -243,29 +266,26 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     if (input) input.value = "";
   };
 
-  const hapusDokumen = async (id: string) => {
-    if (confirm("Yakin hapus dokumen ini dari transparansi publik?")) {
-      await deleteDoc(doc(db, "transparansi_desa", id));
+  const hapusDokumen = async (item: any) => {
+    if (confirm("Yakin hapus dokumen ini? Foto sampul juga akan dihapus dari Cloudinary.")) {
+      if (item.gambar) await hapusFotoDiCloudinary(item.gambar);
+      await deleteDoc(doc(db, "transparansi_desa", item.id));
       ambilData();
     }
   };
 
-  // Filter Data Tabel Berdasarkan Tab
   const dataDokumenTampil = daftarDokumen.filter(doc => {
     if (activeSubMenu === "trans-apbdes") return doc.kategori === "APBDes";
     if (activeSubMenu === "trans-regulasi") return doc.kategori === "Regulasi & Perdes";
-    return true; // Tampilkan semua jika tidak ada filter spesifik
+    return true; 
   });
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20">
+    <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {/* ==========================================
-          MODUL 1: PENGATURAN HEADER/HERO
-      ========================================== */}
       {(!activeSubMenu || activeSubMenu === "trans-hero") && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 mb-8">
-          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Transparansi</h3>
+          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Transparansi (Cloudinary)</h3>
           <p className="text-gray-500 text-sm mb-6">Sesuaikan gambar background dan teks sambutan khusus di halaman publik Transparansi Desa.</p>
           
           <form onSubmit={handleSimpanHero} className="space-y-6">
@@ -283,7 +303,7 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-800">Teks Sub-Judul (Deskripsi Singkat)</label>
+                  <label className="block text-sm font-bold mb-2 text-gray-800">Teks Sub-Judul</label>
                   <textarea 
                     required 
                     rows={4} 
@@ -299,9 +319,19 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                 
                 {heroBgLama && (
                   <div className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200 group">
-                    <img src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} className="w-full h-full object-cover" />
+                    <img 
+                      src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                      className="w-full h-full object-cover" 
+                      alt="Hero Background"
+                    />
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <button type="button" onClick={() => setHeroBgLama("")} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500">Hapus Background</button>
+                      <button 
+                        type="button" 
+                        onClick={handleHapusBackgroundHero} 
+                        className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
+                      >
+                        Hapus Permanen
+                      </button>
                     </div>
                   </div>
                 )}
@@ -309,21 +339,40 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                 <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                   <span className="text-3xl mb-2">📸</span>
                   <span className="font-bold text-yellow-800 text-sm">Upload Background Baru</span>
-                  <input id="inputBgTransparansi" type="file" accept="image/*" onChange={(e) => setHeroBgList(e.target.files)} className="hidden" />
+                  <input 
+                    id="inputBgTransparansi" 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => setHeroBgList(e.target.files)} 
+                    className="hidden" 
+                  />
                 </label>
-                {heroBgList && (<div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">✅ Gambar baru siap diunggah.</div>)}
+                
+                {heroBgList && (
+                  <div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">
+                    ✅ Gambar baru siap diunggah.
+                  </div>
+                )}
               </div>
             </div>
             
-            {statusHero && (<div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusHero.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>{statusHero}</div>)}
-            <button type="submit" disabled={isLoadingHero} className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg">{isLoadingHero ? "Menyimpan Pengaturan..." : "Simpan Header Transparansi"}</button>
+            {statusHero && (
+              <div className={`p-4 rounded-xl text-sm font-bold text-center border ${statusHero.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>
+                {statusHero}
+              </div>
+            )}
+            
+            <button 
+              type="submit" 
+              disabled={isLoadingHero} 
+              className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+            >
+              {isLoadingHero ? "Menyimpan Pengaturan..." : "Simpan Header Transparansi"}
+            </button>
           </form>
         </div>
       )}
 
-      {/* ==========================================
-          MODUL 2: INPUT DOKUMEN TRANSPARANSI
-      ========================================== */}
       {(!activeSubMenu || activeSubMenu === "trans-apbdes" || activeSubMenu === "trans-regulasi") && (
         <>
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600">
@@ -332,10 +381,15 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                 <h3 className="text-2xl font-bold flex items-center gap-2">
                   {editDokumenId ? "✏️ Edit Transparansi" : "📢 Publikasi Dokumen Transparansi"}
                 </h3>
-                <p className="text-gray-500 text-sm mt-1">Unggah foto sampul dokumen ({activeSubMenu === "trans-regulasi" ? "Regulasi/Perdes" : "APBDes"}) beserta link download.</p>
+                <p className="text-gray-500 text-sm mt-1">
+                  Unggah foto sampul dokumen ({activeSubMenu === "trans-regulasi" ? "Regulasi/Perdes" : "APBDes"}) beserta link download.
+                </p>
               </div>
               {editDokumenId && (
-                <button onClick={batalEditDokumen} className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors">
+                <button 
+                  onClick={batalEditDokumen} 
+                  className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg font-bold transition-colors"
+                >
                   Batal Edit
                 </button>
               )}
@@ -407,19 +461,42 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                   
                   {gambarLama && (
                     <div className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200 group bg-gray-100 flex items-center justify-center">
-                      <img src={gambarLama.startsWith("http") ? gambarLama : `https://wsrv.nl/?url=${gambarLama}`} className="w-auto h-full object-contain" />
+                      <img 
+                        src={gambarLama.startsWith("http") ? gambarLama : `https://wsrv.nl/?url=${gambarLama}`} 
+                        className="w-auto h-full object-contain" 
+                        alt="Sampul Dokumen"
+                      />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                        <button type="button" onClick={() => setGambarLama("")} className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700">Hapus Sampul</button>
+                        <button 
+                          type="button" 
+                          onClick={handleHapusSampulLama} 
+                          className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700"
+                        >
+                          Hapus Sampul Permanen
+                        </button>
                       </div>
                     </div>
                   )}
 
                   <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-100 transition-all shadow-sm">
                     <span className="text-3xl mb-2">📸</span>
-                    <span className="font-bold text-blue-800 text-sm">{gambarLama ? "Ganti Foto Baru" : "Upload Foto Banner/Dokumen"}</span>
-                    <input id="inputFotoDok" type="file" accept="image/*" onChange={(e) => setFotoDokumenList(e.target.files)} className="hidden" />
+                    <span className="font-bold text-blue-800 text-sm">
+                      {gambarLama ? "Ganti Foto Baru" : "Upload Foto Banner/Dokumen"}
+                    </span>
+                    <input 
+                      id="inputFotoDok" 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => setFotoDokumenList(e.target.files)} 
+                      className="hidden" 
+                    />
                   </label>
-                  {fotoDokumenList && (<div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">✅ Foto siap diunggah.</div>)}
+                  
+                  {fotoDokumenList && (
+                    <div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">
+                      ✅ Foto siap diunggah ke Cloudinary.
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -439,11 +516,11 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
             </form>
           </div>
 
-          {/* TABEL MANAJEMEN DOKUMEN */}
           <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100">
             <div className="flex justify-between items-center mb-6">
               <h4 className="text-xl font-bold text-gray-800">Daftar Dokumen Publik</h4>
             </div>
+            
             <table className="min-w-full text-sm text-left">
               <thead className="bg-gray-50 border-b">
                 <tr>
@@ -460,24 +537,46 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
                       {item.tanggal_posting ? new Date(item.tanggal_posting).toLocaleDateString("id-ID", {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : "-"}
                     </td>
                     <td className="py-4 px-4">
-                      <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block mb-1 border border-blue-200">{item.kategori}</div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded inline-block mb-1 border border-blue-200">
+                        {item.kategori}
+                      </div>
                       <div className="font-bold text-gray-900 text-base">{item.judul}</div>
                       <p className="text-xs text-gray-500 line-clamp-2 mt-1 w-48 md:w-64">{item.deskripsi}</p>
                     </td>
                     <td className="py-4 px-4 text-center align-middle">
-                      {/* PERBAIKAN: whitespace-nowrap agar tombol tidak terpotong ke bawah di HP */}
-                      <a href={item.link_dokumen} target="_blank" rel="noreferrer" className="inline-block text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg shadow-sm whitespace-nowrap">Buka Link</a>
+                      <a 
+                        href={item.link_dokumen} 
+                        target="_blank" 
+                        rel="noreferrer" 
+                        className="inline-block text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg shadow-sm whitespace-nowrap"
+                      >
+                        Buka Link
+                      </a>
                     </td>
                     <td className="py-4 px-4 text-center">
                       <div className="flex flex-col gap-2 items-center">
-                        <button onClick={() => mulaiEditDokumen(item)} className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Edit</button>
-                        <button onClick={() => hapusDokumen(item.id)} className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors">Hapus</button>
+                        <button 
+                          onClick={() => mulaiEditDokumen(item)} 
+                          className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => hapusDokumen(item)} 
+                          className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                        >
+                          Hapus Permanen
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
                 {dataDokumenTampil.length === 0 && (
-                  <tr><td colSpan={4} className="text-center py-8 text-gray-500">Belum ada dokumen di kategori ini.</td></tr>
+                  <tr>
+                    <td colSpan={4} className="text-center py-8 text-gray-500">
+                      Belum ada dokumen di kategori ini.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

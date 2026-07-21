@@ -2,12 +2,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, addDoc, doc, getDoc, query, orderBy, getDocs, deleteDoc, updateDoc, setDoc } from "firebase/firestore";
+import { 
+  collection, 
+  addDoc, 
+  doc, 
+  getDoc, 
+  query, 
+  orderBy, 
+  getDocs, 
+  deleteDoc, 
+  updateDoc, 
+  setDoc 
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
 export default function PengaturanBeranda({ userEmail }: { userEmail: string | null }) {
   const [tabAktif, setTabAktif] = useState("hero"); // 'hero', 'kontak', 'berita'
 
+  // Helper Waktu
   const getLocalDatetime = (d = new Date()) => {
     const tzOffset = d.getTimezoneOffset() * 60000; 
     return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
@@ -51,7 +63,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   const [gambarLamaKabar, setGambarLamaKabar] = useState<string[]>([]);
 
   // ==========================================
-  // FUNGSI PENGAMBILAN DATA
+  // FUNGSI PENGAMBILAN DATA (FETCH)
   // ==========================================
   const ambilData = async () => {
     try {
@@ -63,7 +75,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         setHeroBgLama(snapHero.data().bg || "");
       }
 
-      // 2. Data Kontak & Sosmed
+      // 2. Data Kontak
       const snapKontak = await getDoc(doc(db, "pengaturan_web", "kontak"));
       if (snapKontak.exists()) {
         const d = snapKontak.data();
@@ -91,50 +103,52 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   }, []);
 
   // ==========================================
-  // FUNGSI UPLOAD GAMBAR API IMGBB
+  // FUNGSI CLOUDINARY (UPLOAD & DELETE API)
   // ==========================================
+  
+  // Konversi Gambar ke Format Base64
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
-        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-        if ((encoded.length % 4) > 0) {
-          encoded += '='.repeat(4 - (encoded.length % 4));
-        }
-        resolve(encoded);
+        let encoded = reader.result?.toString() || '';
+        resolve(encoded); 
       };
       reader.onerror = error => reject(error);
     });
   };
 
-  const uploadFotoKeImgBB = async (file: File) => {
+  // UPLOAD Ke API Route Internal Kita
+  const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const base64Data = await fileToBase64(file);
-      const formData = new FormData();
-      formData.append("image", base64Data);
-      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-      
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
-        method: "POST", 
-        body: formData 
+      const res = await fetch("/api/cloudinary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file: base64Data }),
       });
       const data = await res.json();
-      if (data.success) return data.data.url;
-      throw new Error("Jalur utama gagal");
+      if (data.success) return data.url;
+      throw new Error(data.error);
     } catch (error) {
-      try {
-        const base64Data = await fileToBase64(file);
-        const formData = new FormData();
-        formData.append("image", base64Data);
-        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-        const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
-        
-        const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
-        const dataCdn = await resCdn.json();
-        if (dataCdn.success) return dataCdn.data.url;
-        return null;
-      } catch (errCdn) { return null; }
+      console.error("Gagal Upload ke Cloudinary:", error);
+      return null;
+    }
+  };
+
+  // DELETE Ke API Route Internal Kita
+  const hapusFotoDiCloudinary = async (url: string) => {
+    if (!url || !url.includes("cloudinary.com")) return; // Hanya jalankan jika itu URL Cloudinary
+    try {
+      await fetch("/api/cloudinary", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url }),
+      });
+      console.log("Gambar dihapus dari Cloudinary:", url);
+    } catch (error) {
+      console.error("Gagal Hapus di Cloudinary:", error);
     }
   };
 
@@ -150,9 +164,14 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       let imageUrl = heroBgLama;
       
       if (heroBgList && heroBgList.length > 0) {
-        setStatusHero("Mengunggah gambar background ke Server...");
-        const newBg = await uploadFotoKeImgBB(heroBgList[0]);
+        setStatusHero("Mengunggah gambar ke Cloudinary...");
+        const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
+        
         if (newBg) {
+          // Jika gambar baru berhasil diunggah, HAPUS gambar lama dari server (agar tidak numpuk)
+          if (heroBgLama) {
+            await hapusFotoDiCloudinary(heroBgLama);
+          }
           imageUrl = newBg;
         } else {
           setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil.");
@@ -176,6 +195,32 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       setTimeout(() => setStatusHero(""), 4000);
     } catch (error) {
       setStatusHero("❌ Gagal menyimpan pengaturan ke Database.");
+    } finally {
+      setIsLoadingHero(false);
+    }
+  };
+
+  // Hapus Permanen Background Hero
+  const handleHapusBackgroundHero = async () => {
+    if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
+    setIsLoadingHero(true);
+    setStatusHero("Menghapus gambar dari server...");
+    
+    try {
+      if (heroBgLama) {
+        await hapusFotoDiCloudinary(heroBgLama);
+      }
+      await setDoc(doc(db, "pengaturan_web", "beranda"), {
+        judul: heroJudul,
+        sub: heroSub,
+        bg: "",
+        terakhir_diperbarui: new Date().toISOString()
+      });
+      setHeroBgLama("");
+      setStatusHero("✅ Gambar background dihapus.");
+      setTimeout(() => setStatusHero(""), 4000);
+    } catch (error) {
+      setStatusHero("❌ Gagal menghapus gambar.");
     } finally {
       setIsLoadingHero(false);
     }
@@ -246,14 +291,18 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     e.preventDefault();
     setIsLoadingKabar(true);
     setStatusKabar("Memproses...");
+    
     try {
       let tautanGambarBaru: string[] = [];
+      
       if (fotoKabarList && fotoKabarList.length > 0) {
-        setStatusKabar(`Mengunggah foto...`);
-        const uploadPromises = Array.from(fotoKabarList).map((file) => uploadFotoKeImgBB(file));
+        setStatusKabar(`Mengunggah foto ke Cloudinary...`);
+        // Upload Multi Gambar
+        const uploadPromises = Array.from(fotoKabarList).map((file) => uploadFotoKeCloudinary(file));
         const hasilUpload = await Promise.all(uploadPromises);
         tautanGambarBaru = hasilUpload.filter((url) => url !== null) as string[];
       }
+      
       const gambarFinal = [...gambarLamaKabar, ...tautanGambarBaru];
       const finalTanggalPosting = new Date(tanggalKabar).toISOString();
 
@@ -264,7 +313,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           gambar: gambarFinal,
           tanggal_posting: finalTanggalPosting
         });
-        setStatusKabar("✅ Diperbarui!");
+        setStatusKabar("✅ Berita Diperbarui!");
       } else {
         await addDoc(collection(db, "kabar_desa"), {
           judul: judulKabar, 
@@ -275,7 +324,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           is_featured: true, 
           is_pinned: false
         });
-        setStatusKabar("✅ Dipublikasikan!");
+        setStatusKabar("✅ Berita Dipublikasikan!");
       }
       
       await pastikanSepuluhTerbaru();
@@ -298,8 +347,41 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const hapusGambarDariDaftarLamaKabar = (indexGambar: number) => {
-    setGambarLamaKabar((prev) => prev.filter((_, i) => i !== indexGambar));
+  // MENGHAPUS SATU FOTO SPESIFIK SAAT EDIT BERITA
+  const hapusGambarDariDaftarLamaKabar = async (indexGambar: number) => {
+    if (!confirm("Yakin menghapus foto ini? Foto akan dihapus secara permanen dari server Cloudinary.")) return;
+    
+    const urlYangDihapus = gambarLamaKabar[indexGambar];
+    
+    // 1. Hapus dari Cloudinary
+    await hapusFotoDiCloudinary(urlYangDihapus);
+
+    // 2. Update UI & State
+    const sisaGambar = gambarLamaKabar.filter((_, i) => i !== indexGambar);
+    setGambarLamaKabar(sisaGambar);
+    
+    // 3. Update Database Firebase langsung agar sinkron
+    if (editKabarId) {
+      await updateDoc(doc(db, "kabar_desa", editKabarId), {
+        gambar: sisaGambar
+      });
+    }
+  };
+
+  // MENGHAPUS SELURUH BERITA & MEMUSNAHKAN SEMUA FOTONYA DARI CLOUDINARY
+  const hapusKabar = async (id: string, gambarArray: string[]) => {
+    if (!confirm("Yakin hapus berita permanen? Semua foto yang terkait dengan berita ini akan dimusnahkan juga dari server Cloudinary.")) return;
+    
+    // 1. Loop dan hapus setiap gambar dari Cloudinary
+    if (gambarArray && gambarArray.length > 0) {
+      for (const url of gambarArray) {
+        await hapusFotoDiCloudinary(url);
+      }
+    }
+    
+    // 2. Hapus data dari Firebase
+    await deleteDoc(doc(db, "kabar_desa", id));
+    ambilData();
   };
 
   const batalEditKabar = () => {
@@ -311,13 +393,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     setFotoKabarList(null);
     const input = document.getElementById("inputFotoKabarBeranda") as HTMLInputElement;
     if (input) input.value = "";
-  };
-
-  const hapusKabar = async (id: string) => {
-    if (confirm("Yakin hapus berita permanen?")) {
-      await deleteDoc(doc(db, "kabar_desa", id));
-      ambilData();
-    }
   };
 
   const toggleTampilBerita = async (id: string, currentStatus: boolean) => {
@@ -343,6 +418,9 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
+  // ==========================================
+  // TAMPILAN RENDER UI
+  // ==========================================
   return (
     <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
@@ -377,8 +455,8 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       {/* 1. PENGATURAN TAMPILAN BERANDA (HERO) */}
       {tabAktif === "hero" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
-          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Visual Beranda</h3>
-          <p className="text-gray-500 text-sm mb-6">Ubah gambar latar belakang (*background*) dan teks sambutan utama di halaman depan web.</p>
+          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Visual Beranda (Cloudinary)</h3>
+          <p className="text-gray-500 text-sm mb-6">Ubah gambar latar belakang (*background*) dan teks sambutan utama di halaman depan web. Server kini terhubung dengan Cloudinary.</p>
           
           <form onSubmit={handleSimpanHero} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -419,10 +497,10 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button 
                         type="button" 
-                        onClick={() => setHeroBgLama("")} 
+                        onClick={handleHapusBackgroundHero} 
                         className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
                       >
-                        Hapus Background
+                        Hapus Permanen
                       </button>
                     </div>
                   </div>
@@ -430,7 +508,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
 
                 <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                   <span className="text-3xl mb-2">📸</span>
-                  <span className="font-bold text-yellow-800 text-sm">Ganti Gambar Background Baru</span>
+                  <span className="font-bold text-yellow-800 text-sm">Upload Background ke Cloudinary</span>
                   <input 
                     id="inputBgBeranda" 
                     type="file" 
@@ -472,7 +550,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           <form onSubmit={handleSimpanKontak} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-              {/* Kolom Kiri: Info Dasar */}
               <div className="space-y-5 bg-blue-50 p-5 rounded-2xl border border-blue-100">
                 <h4 className="font-bold text-blue-900 border-b border-blue-200 pb-2 flex items-center gap-2"><span className="text-lg">📍</span> Info Layanan Fisik</h4>
                 <div>
@@ -507,7 +584,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                 </div>
               </div>
 
-              {/* Kolom Kanan: Sosmed & Digital */}
               <div className="space-y-5 bg-green-50 p-5 rounded-2xl border border-green-100">
                 <h4 className="font-bold text-green-900 border-b border-green-200 pb-2 flex items-center gap-2"><span className="text-lg">🌐</span> Kanal Digital & WA</h4>
                 <div>
@@ -545,11 +621,21 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-bold mb-1.5 text-gray-700">Link YouTube</label>
-                    <input type="url" value={linkYt} onChange={(e) => setLinkYt(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+                    <input 
+                      type="url" 
+                      value={linkYt} 
+                      onChange={(e) => setLinkYt(e.target.value)} 
+                      className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" 
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-bold mb-1.5 text-gray-700">Link TikTok</label>
-                    <input type="url" value={linkTt} onChange={(e) => setLinkTt(e.target.value)} className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" />
+                    <input 
+                      type="url" 
+                      value={linkTt} 
+                      onChange={(e) => setLinkTt(e.target.value)} 
+                      className="w-full p-3 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 text-sm" 
+                    />
                   </div>
                 </div>
               </div>
@@ -618,7 +704,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
             
             {editKabarId && gambarLamaKabar.length > 0 && (
               <div className="bg-orange-50 p-4 rounded-xl border border-orange-200">
-                <p className="text-sm font-bold text-orange-900 mb-3">Foto Tersimpan (Klik X untuk menghapus):</p>
+                <p className="text-sm font-bold text-orange-900 mb-3">Foto Tersimpan (Klik X untuk memusnahkan dari server Cloudinary):</p>
                 <div className="flex flex-wrap gap-3">
                   {gambarLamaKabar.map((url, idx) => (
                     <div key={idx} className="relative w-24 h-24 border-2 border-white rounded-xl overflow-hidden group shadow-md">
@@ -655,7 +741,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               </label>
               {fotoKabarList && (
                 <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-3 inline-block">
-                  <p className="text-sm font-bold text-green-800">✅ {fotoKabarList.length} foto baru siap diunggah.</p>
+                  <p className="text-sm font-bold text-green-800">✅ {fotoKabarList.length} foto baru siap diunggah ke Cloudinary.</p>
                 </div>
               )}
             </div>
@@ -688,7 +774,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </div>
       )}
 
-      {/* TABEL MANAJEMEN BERITA (Tampil jika tab Berita aktif) */}
+      {/* 3. TABEL MANAJEMEN BERITA */}
       {tabAktif === "berita" && (
         <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100 animate-fade-in">
           <div className="flex justify-between items-center mb-6">
@@ -710,6 +796,10 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               {riwayatKabar.map((item) => {
                 const isTampil = item.is_featured !== false; 
                 const isPinned = item.is_pinned === true;
+                
+                // Pastikan gambar berbentuk array untuk dilempar ke fungsi hapusKabar
+                const arrGambarHapus = Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : [];
+                
                 return (
                   <tr key={item.id} className={`border-b transition-colors ${isPinned ? 'bg-yellow-50/50 hover:bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="py-4 px-4 font-medium text-gray-500 whitespace-nowrap">
@@ -746,11 +836,12 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                         >
                           Edit
                         </button>
+                        {/* UPDATE SAKTI CLOUDINARY: Lempar array gambar untuk dibasmi */}
                         <button 
-                          onClick={() => hapusKabar(item.id)} 
+                          onClick={() => hapusKabar(item.id, arrGambarHapus)} 
                           className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg"
                         >
-                          Hapus
+                          Hapus Permanen
                         </button>
                       </div>
                     </td>
