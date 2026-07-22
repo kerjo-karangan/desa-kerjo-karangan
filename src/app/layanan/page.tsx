@@ -91,9 +91,6 @@ function LayananContent() {
     return `https://wsrv.nl/?url=${safeUrl}`;
   };
 
-  // ==========================================
-  // STATE & FUNGSI: BUAT SURAT
-  // ==========================================
   const [formSurat, setFormSurat] = useState({
     jenis_surat: "",
     nik: "",
@@ -111,14 +108,24 @@ function LayananContent() {
 
     try {
       await addDoc(collection(db, "antrean_surat"), {
-        ...formSurat,
+        jenis_surat: formSurat.jenis_surat,
+        nik: formSurat.nik,
+        nama: formSurat.nama,
+        no_wa: formSurat.no_wa,
+        keperluan: formSurat.keperluan,
         status: "Menunggu",
         tanggal_pengajuan: new Date().toISOString(),
         keterangan_admin: ""
       });
       
       setStatusSurat("✅ Permohonan berhasil dikirim! Silakan cek status secara berkala.");
-      setFormSurat({ jenis_surat: "", nik: "", nama: "", no_wa: "", keperluan: "" });
+      setFormSurat({ 
+        jenis_surat: "", 
+        nik: "", 
+        nama: "", 
+        no_wa: "", 
+        keperluan: "" 
+      });
       
       setTimeout(() => setStatusSurat(""), 5000);
     } catch (error) {
@@ -128,9 +135,6 @@ function LayananContent() {
     }
   };
 
-  // ==========================================
-  // STATE & FUNGSI: CEK STATUS SURAT
-  // ==========================================
   const [searchNik, setSearchNik] = useState("");
   const [searchResult, setSearchResult] = useState<any[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -165,9 +169,6 @@ function LayananContent() {
     }
   };
 
-  // ==========================================
-  // STATE & FUNGSI: PENGADUAN WARGA
-  // ==========================================
   const [formPengaduan, setFormPengaduan] = useState({
     nama: "",
     no_wa: "",
@@ -213,14 +214,20 @@ function LayananContent() {
       }
 
       await addDoc(collection(db, "pengaduan_warga"), {
-        ...formPengaduan,
+        nama: formPengaduan.nama,
+        no_wa: formPengaduan.no_wa,
+        isi_laporan: formPengaduan.isi_laporan,
         foto: imageUrl,
         status: "Belum Dibaca",
         tanggal_masuk: new Date().toISOString()
       });
       
       setStatusPengaduan("✅ Laporan berhasil dikirim dan akan segera ditindaklanjuti.");
-      setFormPengaduan({ nama: "", no_wa: "", isi_laporan: "" });
+      setFormPengaduan({ 
+        nama: "", 
+        no_wa: "", 
+        isi_laporan: "" 
+      });
       setFotoPengaduan(null);
       
       const fileInput = document.getElementById("inputFotoPengaduan") as HTMLInputElement;
@@ -256,9 +263,6 @@ function LayananContent() {
       className="min-h-screen bg-gray-50 flex flex-col font-sans pb-24"
     >
       
-      {/* ==========================================
-          HEADER (HERO SECTION)
-      ========================================== */}
       <div 
         className={`relative py-16 md:py-24 text-white overflow-hidden shadow-md transition-colors duration-500 ${
           heroData.bg ? "bg-gray-900" : "bg-green-700"
@@ -303,14 +307,10 @@ function LayananContent() {
         </div>
       </div>
 
-      {/* ==========================================
-          KONTEN UTAMA & MENU TAB
-      ========================================== */}
       <div 
         className="container mx-auto px-4 max-w-5xl relative z-20 -mt-8"
       >
         
-        {/* Navigasi Tab Internal */}
         <div 
           className="bg-white p-2 md:p-3 rounded-2xl shadow-lg border border-gray-100 flex flex-col md:flex-row gap-2 md:gap-4 justify-center mx-auto mb-10"
         >
@@ -327,7 +327,7 @@ function LayananContent() {
             >
               📝
             </span> 
-            Buat Surat
+            Layanan Surat Mandiri
           </button>
           
           <button 
@@ -343,7 +343,7 @@ function LayananContent() {
             >
               🔍
             </span> 
-            Cek Status
+            Cek Status Surat
           </button>
 
           <button 
@@ -359,7 +359,7 @@ function LayananContent() {
             >
               📢
             </span> 
-            Pengaduan
+            Kotak Pengaduan
           </button>
         </div>
 
@@ -682,10 +682,12 @@ function LayananContent() {
                     <label 
                       className="block text-sm font-bold text-gray-700 mb-2"
                     >
-                      No. WhatsApp (Opsional)
+                      No. WhatsApp (Wajib)
                     </label>
+                    {/* PERBAIKAN: Menambahkan 'required' untuk Nomor WA Pengaduan */}
                     <input 
                       type="number" 
+                      required 
                       value={formPengaduan.no_wa} 
                       onChange={(e) => setFormPengaduan({...formPengaduan, no_wa: e.target.value})} 
                       className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all font-mono"

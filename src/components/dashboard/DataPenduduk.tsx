@@ -22,158 +22,72 @@ interface DataPendudukProps {
   activeSubMenu?: string;
 }
 
-// ==========================================
-// KAMUS MAPPING ANGKA KE TEKS (Otomatisasi Excel)
-// ==========================================
-const MAP_AGAMA: any = { 
-  1: "ISLAM", 
-  2: "KRISTEN", 
-  3: "KATHOLIK", 
-  4: "HINDU", 
-  5: "BUDHA", 
-  6: "KONGHUCU", 
-  7: "KEPERCAYAAN TERHADAP TUHAN YME" 
-};
-
-const MAP_GENDER: any = { 
-  1: "LAKI-LAKI", 
-  2: "PEREMPUAN" 
-};
-
-const MAP_PENDIDIKAN: any = { 
-  1: "TIDAK / BELUM SEKOLAH", 
-  2: "BELUM TAMAT SD/SEDERAJAT", 
-  3: "TAMAT SD / SEDERAJAT", 
-  4: "SLTP/SEDERAJAT", 
-  5: "SLTA/SEDERAJAT", 
-  6: "DIPLOMA I/II", 
-  7: "AKADEMI/DIPLOMA III/S.MUDA", 
-  8: "DIPLOMA IV/STRATA I", 
-  9: "STRATA II", 
-  10: "STRATA III" 
-};
-
-const MAP_KAWIN: any = { 
-  1: "BELUM KAWIN", 
-  2: "KAWIN", 
-  3: "CERAI HIDUP", 
-  4: "CERAI MATI" 
-};
-
-const MAP_HUBUNGAN: any = { 
-  1: "KEPALA KELUARGA", 
-  2: "SUAMI", 
-  3: "ISTRI", 
-  4: "ANAK", 
-  5: "MENANTU", 
-  6: "CUCU", 
-  7: "ORANG TUA", 
-  8: "MERTUA", 
-  9: "FAMILI LAIN", 
-  10: "PEMBANTU", 
-  11: "LAINNYA" 
-};
-
-const MAP_DARAH: any = { 
-  1: "A", 
-  2: "B", 
-  3: "AB", 
-  4: "O", 
-  5: "A+", 
-  6: "A-", 
-  7: "B+", 
-  8: "B-", 
-  9: "AB+", 
-  10: "AB-", 
-  11: "O+", 
-  12: "O-", 
-  13: "TIDAK TAHU" 
-};
-
-const MAP_WARGA: any = { 
-  1: "WNI", 
-  2: "WNA", 
-  3: "DUA KEWARGANEGARAAN" 
-};
-
-// ==========================================
-// MESIN PEMBERSIH & PENCARI KOLOM (FUZZY MATCHING)
-// ==========================================
-const bersihkanTeks = (text: any) => {
-  if (text === null || text === undefined || String(text).trim() === "") {
-    return "-";
-  }
-  return String(text).toUpperCase().trim();
-};
-
-const mapData = (value: any, kamus: any) => {
-  if (value === null || value === undefined || String(value).trim() === "") {
-    return "-";
-  }
-  const numValue = Number(value);
-  if (!isNaN(numValue) && kamus[numValue]) {
-    return kamus[numValue];
-  }
-  return bersihkanTeks(value);
-};
-
-const findKey = (row: any, possibleKeys: string[]) => {
-  const keys = Object.keys(row);
-  for (const key of keys) {
-    const lowerKey = key.toLowerCase().replace(/[^a-z0-9]/g, ""); 
-    for (const pk of possibleKeys) {
-      const lowerPk = pk.toLowerCase().replace(/[^a-z0-9]/g, ""); 
-      if (lowerKey.includes(lowerPk)) {
-        return row[key];
-      }
-    }
-  }
-  return "";
-};
-
+// Helper: Generator ID Acak Enkripsi
 const generateIdAcak = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
-// ==========================================
-// KOMPONEN UTAMA DATA PENDUDUK
-// ==========================================
 export default function DataPenduduk({ 
   activeSubMenu 
 }: DataPendudukProps) {
   
   const defaultTab = activeSubMenu === "data-hero" ? "hero" 
+                   : activeSubMenu === "data-input" ? "input"
                    : activeSubMenu === "data-upload" ? "upload" 
                    : "kelola";
                    
   const [tabAktif, setTabAktif] = useState(defaultTab);
 
   useEffect(() => {
-    if (activeSubMenu === "data-hero") {
-      setTabAktif("hero");
-    } else if (activeSubMenu === "data-upload") {
-      setTabAktif("upload");
-    } else {
-      setTabAktif("kelola");
-    }
+    if (activeSubMenu === "data-hero") setTabAktif("hero");
+    else if (activeSubMenu === "data-input") setTabAktif("input");
+    else if (activeSubMenu === "data-upload") setTabAktif("upload");
+    else if (activeSubMenu === "data-kelola") setTabAktif("kelola");
   }, [activeSubMenu]);
 
-  // STATE HEADER DATA DESA
+  // ==========================================
+  // STATE HEADER & STATUS
+  // ==========================================
   const [heroJudul, setHeroJudul] = useState("");
   const [heroSub, setHeroSub] = useState("");
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
   const [heroBgLama, setHeroBgLama] = useState("");
-  const [statusHero, setStatusHero] = useState("");
-  const [isLoadingHero, setIsLoadingHero] = useState(false);
-
-  // STATE KELOLA PENDUDUK
-  const [daftarPenduduk, setDaftarPenduduk] = useState<any[]>([]);
-  const [daftarKeluarga, setDaftarKeluarga] = useState<any[]>([]); 
-  const [loadingData, setLoadingData] = useState(true);
   const [statusProses, setStatusProses] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [loadingData, setLoadingData] = useState(true);
 
-  // STATE MODAL EDIT / TAMBAH MANUAL
+  // ==========================================
+  // STATE MASTER DATA (PENGATURAN INPUT)
+  // ==========================================
+  const defaultMasterData = {
+    dusun: [{id: 1, label: "KRAJAN"}, {id: 2, label: "KRANDON"}],
+    rt: [{id: 1, label: "01"}, {id: 2, label: "02"}],
+    rw: [{id: 1, label: "01"}, {id: 2, label: "02"}],
+    kelamin: [{id: 1, label: "LAKI-LAKI"}, {id: 2, label: "PEREMPUAN"}],
+    agama: [{id: 1, label: "ISLAM"}, {id: 2, label: "KRISTEN"}],
+    pendidikan: [{id: 1, label: "SD SEDERAJAT"}, {id: 2, label: "SMP SEDERAJAT"}],
+    pekerjaan: [{id: 1, label: "PETANI"}, {id: 2, label: "WIRASWASTA"}],
+    kawin: [{id: 1, label: "BELUM KAWIN"}, {id: 2, label: "KAWIN"}],
+    hubungan: [{id: 1, label: "KEPALA KELUARGA"}, {id: 2, label: "ISTRI"}, {id: 3, label: "ANAK"}],
+    warga: [{id: 1, label: "WNI"}, {id: 2, label: "WNA"}],
+    darah: [{id: 1, label: "A"}, {id: 2, label: "B"}, {id: 3, label: "O"}, {id: 4, label: "AB"}]
+  };
+  
+  const [masterData, setMasterData] = useState<any>(defaultMasterData);
+  const [kategoriMasterAktif, setKategoriMasterAktif] = useState("dusun");
+  const [inputMasterBaru, setInputMasterBaru] = useState("");
+
+  // ==========================================
+  // STATE KELOLA PENDUDUK & PAGINASI
+  // ==========================================
+  const [daftarPenduduk, setDaftarPenduduk] = useState<any[]>([]);
+  const [daftarKepalaKeluarga, setDaftarKepalaKeluarga] = useState<any[]>([]); 
+  const [searchTerm, setSearchTerm] = useState("");
+  const [perPage, setPerPage] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ==========================================
+  // STATE MODAL MANUAL
+  // ==========================================
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -190,40 +104,48 @@ export default function DataPenduduk({
     pekerjaan: "", 
     status_kawin: "", 
     hubungan_keluarga: "",
+    kewarganegaraan: "",
     nama_ayah: "",
     nama_ibu: "",
     golongan_darah: ""
   });
 
+  // State Mode Upload Excel
+  const [modeUpload, setModeUpload] = useState<"ganti" | "tambah">("tambah");
+
+  // ==========================================
+  // FUNGSI FETCH UTAMA
+  // ==========================================
   const ambilData = async () => {
     setLoadingData(true);
     try {
+      // 1. Fetch Hero
       const snapHero = await getDoc(doc(db, "pengaturan_web", "datadesa_hero"));
       if (snapHero.exists() && snapHero.data()) {
-        setHeroJudul(snapHero.data().judul || "Data Demografi Desa");
-        setHeroSub(snapHero.data().sub || "Visualisasi data kependudukan yang akurat dan transparan.");
+        setHeroJudul(snapHero.data().judul || "");
+        setHeroSub(snapHero.data().sub || "");
         setHeroBgLama(snapHero.data().bg || "");
       }
 
+      // 2. Fetch Master Data
+      const snapMaster = await getDoc(doc(db, "pengaturan_web", "master_input_penduduk"));
+      if (snapMaster.exists() && snapMaster.data()) {
+        setMasterData(snapMaster.data());
+      } else {
+        await setDoc(doc(db, "pengaturan_web", "master_input_penduduk"), defaultMasterData);
+      }
+
+      // 3. Fetch Penduduk
       const snapPenduduk = await getDocs(collection(db, "data_penduduk"));
       const dataPend = snapPenduduk.docs.map(doc => ({ 
         id: doc.id, 
         ...(doc.data() as any) 
       }));
-      
       setDaftarPenduduk(dataPend);
 
-      const unikKeluargaMap = new Map();
-      dataPend.forEach((p: any) => {
-        if (p.id_keluarga && p.hubungan_keluarga === "KEPALA KELUARGA") {
-          unikKeluargaMap.set(p.id_keluarga, { 
-            id: p.id_keluarga, 
-            kepala: p.nama 
-          });
-        }
-      });
-      
-      setDaftarKeluarga(Array.from(unikKeluargaMap.values()));
+      // Ekstrak khusus Kepala Keluarga untuk form manual
+      const kkList = dataPend.filter(p => p.hubungan_keluarga?.toUpperCase() === "KEPALA KELUARGA");
+      setDaftarKepalaKeluarga(kkList);
 
     } catch (error) {
       console.error("Gagal mengambil data:", error);
@@ -236,82 +158,125 @@ export default function DataPenduduk({
     ambilData();
   }, []);
 
+  // ==========================================
+  // HANDLER PENGATURAN MASTER DATA
+  // ==========================================
+  const tambahMasterData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputMasterBaru.trim()) return;
+
+    setStatusProses("Menambahkan pengaturan...");
+    const currentList = masterData[kategoriMasterAktif] || [];
+    const newId = currentList.length > 0 ? Math.max(...currentList.map((m:any) => m.id)) + 1 : 1;
+    
+    const updatedList = [...currentList, { id: newId, label: inputMasterBaru.toUpperCase() }];
+    const updatedMaster = { ...masterData, [kategoriMasterAktif]: updatedList };
+
+    try {
+      await setDoc(doc(db, "pengaturan_web", "master_input_penduduk"), updatedMaster);
+      setMasterData(updatedMaster);
+      setInputMasterBaru("");
+      setStatusProses("✅ Berhasil ditambahkan");
+      setTimeout(() => setStatusProses(""), 2000);
+    } catch (error) {
+      setStatusProses("❌ Gagal menambahkan");
+    }
+  };
+
+  const hapusMasterData = async (kategori: string, idItem: number) => {
+    if (!confirm("Yakin ingin menghapus pilihan ini?")) return;
+    
+    setStatusProses("Menghapus pengaturan...");
+    const updatedList = masterData[kategori].filter((item: any) => item.id !== idItem);
+    const updatedMaster = { ...masterData, [kategori]: updatedList };
+
+    try {
+      await setDoc(doc(db, "pengaturan_web", "master_input_penduduk"), updatedMaster);
+      setMasterData(updatedMaster);
+      setStatusProses("✅ Berhasil dihapus");
+      setTimeout(() => setStatusProses(""), 2000);
+    } catch (error) {
+      setStatusProses("❌ Gagal menghapus");
+    }
+  };
+
+  // ==========================================
+  // HANDLER UPLOAD KE CLOUDINARY
+  // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const res = await fetch("/api/cloudinary", {
-        method: "POST",
-        body: formData,
-      });
-      
+      const res = await fetch("/api/cloudinary", { method: "POST", body: formData });
       const data = await res.json();
-      if (data.success) {
-        return data.url;
-      }
-      throw new Error(data.error);
+      if (data.success) return data.url;
+      return null;
     } catch (error) {
       return null;
     }
   };
 
-  const hapusFotoDiCloudinary = async (url: string) => {
-    if (!url || !url.includes("cloudinary.com")) return;
-    try {
-      await fetch("/api/cloudinary", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-    } catch (error) {
-      console.error("Delete error:", error);
-    }
-  };
-
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoadingHero(true);
-    setStatusHero("Menyimpan Header...");
-    
+    setStatusProses("Menyimpan Header...");
     try {
       let imageUrl = heroBgLama;
       if (heroBgList && heroBgList.length > 0) {
-        setStatusHero("Mengunggah gambar ke Cloudinary...");
+        setStatusProses("Mengunggah gambar...");
         const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
-        if (newBg) {
-          if (heroBgLama) {
-            await hapusFotoDiCloudinary(heroBgLama);
-          }
-          imageUrl = newBg;
-        }
+        if (newBg) imageUrl = newBg;
       }
-      
       await setDoc(doc(db, "pengaturan_web", "datadesa_hero"), {
         judul: heroJudul, 
         sub: heroSub, 
         bg: imageUrl, 
         terakhir_diperbarui: new Date().toISOString()
       });
-      
-      setStatusHero("✅ Pengaturan Header berhasil diperbarui!");
+      setStatusProses("✅ Pengaturan Header berhasil diperbarui!");
       setHeroBgLama(imageUrl); 
-      setHeroBgList(null);
-      
-      setTimeout(() => setStatusHero(""), 4000);
+      setTimeout(() => setStatusProses(""), 3000);
     } catch (error) {
-      setStatusHero("❌ Gagal menyimpan pengaturan.");
-    } finally {
-      setIsLoadingHero(false);
+      setStatusProses("❌ Gagal menyimpan pengaturan.");
     }
   };
 
   // ==========================================
   // LOGIKA IMPOR EXCEL & ENKRIPSI
   // ==========================================
+  const bersihkanTeks = (text: any) => {
+    if (text === null || text === undefined || String(text).trim() === "") return "-";
+    return String(text).toUpperCase().trim();
+  };
+
+  const findKey = (row: any, possibleKeys: string[]) => {
+    const keys = Object.keys(row);
+    for (const key of keys) {
+      const lowerKey = key.toLowerCase().replace(/[^a-z0-9]/g, ""); 
+      for (const pk of possibleKeys) {
+        const lowerPk = pk.toLowerCase().replace(/[^a-z0-9]/g, ""); 
+        if (lowerKey.includes(lowerPk)) return row[key];
+      }
+    }
+    return "";
+  };
+
   const tanganiUploadExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (modeUpload === "ganti") {
+      const isConfirmed = confirm("PERINGATAN KERAS!\n\nAnda memilih 'Perbarui Data Total'. Seluruh data penduduk yang ada saat ini di sistem akan DIHAPUS PERMANEN dan digantikan sepenuhnya oleh data dari file Excel ini.\n\nApakah Anda YAKIN?");
+      if (!isConfirmed) {
+        e.target.value = '';
+        return;
+      }
+    } else {
+      const isConfirmed = confirm("Anda memilih 'Tambahkan Data'. Data dari Excel ini akan ditambahkan ke data yang sudah ada di sistem tanpa menghapus data lama.\n\nLanjutkan?");
+      if (!isConfirmed) {
+        e.target.value = '';
+        return;
+      }
+    }
 
     setStatusProses("Membaca file Excel/CSV...");
     const reader = new FileReader();
@@ -326,20 +291,6 @@ export default function DataPenduduk({
         if (sheetData.length === 0) {
           setStatusProses("❌ File Excel kosong atau salah format.");
           return;
-        }
-
-        const firstRowKeys = Object.keys(sheetData[0] as object);
-        if (firstRowKeys.length === 1 && firstRowKeys[0].includes(";")) {
-          const keys = firstRowKeys[0].split(";");
-          sheetData = sheetData.map((row: any) => {
-            const rawValue = row[firstRowKeys[0]];
-            const values = rawValue !== undefined && rawValue !== null ? String(rawValue).split(";") : [];
-            const newRow: any = {};
-            keys.forEach((k, i) => {
-              newRow[k.trim()] = values[i] !== undefined ? String(values[i]).trim() : "";
-            });
-            return newRow;
-          });
         }
 
         setStatusProses("Memproses, Memetakan (Mapping), dan Mengenkripsi Data...");
@@ -364,48 +315,41 @@ export default function DataPenduduk({
             kkToFamilyIdMap.set(noKkAsli, idKeluarga);
           }
 
-          const idWarga = `W-${generateIdAcak()}`;
-
           const dataBersih = {
             id_keluarga: idKeluarga,
-            id_warga: idWarga,
+            id_warga: `W-${generateIdAcak()}`,
             dusun: bersihkanTeks(findKey(baris, ["dusun", "kampung"])),
             rw: bersihkanTeks(findKey(baris, ["rw", "rukunwarga"])),
             rt: bersihkanTeks(findKey(baris, ["rt", "rukuntetangga"])),
             nama: bersihkanTeks(findKey(baris, ["nama", "namalengkap"])),
-            jenis_kelamin: mapData(findKey(baris, ["kelamin", "gender"]), MAP_GENDER),
+            jenis_kelamin: bersihkanTeks(findKey(baris, ["kelamin", "gender"])),
             tempat_lahir: bersihkanTeks(findKey(baris, ["tempatlahir", "lahir"])),
             tanggal_lahir: bersihkanTeks(findKey(baris, ["tanggallahir", "tgl"])),
-            agama: mapData(findKey(baris, ["agama"]), MAP_AGAMA),
-            pendidikan: mapData(findKey(baris, ["pendidikan", "sekolah"]), MAP_PENDIDIKAN),
+            agama: bersihkanTeks(findKey(baris, ["agama"])),
+            pendidikan: bersihkanTeks(findKey(baris, ["pendidikan", "sekolah"])),
             pekerjaan: bersihkanTeks(findKey(baris, ["kerja", "profesi"])), 
-            status_kawin: mapData(findKey(baris, ["kawin", "nikah", "perkawinan"]), MAP_KAWIN),
-            hubungan_keluarga: mapData(findKey(baris, ["hubungan", "statuskeluarga"]), MAP_HUBUNGAN),
-            kewarganegaraan: mapData(findKey(baris, ["warga", "negara"]), MAP_WARGA),
+            status_kawin: bersihkanTeks(findKey(baris, ["kawin", "nikah", "perkawinan"])),
+            hubungan_keluarga: bersihkanTeks(findKey(baris, ["hubungan", "statuskeluarga"])),
+            kewarganegaraan: bersihkanTeks(findKey(baris, ["warga", "negara"])),
             nama_ayah: bersihkanTeks(findKey(baris, ["ayah"])),
             nama_ibu: bersihkanTeks(findKey(baris, ["ibu"])),
-            golongan_darah: mapData(findKey(baris, ["darah", "gol"]), MAP_DARAH),
+            golongan_darah: bersihkanTeks(findKey(baris, ["darah", "gol"])),
             tanggal_input: new Date().toISOString()
           };
-
           batchDataMurni.push(dataBersih);
         }
 
         if (batchDataMurni.length === 0) {
            setStatusProses("❌ Gagal. Tidak ada data valid (No KK hilang/kosong).");
-           alert(`Proses Gagal!\n\nTidak ada data yang valid.\nPastikan kolom "NO_KK" (Nomor KK) tersedia di file Excel/CSV Anda.`);
            return;
         }
 
-        setStatusProses(`Mengunggah ${batchDataMurni.length} data terenkripsi ke Database...`);
+        setStatusProses(`Mengunggah ${batchDataMurni.length} data ke Database...`);
 
-        if (daftarPenduduk.length > 0) {
-          const hapusLama = confirm(`Terdapat ${daftarPenduduk.length} data lama di database. Klik "OK" jika Anda ingin MENGHAPUS data lama dan menggantinya dengan yang baru. Klik "Cancel" jika ingin MENGGABUNGKAN data.`);
-          if (hapusLama) {
-            setStatusProses("Membersihkan data lama...");
-            for (const p of daftarPenduduk) {
-              await deleteDoc(doc(db, "data_penduduk", p.id));
-            }
+        if (modeUpload === "ganti" && daftarPenduduk.length > 0) {
+          setStatusProses("Membersihkan data lama (Proses ini mungkin memakan waktu)...");
+          for (const p of daftarPenduduk) {
+            await deleteDoc(doc(db, "data_penduduk", p.id));
           }
         }
 
@@ -414,11 +358,11 @@ export default function DataPenduduk({
         }
 
         setStatusProses("");
-        alert(`✅ Proses Import & Enkripsi Selesai!\n\n📊 Ringkasan:\n- Berhasil diimpor: ${batchDataMurni.length} data\n- Dilewati (Baris kosong/Tanpa KK): ${skippedData} data`);
+        alert(`✅ Proses Import Selesai!\n\nBerhasil: ${batchDataMurni.length} data\nDilewati: ${skippedData} data`);
         ambilData();
         
       } catch (error: any) {
-        setStatusProses(`❌ Terjadi kesalahan: ${error.message}`);
+        setStatusProses(`❌ Kesalahan: ${error.message}`);
       }
     };
     
@@ -427,27 +371,53 @@ export default function DataPenduduk({
   };
 
   // ==========================================
-  // HANDLER MODAL MANUAL
+  // HANDLER EKSPOR EXCEL
+  // ==========================================
+  const handleExportExcel = () => {
+    if (daftarPenduduk.length === 0) {
+      alert("Tidak ada data untuk diekspor!");
+      return;
+    }
+    
+    // Format ulang data agar rapi di excel, hapus field tidak perlu
+    const dataEkspor = daftarPenduduk.map((p, index) => ({
+      "NO": index + 1,
+      "ID KELUARGA (ENKRIPSI)": p.id_keluarga,
+      "ID WARGA (ENKRIPSI)": p.id_warga,
+      "NAMA LENGKAP": p.nama,
+      "HUBUNGAN KELUARGA": p.hubungan_keluarga,
+      "DUSUN": p.dusun,
+      "RT": p.rt,
+      "RW": p.rw,
+      "JENIS KELAMIN": p.jenis_kelamin,
+      "TEMPAT LAHIR": p.tempat_lahir,
+      "TANGGAL LAHIR": p.tanggal_lahir,
+      "AGAMA": p.agama,
+      "PENDIDIKAN": p.pendidikan,
+      "PEKERJAAN": p.pekerjaan,
+      "STATUS KAWIN": p.status_kawin,
+      "WARGA NEGARA": p.kewarganegaraan,
+      "GOL DARAH": p.golongan_darah,
+      "NAMA AYAH": p.nama_ayah,
+      "NAMA IBU": p.nama_ibu
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(dataEkspor);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data Penduduk");
+    XLSX.writeFile(wb, `Data_Penduduk_Desa_${new Date().getTime()}.xlsx`);
+  };
+
+  // ==========================================
+  // HANDLER MODAL MANUAL & KEPALA KELUARGA
   // ==========================================
   const bukaModalTambah = () => {
     setEditId(null);
     setFormData({
       id_keluarga: "", 
-      dusun: "", 
-      rw: "", 
-      rt: "", 
-      nama: "", 
-      jenis_kelamin: "", 
-      tempat_lahir: "", 
-      tanggal_lahir: "", 
-      agama: "", 
-      pendidikan: "", 
-      pekerjaan: "", 
-      status_kawin: "", 
-      hubungan_keluarga: "", 
-      nama_ayah: "", 
-      nama_ibu: "", 
-      golongan_darah: ""
+      dusun: "", rw: "", rt: "", nama: "", jenis_kelamin: "", tempat_lahir: "", tanggal_lahir: "", 
+      agama: "", pendidikan: "", pekerjaan: "", status_kawin: "", hubungan_keluarga: "", 
+      kewarganegaraan: "", nama_ayah: "", nama_ibu: "", golongan_darah: ""
     });
     setIsModalOpen(true);
   };
@@ -468,6 +438,7 @@ export default function DataPenduduk({
       pekerjaan: item.pekerjaan || "",
       status_kawin: item.status_kawin || "",
       hubungan_keluarga: item.hubungan_keluarga || "",
+      kewarganegaraan: item.kewarganegaraan || "",
       nama_ayah: item.nama_ayah || "",
       nama_ibu: item.nama_ibu || "",
       golongan_darah: item.golongan_darah || ""
@@ -479,8 +450,11 @@ export default function DataPenduduk({
     e.preventDefault();
     setStatusProses("Menyimpan...");
     try {
+      // LOGIKA KEPALA KELUARGA
       let finalIdKeluarga = formData.id_keluarga;
-      if (finalIdKeluarga === "BARU" || finalIdKeluarga === "") {
+      
+      // Jika dia KEPALA KELUARGA dan membuat baru, berikan ID KELUARGA BARU
+      if (formData.hubungan_keluarga === "KEPALA KELUARGA" && !editId) {
         finalIdKeluarga = `KEL-${generateIdAcak()}`;
       }
 
@@ -488,9 +462,7 @@ export default function DataPenduduk({
         ...formData,
         id_keluarga: finalIdKeluarga,
         nama: bersihkanTeks(formData.nama),
-        pekerjaan: bersihkanTeks(formData.pekerjaan),
         tempat_lahir: bersihkanTeks(formData.tempat_lahir),
-        dusun: bersihkanTeks(formData.dusun),
         nama_ayah: bersihkanTeks(formData.nama_ayah),
         nama_ibu: bersihkanTeks(formData.nama_ibu),
       };
@@ -509,7 +481,6 @@ export default function DataPenduduk({
       
       setIsModalOpen(false);
       ambilData();
-      
       setTimeout(() => setStatusProses(""), 3000);
     } catch (error) {
       setStatusProses("❌ Gagal menyimpan data manual.");
@@ -523,73 +494,310 @@ export default function DataPenduduk({
     }
   };
 
+  // ==========================================
+  // PAGINASI & FILTER DATA
+  // ==========================================
   const dataTerfilter = daftarPenduduk.filter((p) => 
     p.nama?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.id_keluarga?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.id_keluarga?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.id_warga?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalPages = Math.ceil(dataTerfilter.length / perPage);
+  const dataPaginasi = dataTerfilter.slice((currentPage - 1) * perPage, currentPage * perPage);
 
   return (
     <div 
       className="space-y-8 animate-fade-in pb-20 font-sans"
     >
       
-      {/* Sembunyikan Tombol Internal Jika Mengakses via Sidebar */}
-      {!activeSubMenu && (
-        <div 
-          className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100"
+      {/* MENU SELALU TAMPIL */}
+      <div 
+        className="flex flex-wrap gap-2 md:gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100"
+      >
+        <button 
+          onClick={() => setTabAktif("hero")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "hero" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
         >
-          <button 
-            onClick={() => setTabAktif("kelola")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "kelola" 
-              ? "bg-blue-600 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span 
-              className="text-xl"
-            >
-              👥
-            </span> 
-            Daftar Penduduk
-          </button>
-          
-          <button 
-            onClick={() => setTabAktif("upload")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "upload" 
-              ? "bg-green-600 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span 
-              className="text-xl"
-            >
-              📄
-            </span> 
-            Impor Excel
-          </button>
-          
-          <button 
-            onClick={() => setTabAktif("hero")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "hero" 
-              ? "bg-yellow-500 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span 
-              className="text-xl"
-            >
-              🖼️
-            </span> 
-            Pengaturan Publik
-          </button>
+          <span>🖼️</span> Header Publik
+        </button>
+        <button 
+          onClick={() => setTabAktif("input")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "input" ? "bg-purple-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>⚙️</span> Pengaturan Input Data
+        </button>
+        <button 
+          onClick={() => setTabAktif("kelola")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "kelola" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>👥</span> Data Penduduk
+        </button>
+        <button 
+          onClick={() => setTabAktif("upload")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "upload" ? "bg-green-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>📄</span> Impor & Ekspor Excel
+        </button>
+      </div>
+
+      {statusProses && (
+        <div 
+          className={`p-4 rounded-xl text-sm font-bold text-center border shadow-sm ${
+            statusProses.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-blue-50 text-blue-800 border-blue-200"
+          }`}
+        >
+          {statusProses}
         </div>
       )}
 
       {/* ==========================================
-          TAB 1: TABEL KELOLA PENDUDUK
+          TAB 1: HEADER PUBLIK
+      ========================================== */}
+      {tabAktif === "hero" && (
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in"
+        >
+          <h3 
+            className="text-2xl font-bold mb-2 flex items-center gap-2"
+          >
+            <span>🖼️</span> Pengaturan Halaman Visualisasi Publik
+          </h3>
+          
+          <form 
+            onSubmit={handleSimpanHero} 
+            className="space-y-6 mt-6"
+          >
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
+              <div 
+                className="space-y-5"
+              >
+                <div>
+                  <label 
+                    className="block text-sm font-bold mb-2"
+                  >
+                    Judul Header
+                  </label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={heroJudul} 
+                    onChange={(e) => setHeroJudul(e.target.value)} 
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold" 
+                  />
+                </div>
+                <div>
+                  <label 
+                    className="block text-sm font-bold mb-2"
+                  >
+                    Teks Sub-Judul
+                  </label>
+                  <textarea 
+                    required 
+                    rows={4} 
+                    value={heroSub} 
+                    onChange={(e) => setHeroSub(e.target.value)} 
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                  ></textarea>
+                </div>
+              </div>
+
+              <div 
+                className="space-y-4"
+              >
+                <label 
+                  className="block text-sm font-bold mb-2"
+                >
+                  Gambar Background
+                </label>
+                {heroBgLama && (
+                  <div 
+                    className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200"
+                  >
+                    <img 
+                      src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                )}
+                <label 
+                  className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"
+                >
+                  <span 
+                    className="text-3xl mb-2"
+                  >
+                    📸
+                  </span>
+                  <span 
+                    className="font-bold text-yellow-800 text-sm"
+                  >
+                    Upload Background Baru
+                  </span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => setHeroBgList(e.target.files)} 
+                    className="hidden" 
+                  />
+                </label>
+              </div>
+            </div>
+            
+            <button 
+              type="submit" 
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg mt-4"
+            >
+              Simpan Header Publik
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB 2: PENGATURAN INPUT DATA (MASTER ID)
+      ========================================== */}
+      {tabAktif === "input" && (
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-600 animate-fade-in"
+        >
+          <div 
+            className="mb-6"
+          >
+            <h3 
+              className="text-2xl font-bold flex items-center gap-2 mb-2"
+            >
+              <span>⚙️</span> Manajemen Master ID Input Data
+            </h3>
+            <p 
+              className="text-gray-500 text-sm"
+            >
+              Atur daftar pilihan (dropdown) yang akan muncul saat menambahkan warga secara manual. Sistem otomatis menetapkan ID berurut.
+            </p>
+          </div>
+
+          <div 
+            className="flex flex-col md:flex-row gap-6"
+          >
+            {/* Kategori Sidebar */}
+            <div 
+              className="w-full md:w-64 flex flex-col gap-2 border-r border-gray-100 pr-0 md:pr-4"
+            >
+              {Object.keys(defaultMasterData).map((kat) => (
+                <button 
+                  key={kat}
+                  onClick={() => setKategoriMasterAktif(kat)}
+                  className={`py-3 px-4 rounded-xl text-sm font-bold text-left uppercase tracking-widest transition-all ${
+                    kategoriMasterAktif === kat ? "bg-purple-100 text-purple-700 border border-purple-200" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  {kat}
+                </button>
+              ))}
+            </div>
+
+            {/* List Item & Tambah */}
+            <div 
+              className="flex-1"
+            >
+              <form 
+                onSubmit={tambahMasterData} 
+                className="flex gap-3 mb-6 bg-gray-50 p-4 rounded-2xl border border-gray-200"
+              >
+                <input 
+                  type="text" 
+                  required 
+                  value={inputMasterBaru}
+                  onChange={(e) => setInputMasterBaru(e.target.value)}
+                  placeholder={`Tambah ${kategoriMasterAktif.toUpperCase()} baru...`}
+                  className="flex-1 p-3 rounded-xl border border-gray-300 outline-none uppercase font-bold text-sm"
+                />
+                <button 
+                  type="submit" 
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 rounded-xl shadow-sm transition-colors text-sm"
+                >
+                  Tambah ID
+                </button>
+              </form>
+
+              <div 
+                className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm"
+              >
+                <table 
+                  className="min-w-full text-sm text-left bg-white"
+                >
+                  <thead 
+                    className="bg-gray-50 border-b border-gray-200"
+                  >
+                    <tr>
+                      <th 
+                        className="py-3 px-4 font-black text-gray-500 w-24 text-center"
+                      >
+                        ID URUT
+                      </th>
+                      <th 
+                        className="py-3 px-4 font-black text-gray-700"
+                      >
+                        NAMA / NILAI ({kategoriMasterAktif.toUpperCase()})
+                      </th>
+                      <th 
+                        className="py-3 px-4 text-center font-black text-gray-700 w-32"
+                      >
+                        AKSI
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {masterData[kategoriMasterAktif]?.map((item: any) => (
+                      <tr 
+                        key={item.id} 
+                        className="border-b border-gray-100 hover:bg-purple-50/30"
+                      >
+                        <td 
+                          className="py-3 px-4 text-center"
+                        >
+                          <span 
+                            className="bg-gray-100 text-gray-700 font-black px-3 py-1 rounded-lg border border-gray-200"
+                          >
+                            {item.id}
+                          </span>
+                        </td>
+                        <td 
+                          className="py-3 px-4 font-bold text-gray-900"
+                        >
+                          {item.label}
+                        </td>
+                        <td 
+                          className="py-3 px-4 text-center"
+                        >
+                          <button 
+                            onClick={() => hapusMasterData(kategoriMasterAktif, item.id)} 
+                            className="bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-100 transition-colors"
+                          >
+                            Hapus
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB 3: DATA PENDUDUK (DENGAN PAGINASI)
       ========================================== */}
       {tabAktif === "kelola" && (
         <div 
@@ -607,25 +815,34 @@ export default function DataPenduduk({
               <p 
                 className="text-gray-500 text-sm mt-1"
               >
-                Data NIK dan No. KK telah dienkripsi (diubah menjadi ID Warga & ID Keluarga).
+                Total Data: <span className="font-black text-blue-600">{daftarPenduduk.length} Jiwa</span>
               </p>
             </div>
             <div 
-              className="flex items-center gap-3 w-full md:w-auto"
+              className="flex items-center gap-3 w-full md:w-auto flex-wrap"
             >
+              <select 
+                value={perPage} 
+                onChange={(e) => { setPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                className="p-2.5 rounded-xl border border-gray-300 outline-none text-sm font-bold bg-gray-50 cursor-pointer"
+              >
+                <option value={20}>20 Baris</option>
+                <option value={50}>50 Baris</option>
+                <option value={100}>100 Baris</option>
+              </select>
+
               <input 
                 type="text" 
-                placeholder="Cari Nama / ID Keluarga..." 
+                placeholder="Cari Nama / ID Warga..." 
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full md:w-64 p-2.5 rounded-xl border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm"
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                className="w-full md:w-56 p-2.5 rounded-xl border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-sm"
               />
               <button 
                 onClick={bukaModalTambah} 
                 className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm flex items-center gap-2"
               >
-                <span>➕</span> 
-                Tambah Manual
+                <span>➕</span> Tambah Manual
               </button>
             </div>
           </div>
@@ -665,24 +882,14 @@ export default function DataPenduduk({
               <tbody>
                 {loadingData ? (
                   <tr>
-                    <td 
-                      colSpan={4} 
-                      className="text-center py-10 font-bold text-gray-400"
-                    >
-                      Memuat data...
-                    </td>
+                    <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Memuat data...</td>
                   </tr>
-                ) : dataTerfilter.length === 0 ? (
+                ) : dataPaginasi.length === 0 ? (
                   <tr>
-                    <td 
-                      colSpan={4} 
-                      className="text-center py-10 font-bold text-gray-400"
-                    >
-                      Belum ada data penduduk.
-                    </td>
+                    <td colSpan={4} className="text-center py-10 font-bold text-gray-400">Belum ada data penduduk.</td>
                   </tr>
                 ) : (
-                  dataTerfilter.map((p) => (
+                  dataPaginasi.map((p) => (
                     <tr 
                       key={p.id} 
                       className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors"
@@ -713,40 +920,11 @@ export default function DataPenduduk({
                         <div 
                           className="text-xs text-gray-700 leading-relaxed"
                         >
-                          <span 
-                            className="font-bold"
-                          >
-                            Alamat:
-                          </span> 
-                          {p.dusun !== "-" ? `Dusun ${p.dusun}, RT ${p.rt}/RW ${p.rw}` : "-"}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Lahir:
-                          </span> 
-                          {p.tempat_lahir}, {p.tanggal_lahir}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Gender:
-                          </span> 
-                          {p.jenis_kelamin}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Agama:
-                          </span> 
-                          {p.agama}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Pendidikan:
-                          </span> 
-                          {p.pendidikan}
+                          <span className="font-bold">Alamat:</span> {p.dusun !== "-" ? `Dsn ${p.dusun}, RT ${p.rt}/RW ${p.rw}` : "-"}
+                          <br/><span className="font-bold">Lahir:</span> {p.tempat_lahir}, {p.tanggal_lahir}
+                          <br/><span className="font-bold">Gender:</span> {p.jenis_kelamin}
+                          <br/><span className="font-bold">Agama:</span> {p.agama}
+                          <br/><span className="font-bold">Pendidikan:</span> {p.pendidikan}
                         </div>
                       </td>
                       
@@ -761,26 +939,10 @@ export default function DataPenduduk({
                           >
                             {p.hubungan_keluarga}
                           </span>
-                          <span 
-                            className="font-bold"
-                          >
-                            Status Kawin:
-                          </span> 
-                          {p.status_kawin}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Pekerjaan:
-                          </span> 
-                          {p.pekerjaan}
-                          <br/>
-                          <span 
-                            className="font-bold"
-                          >
-                            Darah:
-                          </span> 
-                          {p.golongan_darah}
+                          <span className="font-bold">Status Kawin:</span> {p.status_kawin}
+                          <br/><span className="font-bold">Pekerjaan:</span> {p.pekerjaan}
+                          <br/><span className="font-bold">Warga:</span> {p.kewarganegaraan}
+                          <br/><span className="font-bold">Darah:</span> {p.golongan_darah}
                         </div>
                       </td>
                       
@@ -810,11 +972,38 @@ export default function DataPenduduk({
               </tbody>
             </table>
           </div>
+
+          {/* KONTROL PAGINASI BAWAH */}
+          {totalPages > 1 && (
+            <div 
+              className="flex justify-between items-center mt-6 bg-gray-50 p-4 rounded-2xl border border-gray-200"
+            >
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              >
+                ◀ Sebelumnya
+              </button>
+              <span 
+                className="font-bold text-gray-600 text-sm"
+              >
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 rounded-xl bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              >
+                Selanjutnya ▶
+              </button>
+            </div>
+          )}
         </div>
       )}
 
       {/* ==========================================
-          TAB 2: IMPOR EXCEL
+          TAB 4: IMPOR EXCEL (DENGAN 2 OPSI) & EKSPOR
       ========================================== */}
       {tabAktif === "upload" && (
         <div 
@@ -823,175 +1012,102 @@ export default function DataPenduduk({
           <h3 
             className="text-2xl font-bold text-gray-900 mb-2"
           >
-            📄 Impor Data Demografi Massal
+            📄 Import & Export Data Excel
           </h3>
           <p 
-            className="text-gray-500 text-sm mb-6 leading-relaxed max-w-3xl"
+            className="text-gray-500 text-sm mb-8 leading-relaxed max-w-3xl"
           >
-            Sistem pintar ini secara otomatis akan menoleransi file <b>CSV bersimbol titik koma (;)</b>, memetakan angka menjadi teks (misal: 1 menjadi ISLAM), dan memusnahkan NIK/KK asli untuk diganti menjadi Enkripsi ID Warga demi keamanan mutlak.
+            Sistem secara otomatis akan mengganti NIK dan Nomor KK yang di-upload menjadi ID Warga dan ID Keluarga terenkripsi untuk mengamankan data rahasia warga dari akses publik.
           </p>
 
           <div 
-            className="bg-green-50 border-2 border-dashed border-green-300 p-10 rounded-3xl text-center"
+            className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8"
           >
-            <span 
-              className="text-6xl mb-4 block"
+            {/* OPSI 1: PERBARUI TOTAL */}
+            <div 
+              className="bg-red-50 border-2 border-dashed border-red-300 p-8 rounded-3xl text-center hover:bg-red-100 transition-colors"
             >
-              📊
-            </span>
-            <label 
-              className="bg-green-600 hover:bg-green-700 text-white font-black py-4 px-8 rounded-xl shadow-lg cursor-pointer transition-transform transform hover:-translate-y-1 inline-block"
+              <span 
+                className="text-5xl mb-4 block"
+              >
+                🚨
+              </span>
+              <h4 
+                className="font-black text-red-900 mb-2"
+              >
+                Opsi 1: Perbarui Data Total
+              </h4>
+              <p 
+                className="text-xs text-red-700 font-medium mb-6 leading-relaxed"
+              >
+                Menghapus SELURUH data lama di sistem, dan menggantinya 100% dengan data dari file Excel yang baru.
+              </p>
+              <label 
+                className="bg-red-600 hover:bg-red-700 text-white font-black py-3 px-6 rounded-xl shadow-lg cursor-pointer transition-transform transform hover:-translate-y-1 inline-block"
+              >
+                Upload & Perbarui Total
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  onChange={(e) => { setModeUpload("ganti"); tanganiUploadExcel(e); }} 
+                  className="hidden" 
+                />
+              </label>
+            </div>
+
+            {/* OPSI 2: TAMBAH DATA */}
+            <div 
+              className="bg-green-50 border-2 border-dashed border-green-300 p-8 rounded-3xl text-center hover:bg-green-100 transition-colors"
             >
-              Pilih File Excel / CSV (.xlsx, .csv)
-              <input 
-                type="file" 
-                accept=".xlsx, .xls, .csv" 
-                onChange={tanganiUploadExcel} 
-                className="hidden" 
-              />
-            </label>
-            <p 
-              className="mt-4 text-xs font-bold text-green-800"
-            >
-              Sistem telah diperbarui dengan Fuzzy Matcher (Kebal Typo).
-            </p>
+              <span 
+                className="text-5xl mb-4 block"
+              >
+                ➕
+              </span>
+              <h4 
+                className="font-black text-green-900 mb-2"
+              >
+                Opsi 2: Tambahkan Data Baru
+              </h4>
+              <p 
+                className="text-xs text-green-800 font-medium mb-6 leading-relaxed"
+              >
+                Mempertahankan data lama yang sudah ada di sistem, dan hanya menyuntikkan tambahan data baru dari Excel.
+              </p>
+              <label 
+                className="bg-green-600 hover:bg-green-700 text-white font-black py-3 px-6 rounded-xl shadow-lg cursor-pointer transition-transform transform hover:-translate-y-1 inline-block"
+              >
+                Upload & Tambahkan Data
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  onChange={(e) => { setModeUpload("tambah"); tanganiUploadExcel(e); }} 
+                  className="hidden" 
+                />
+              </label>
+            </div>
           </div>
 
-          {statusProses && (
-            <div 
-              className={`mt-6 p-4 rounded-xl text-sm font-bold text-center border shadow-sm ${
-                statusProses.includes("❌") 
-                ? "bg-red-50 text-red-700 border-red-200" 
-                : "bg-blue-50 text-blue-800 border-blue-300"
-              }`}
+          <div 
+            className="border-t border-gray-100 pt-8 text-center"
+          >
+            <h4 
+              className="font-black text-gray-900 mb-4"
             >
-              {statusProses}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ==========================================
-          TAB 3: HEADER PUBLIK
-      ========================================== */}
-      {tabAktif === "hero" && (
-        <div 
-          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in"
-        >
-          <h3 
-            className="text-2xl font-bold mb-2"
-          >
-            🖼️ Pengaturan Halaman Publik (Cloudinary)
-          </h3>
-          <p 
-            className="text-gray-500 text-sm mb-6"
-          >
-            Sesuaikan gambar background dan teks sambutan di halaman Visualisasi Data Desa warga.
-          </p>
-          
-          <form 
-            onSubmit={handleSimpanHero} 
-            className="space-y-6"
-          >
-            <div 
-              className="grid grid-cols-1 md:grid-cols-2 gap-8"
-            >
-              <div 
-                className="space-y-5"
-              >
-                <div>
-                  <label 
-                    className="block text-sm font-bold mb-2 text-gray-800"
-                  >
-                    Judul Header
-                  </label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={heroJudul} 
-                    onChange={(e) => setHeroJudul(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold" 
-                  />
-                </div>
-                <div>
-                  <label 
-                    className="block text-sm font-bold mb-2 text-gray-800"
-                  >
-                    Teks Sub-Judul
-                  </label>
-                  <textarea 
-                    required 
-                    rows={4} 
-                    value={heroSub} 
-                    onChange={(e) => setHeroSub(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
-                  ></textarea>
-                </div>
-              </div>
-
-              <div 
-                className="space-y-4"
-              >
-                <label 
-                  className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2"
-                >
-                  Gambar Background Publik
-                </label>
-                {heroBgLama && (
-                  <div 
-                    className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200 group"
-                  >
-                    <img 
-                      src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
-                      className="w-full h-full object-cover" 
-                      alt="Hero"
-                    />
-                  </div>
-                )}
-                <label 
-                  className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"
-                >
-                  <span 
-                    className="text-3xl mb-2"
-                  >
-                    📸
-                  </span>
-                  <span 
-                    className="font-bold text-yellow-800 text-sm"
-                  >
-                    Upload Background Baru
-                  </span>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    onChange={(e) => setHeroBgList(e.target.files)} 
-                    className="hidden" 
-                  />
-                </label>
-              </div>
-            </div>
-            
-            {statusHero && (
-              <div 
-                className="p-4 rounded-xl text-sm font-bold text-center bg-green-100 text-green-800 border-green-300"
-              >
-                {statusHero}
-              </div>
-            )}
-            
+              Opsi Ekspor Database (Backup)
+            </h4>
             <button 
-              type="submit" 
-              disabled={isLoadingHero} 
-              className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+              onClick={handleExportExcel}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-md transition-colors flex items-center gap-2 mx-auto"
             >
-              {isLoadingHero ? "Menyimpan Pengaturan..." : "Simpan Header Publik"}
+              <span>📥</span> Download Data ke Excel
             </button>
-          </form>
+          </div>
         </div>
       )}
 
       {/* ==========================================
-          MODAL TAMBAH & EDIT
+          MODAL TAMBAH MANUAL (LOGIKA KEPALA KELUARGA DARI MASTER DATA)
       ========================================== */}
       {isModalOpen && (
         <div 
@@ -1020,51 +1136,76 @@ export default function DataPenduduk({
               onSubmit={handleSimpanManual} 
               className="p-6 space-y-6"
             >
+              {/* LOGIKA KEPALA KELUARGA / KK */}
               <div 
                 className="bg-blue-50 p-5 rounded-2xl border border-blue-200"
               >
-                <label 
-                  className="block text-sm font-bold text-blue-900 mb-2"
+                <div 
+                  className="grid grid-cols-1 md:grid-cols-2 gap-5"
                 >
-                  Keluarga Induk (Enkripsi Berlaku)
-                </label>
-                <select 
-                  required 
-                  value={formData.id_keluarga} 
-                  onChange={(e) => setFormData({...formData, id_keluarga: e.target.value})} 
-                  className="w-full p-3 rounded-xl border border-blue-300 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold text-gray-800"
-                >
-                  <option 
-                    value="" 
-                    disabled
-                  >
-                    -- Pilih Status Keluarga --
-                  </option>
-                  <option 
-                    value="BARU"
-                  >
-                    🟢 BENTUK KELUARGA BARU (KK TERPISAH)
-                  </option>
-                  <optgroup 
-                    label="Gabung ke Keluarga yang Sudah Terdaftar:"
-                  >
-                    {daftarKeluarga.map((kel) => (
-                      <option 
-                        key={kel.id} 
-                        value={kel.id}
+                  <div>
+                    <label 
+                      className="block text-sm font-bold text-blue-900 mb-2"
+                    >
+                      Status Hubungan dlm Keluarga
+                    </label>
+                    <select 
+                      required 
+                      value={formData.hubungan_keluarga} 
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData({...formData, hubungan_keluarga: val, id_keluarga: val === "KEPALA KELUARGA" ? "" : formData.id_keluarga});
+                      }} 
+                      className="w-full p-3 rounded-xl border border-blue-300 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold"
+                    >
+                      <option value="" disabled>Pilih Status Hubungan</option>
+                      {masterData.hubungan?.map((m:any) => (
+                        <option key={m.id} value={m.label}>{m.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {formData.hubungan_keluarga !== "KEPALA KELUARGA" && (
+                    <div>
+                      <label 
+                        className="block text-sm font-bold text-blue-900 mb-2"
                       >
-                        Gabung: Keluarga {kel.kepala} ({kel.id})
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-                <p 
-                  className="text-[10px] text-blue-600 mt-2 font-bold leading-relaxed"
-                >
-                  Sistem memblokir input Nomor KK demi privasi. Silakan hubungkan warga ini dengan ID Keluarga yang sudah ada, atau buat yang baru.
-                </p>
+                        Pilih Kepala Keluarga Induk
+                      </label>
+                      <select 
+                        required 
+                        value={formData.id_keluarga} 
+                        onChange={(e) => setFormData({...formData, id_keluarga: e.target.value})} 
+                        className="w-full p-3 rounded-xl border border-blue-300 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm font-bold"
+                      >
+                        <option value="" disabled>-- Cari Kepala Keluarga --</option>
+                        {daftarKepalaKeluarga.map((kk) => (
+                          <option key={kk.id} value={kk.id_keluarga}>
+                            {kk.nama} (Dusun {kk.dusun} RT {kk.rt})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                
+                {formData.hubungan_keluarga === "KEPALA KELUARGA" && !editId && (
+                  <p 
+                    className="text-[10px] text-green-700 mt-3 font-bold bg-green-100 p-2 rounded-lg inline-block border border-green-200"
+                  >
+                    ✅ Warga ini didaftarkan sebagai Kepala Keluarga. Sistem otomatis akan membuatkan ID Keluarga (KK) Baru.
+                  </p>
+                )}
+                {formData.hubungan_keluarga !== "KEPALA KELUARGA" && (
+                  <p 
+                    className="text-[10px] text-blue-700 mt-3 font-bold"
+                  >
+                    Sistem memblokir input NIK/No KK demi privasi. Warga akan otomatis disatukan ke dalam ID Keluarga Induk yang dipilih.
+                  </p>
+                )}
               </div>
 
+              {/* DATA DIRI LAINNYA DI AMBIL DARI MASTER DATA DROPDOWN */}
               <div 
                 className="grid grid-cols-1 md:grid-cols-2 gap-5"
               >
@@ -1094,12 +1235,15 @@ export default function DataPenduduk({
                     >
                       Dusun
                     </label>
-                    <input 
-                      type="text" 
+                    <select 
+                      required 
                       value={formData.dusun} 
                       onChange={(e) => setFormData({...formData, dusun: e.target.value})} 
-                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 uppercase text-sm" 
-                    />
+                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
+                    >
+                      <option value="" disabled>Pilih</option>
+                      {masterData.dusun?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
+                    </select>
                   </div>
                   <div 
                     className="w-1/3"
@@ -1109,12 +1253,15 @@ export default function DataPenduduk({
                     >
                       RW
                     </label>
-                    <input 
-                      type="text" 
+                    <select 
+                      required 
                       value={formData.rw} 
                       onChange={(e) => setFormData({...formData, rw: e.target.value})} 
-                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 uppercase text-sm" 
-                    />
+                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
+                    >
+                      <option value="" disabled>Pilih</option>
+                      {masterData.rw?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
+                    </select>
                   </div>
                   <div 
                     className="w-1/3"
@@ -1124,43 +1271,18 @@ export default function DataPenduduk({
                     >
                       RT
                     </label>
-                    <input 
-                      type="text" 
+                    <select 
+                      required 
                       value={formData.rt} 
                       onChange={(e) => setFormData({...formData, rt: e.target.value})} 
-                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 uppercase text-sm" 
-                    />
+                      className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
+                    >
+                      <option value="" disabled>Pilih</option>
+                      {masterData.rt?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
+                    </select>
                   </div>
                 </div>
 
-                <div>
-                  <label 
-                    className="block text-xs font-bold mb-1.5 text-gray-700"
-                  >
-                    Hubungan Keluarga
-                  </label>
-                  <select 
-                    required 
-                    value={formData.hubungan_keluarga} 
-                    onChange={(e) => setFormData({...formData, hubungan_keluarga: e.target.value})} 
-                    className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm font-bold"
-                  >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih Status Hubungan
-                    </option>
-                    {Object.values(MAP_HUBUNGAN).map((v:any) => (
-                      <option 
-                        key={v} 
-                        value={v}
-                      >
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label 
                     className="block text-xs font-bold mb-1.5 text-gray-700"
@@ -1173,22 +1295,8 @@ export default function DataPenduduk({
                     onChange={(e) => setFormData({...formData, jenis_kelamin: e.target.value})} 
                     className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
                   >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih
-                    </option>
-                    <option 
-                      value="LAKI-LAKI"
-                    >
-                      LAKI-LAKI
-                    </option>
-                    <option 
-                      value="PEREMPUAN"
-                    >
-                      PEREMPUAN
-                    </option>
+                    <option value="" disabled>Pilih</option>
+                    {masterData.kelamin?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
                   </select>
                 </div>
 
@@ -1241,20 +1349,8 @@ export default function DataPenduduk({
                     onChange={(e) => setFormData({...formData, agama: e.target.value})} 
                     className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
                   >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih
-                    </option>
-                    {Object.values(MAP_AGAMA).map((v:any) => (
-                      <option 
-                        key={v} 
-                        value={v}
-                      >
-                        {v}
-                      </option>
-                    ))}
+                    <option value="" disabled>Pilih</option>
+                    {masterData.agama?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1269,20 +1365,8 @@ export default function DataPenduduk({
                     onChange={(e) => setFormData({...formData, pendidikan: e.target.value})} 
                     className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
                   >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih
-                    </option>
-                    {Object.values(MAP_PENDIDIKAN).map((v:any) => (
-                      <option 
-                        key={v} 
-                        value={v}
-                      >
-                        {v}
-                      </option>
-                    ))}
+                    <option value="" disabled>Pilih</option>
+                    {masterData.pendidikan?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
                   </select>
                 </div>
 
@@ -1298,22 +1382,11 @@ export default function DataPenduduk({
                     onChange={(e) => setFormData({...formData, status_kawin: e.target.value})} 
                     className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
                   >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih
-                    </option>
-                    {Object.values(MAP_KAWIN).map((v:any) => (
-                      <option 
-                        key={v} 
-                        value={v}
-                      >
-                        {v}
-                      </option>
-                    ))}
+                    <option value="" disabled>Pilih</option>
+                    {masterData.kawin?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
                   </select>
                 </div>
+
                 <div>
                   <label 
                     className="block text-xs font-bold mb-1.5 text-gray-700"
@@ -1326,39 +1399,43 @@ export default function DataPenduduk({
                     onChange={(e) => setFormData({...formData, golongan_darah: e.target.value})} 
                     className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
                   >
-                    <option 
-                      value="" 
-                      disabled
-                    >
-                      Pilih
-                    </option>
-                    {Object.values(MAP_DARAH).map((v:any) => (
-                      <option 
-                        key={v} 
-                        value={v}
-                      >
-                        {v}
-                      </option>
-                    ))}
+                    <option value="" disabled>Pilih</option>
+                    {masterData.darah?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
                   </select>
                 </div>
 
-                <div 
-                  className="md:col-span-2"
-                >
+                <div>
                   <label 
                     className="block text-xs font-bold mb-1.5 text-gray-700"
                   >
-                    Pekerjaan (Ketik Manual)
+                    Kewarganegaraan
                   </label>
-                  <input 
-                    type="text" 
+                  <select 
+                    required 
+                    value={formData.kewarganegaraan} 
+                    onChange={(e) => setFormData({...formData, kewarganegaraan: e.target.value})} 
+                    className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
+                  >
+                    <option value="" disabled>Pilih</option>
+                    {masterData.warga?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label 
+                    className="block text-xs font-bold mb-1.5 text-gray-700"
+                  >
+                    Pekerjaan
+                  </label>
+                  <select 
                     required 
                     value={formData.pekerjaan} 
                     onChange={(e) => setFormData({...formData, pekerjaan: e.target.value})} 
-                    placeholder="Misal: PETANI / WIRASWASTA" 
-                    className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm uppercase" 
-                  />
+                    className="w-full p-3 rounded-xl border border-gray-300 outline-none bg-gray-50 text-sm"
+                  >
+                    <option value="" disabled>Pilih Pekerjaan</option>
+                    {masterData.pekerjaan?.map((m:any) => <option key={m.id} value={m.label}>{m.label}</option>)}
+                  </select>
                 </div>
                 
                 <div>

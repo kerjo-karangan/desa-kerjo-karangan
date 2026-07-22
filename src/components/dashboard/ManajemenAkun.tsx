@@ -1,100 +1,120 @@
 // src/components/dashboard/ManajemenAkun.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { 
+  useEffect, 
+  useState 
+} from "react";
 import { 
   collection, 
-  doc, 
   getDocs, 
-  setDoc, 
+  doc, 
   updateDoc, 
-  deleteDoc 
+  deleteDoc, 
+  query, 
+  where,
+  addDoc
 } from "firebase/firestore";
+import { 
+  getAuth, 
+  updateProfile, 
+  updatePassword 
+} from "firebase/auth";
 import { db } from "../../lib/firebase";
-import { getApp, initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-};
-
-interface AkunProps {
+interface ManajemenAkunProps {
   userEmail: string | null;
 }
 
-export default function ManajemenAkun({ userEmail }: AkunProps) {
-  const [daftarUser, setDaftarUser] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState("");
+export default function ManajemenAkun({ 
+  userEmail 
+}: ManajemenAkunProps) {
+  
+  const [tabAktif, setTabAktif] = useState("profil");
+  const [userRole, setUserRole] = useState("Memuat...");
+  const [currentUserDocId, setCurrentUserDocId] = useState<string | null>(null);
+  
+  const [statusProses, setStatusProses] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [myProfile, setMyProfile] = useState<any>(null);
+  // ==========================================
+  // STATE: PROFIL SAYA
+  // ==========================================
+  const [profilNama, setProfilNama] = useState("");
+  const [profilPasswordBaru, setProfilPasswordBaru] = useState("");
+  const [profilFotoLama, setProfilFotoLama] = useState("");
+  const [profilFotoList, setProfilFotoList] = useState<FileList | null>(null);
 
-  const [nama, setNama] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Kontributor");
-  const [fotoList, setFotoList] = useState<FileList | null>(null);
-  const [editModeId, setEditModeId] = useState<string | null>(null);
-  const [fotoLama, setFotoLama] = useState("");
+  // ==========================================
+  // STATE: KELOLA AKUN (HANYA ADMIN)
+  // ==========================================
+  const [daftarAkun, setDaftarAkun] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formAkunBaru, setFormAkunBaru] = useState({
+    nama: "",
+    email: "",
+    role: "Kontributor"
+  });
 
-  const ambilDataAkun = async () => {
-    setLoading(true);
+  // ==========================================
+  // FUNGSI FETCH DATA & OTORISASI RBAC
+  // ==========================================
+  const ambilData = async () => {
+    if (!userEmail) return;
+
     try {
-      const snap = await getDocs(collection(db, "users_desa"));
-      // PERBAIKAN TYPESCRIPT: Menambahkan 'as any' secara eksplisit
-      const users = snap.docs.map((d) => ({ uid: d.id, ...(d.data() as any) }));
+      // 1. Cari data user yang sedang login
+      const qUser = query(
+        collection(db, "users_desa"), 
+        where("email", "==", userEmail)
+      );
+      const snapUser = await getDocs(qUser);
       
-      setDaftarUser(users);
+      let roleSaatIni = "Kontributor"; // Default aman terendah
 
-      const me = users.find((u: any) => u.email === userEmail);
-      
-      if (me) {
-        setMyProfile(me);
-        if (me.role === "Admin" || userEmail === "admin@kerjo.co.id") {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-          mulaiEdit(me);
-        }
+      if (!snapUser.empty) {
+        const docUser = snapUser.docs[0];
+        setCurrentUserDocId(docUser.id);
+        
+        const dataUser = docUser.data();
+        roleSaatIni = dataUser.role;
+        setUserRole(roleSaatIni);
+        setProfilNama(dataUser.nama || "");
+        setProfilFotoLama(dataUser.foto || "");
       } else if (userEmail === "admin@kerjo.co.id") {
-        setIsAdmin(true); 
+        // Fallback untuk Super Admin bawaan
+        roleSaatIni = "Admin";
+        setUserRole("Admin");
+        setProfilNama("Super Administrator");
       }
+
+      // 2. Jika Admin, ambil seluruh daftar akun
+      if (roleSaatIni === "Admin") {
+        const snapSemua = await getDocs(collection(db, "users_desa"));
+        setDaftarAkun(snapSemua.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
     } catch (error) {
-      console.error("Gagal mengambil data user:", error);
-    } finally {
-      setLoading(false);
+      console.error("Gagal memuat profil:", error);
     }
   };
 
   useEffect(() => {
-    if (userEmail) {
-      ambilDataAkun();
-    }
+    ambilData();
   }, [userEmail]);
 
+  // ==========================================
+  // CLOUDINARY UPLOADER
+  // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const res = await fetch("/api/cloudinary", {
-        method: "POST",
-        body: formData,
-      });
-      
+      const res = await fetch("/api/cloudinary", { method: "POST", body: formData });
       const data = await res.json();
-      if (data.success) {
-        return data.url;
-      }
-      throw new Error(data.error);
+      if (data.success) return data.url;
+      return null;
     } catch (error) {
-      console.error("Upload error:", error);
       return null;
     }
   };
@@ -107,359 +127,586 @@ export default function ManajemenAkun({ userEmail }: AkunProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-    } catch (error) {
-      console.error("Delete error:", error);
-    }
+    } catch (error) {}
   };
 
-  const handleSimpanUser = async (e: React.FormEvent) => {
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
+  };
+
+  // ==========================================
+  // HANDLER: SIMPAN PROFIL DIRI SENDIRI
+  // ==========================================
+  const handleSimpanProfil = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setStatus("Memproses...");
+    setIsLoading(true);
+    setStatusProses("Menyimpan pembaruan profil...");
 
     try {
-      let imageUrl = fotoLama;
-      
-      if (fotoList && fotoList.length > 0) {
-        setStatus("Mengunggah Foto Profil ke Cloudinary...");
-        const newUrl = await uploadFotoKeCloudinary(fotoList[0]);
-        if (newUrl) {
-          if (fotoLama) {
-            await hapusFotoDiCloudinary(fotoLama);
-          }
-          imageUrl = newUrl;
+      const auth = getAuth();
+      const user = auth.currentUser;
+
+      let imageUrl = profilFotoLama;
+
+      // 1. Upload Foto Baru Jika Ada
+      if (profilFotoList && profilFotoList.length > 0) {
+        setStatusProses("Mengunggah foto profil baru...");
+        const newImg = await uploadFotoKeCloudinary(profilFotoList[0]);
+        if (newImg) {
+          if (profilFotoLama) await hapusFotoDiCloudinary(profilFotoLama);
+          imageUrl = newImg;
         }
       }
 
-      if (editModeId) {
-        await updateDoc(doc(db, "users_desa", editModeId), {
-          nama: nama, 
-          role: role, 
+      // 2. Update Auth Display Name & Photo URL (Firebase Auth)
+      if (user) {
+        await updateProfile(user, {
+          displayName: profilNama,
+          photoURL: imageUrl
+        });
+
+        // 3. Update Password Jika Diisi
+        if (profilPasswordBaru.trim() !== "") {
+          setStatusProses("Memperbarui kata sandi...");
+          await updatePassword(user, profilPasswordBaru);
+        }
+      }
+
+      // 4. Update Database Firestore (users_desa)
+      if (currentUserDocId) {
+        await updateDoc(doc(db, "users_desa", currentUserDocId), {
+          nama: profilNama,
           foto: imageUrl
         });
-        
-        if (password.length >= 6) {
-           const auth = getAuth();
-           if (auth.currentUser && auth.currentUser.email === email) {
-              await updatePassword(auth.currentUser, password);
-              setStatus("✅ Profil & Password berhasil diperbarui!");
-           } else {
-              setStatus("⚠️ Profil diupdate. (Password orang lain tidak bisa diubah demi keamanan Firebase)");
-           }
-        } else {
-           setStatus("✅ Profil berhasil diperbarui!");
-        }
-      } else {
-        setStatus("Membuat Autentikasi Firebase via Jalur Aman...");
-        let secondaryApp;
-        try { 
-          secondaryApp = getApp("Secondary"); 
-        } catch { 
-          secondaryApp = initializeApp(firebaseConfig, "Secondary"); 
-        }
-        
-        const secondaryAuth = getAuth(secondaryApp);
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-        await secondaryAuth.signOut(); 
-
-        setStatus("Menyimpan Hak Akses Role ke Database...");
-        await setDoc(doc(db, "users_desa", userCredential.user.uid), {
-          email: email, 
-          nama: nama, 
-          role: role, 
-          foto: imageUrl, 
-          tanggal_dibuat: new Date().toISOString()
-        });
-        
-        setStatus("✅ User baru berhasil didaftarkan!");
       }
 
-      if (isAdmin) {
-        batalEdit();
-      }
-      
-      ambilDataAkun();
-      setTimeout(() => setStatus(""), 5000);
-      
+      setProfilFotoLama(imageUrl);
+      setProfilFotoList(null);
+      setProfilPasswordBaru("");
+      setStatusProses("✅ Profil berhasil diperbarui!");
+      setTimeout(() => setStatusProses(""), 4000);
+
     } catch (error: any) {
-      setStatus(`❌ Gagal: ${error.message}`);
+      console.error("Error Update Profil:", error);
+      // PENANGANAN ERROR PASSWORD REQUIRES RECENT LOGIN
+      if (error.code === "auth/requires-recent-login") {
+        setStatusProses("⚠️ GAGAL GANTI PASSWORD: Demi keamanan, sistem Firebase mewajibkan Anda untuk LOGOUT dan LOGIN KEMBALI terlebih dahulu sebelum dapat mengganti kata sandi.");
+      } else if (error.code === "auth/weak-password") {
+        setStatusProses("❌ GAGAL: Kata sandi terlalu lemah. Gunakan minimal 6 karakter.");
+      } else {
+        setStatusProses(`❌ Terjadi kesalahan: ${error.message}`);
+      }
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const mulaiEdit = (user: any) => {
-    setEditModeId(user.uid || user.id); 
-    setNama(user.nama); 
-    setEmail(user.email); 
-    setRole(user.role); 
-    setFotoLama(user.foto || "");
-    setPassword(""); 
-    setFotoList(null); 
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+  // ==========================================
+  // HANDLER: TAMBAH & HAPUS AKUN (HANYA ADMIN)
+  // ==========================================
+  const handleTambahAkun = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Mendaftarkan akun ke database...");
 
-  const batalEdit = () => {
-    setEditModeId(null); 
-    setNama(""); 
-    setEmail(""); 
-    setPassword(""); 
-    setRole("Kontributor"); 
-    setFotoLama(""); 
-    setFotoList(null);
-  };
+    try {
+      // Menambahkan hak akses ke database Firestore
+      await addDoc(collection(db, "users_desa"), {
+        nama: formAkunBaru.nama,
+        email: formAkunBaru.email,
+        role: formAkunBaru.role,
+        foto: "",
+        tanggal_dibuat: new Date().toISOString()
+      });
 
-  const hapusUser = async (uid: string, fotoUrl: string) => {
-    if (!confirm("Hapus hak akses user ini dari Database? Akun Auth di Firebase tetap ada, tapi ia tidak bisa lagi login ke Dashboard ini.")) return;
-    
-    if (fotoUrl) {
-      await hapusFotoDiCloudinary(fotoUrl);
+      setIsModalOpen(false);
+      ambilData();
+      setFormAkunBaru({ nama: "", email: "", role: "Kontributor" });
+      setStatusProses("✅ Akun berhasil didaftarkan ke Database! Info: User terkait harus melakukan 'Sign Up / Daftar' menggunakan Email tersebut agar bisa Login.");
+      setTimeout(() => setStatusProses(""), 6000);
+    } catch (error) {
+      setStatusProses("❌ Gagal mendaftarkan akun.");
+    } finally {
+      setIsLoading(false);
     }
-    
-    await deleteDoc(doc(db, "users_desa", uid));
-    ambilDataAkun();
   };
 
-  if (!isAdmin && !myProfile) {
-    return (
-      <div className="p-8 text-center text-red-500 font-bold bg-white rounded-3xl shadow-sm border border-gray-100">
-        <span className="text-5xl mb-4 block">🚫</span>
-        Akses Ditolak. Hubungi Admin Utama Desa Kerjo.
-      </div>
-    );
-  }
+  const handleHapusAkun = async (id: string, emailTarget: string) => {
+    if (emailTarget === "admin@kerjo.co.id" || emailTarget === userEmail) {
+      alert("Akses Ditolak: Anda tidak dapat menghapus akun Super Admin atau akun Anda sendiri.");
+      return;
+    }
+
+    if (confirm(`Yakin ingin mencabut hak akses untuk email ${emailTarget}? (Ini hanya menghapus hak akses di Panel Admin)`)) {
+      try {
+        await deleteDoc(doc(db, "users_desa", id));
+        ambilData();
+      } catch (error) {
+        console.error("Gagal menghapus:", error);
+      }
+    }
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 font-sans">
+    <div 
+      className="space-y-8 animate-fade-in pb-20 font-sans"
+    >
       
-      <div className={`bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-gray-100 border-t-4 ${isAdmin && !editModeId ? 'border-green-500' : 'border-blue-500'}`}>
-        <h3 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-2">
-          {editModeId 
-            ? "✏️ Edit Profil Akun" 
-            : isAdmin 
-              ? "➕ Tambah User Baru" 
-              : "⚙️ Pengaturan Profil Saya"
-          }
-        </h3>
-        <p className="text-gray-500 text-sm mb-8 pb-4 border-b border-gray-100">
-          {isAdmin 
-            ? "Kelola akses anggota staf untuk Dashboard E-Government Desa Kerjo." 
-            : "Anda bisa mengubah nama, foto profil, atau password Anda secara mandiri di sini."
-          }
-        </p>
+      {/* 
+        TAB NAVIGASI DINAMIS (RBAC) 
+        Kontributor dan Pemdes tidak akan melihat tombol "Kelola Akun Admin"
+      */}
+      <div 
+        className="flex flex-wrap gap-2 md:gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
+      >
+        <button 
+          onClick={() => setTabAktif("profil")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "profil" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>👤</span> Profil Saya
+        </button>
+        
+        {userRole === "Admin" && (
+          <button 
+            onClick={() => setTabAktif("kelola")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "kelola" ? "bg-red-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span>🛡️</span> Kelola Akun Admin
+          </button>
+        )}
+      </div>
 
-        <form onSubmit={handleSimpanUser} className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {statusProses && (
+        <div 
+          className={`p-4 rounded-xl text-sm font-bold text-center border shadow-sm ${
+            statusProses.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : 
+            statusProses.includes("⚠️") ? "bg-yellow-50 text-yellow-800 border-yellow-300" :
+            "bg-blue-50 text-blue-800 border-blue-200"
+          }`}
+        >
+          {statusProses}
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB 1: EDIT PROFIL DIRI SENDIRI
+      ========================================== */}
+      {tabAktif === "profil" && (
+        <div 
+          className="bg-white p-6 md:p-10 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in max-w-4xl mx-auto"
+        >
+          <div 
+            className="text-center mb-10"
+          >
+            <h3 
+              className="text-3xl font-black text-gray-900 mb-2"
+            >
+              Pengaturan Profil
+            </h3>
+            <p 
+              className="text-gray-500 font-medium"
+            >
+              Kelola identitas publik dan kata sandi keamanan Anda di sini.
+            </p>
+          </div>
+
+          <form 
+            onSubmit={handleSimpanProfil} 
+            className="space-y-8"
+          >
             
-            <div>
-              <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                Nama Pengguna Lengkap
-              </label>
-              <input 
-                type="text" 
-                required 
-                value={nama} 
-                onChange={(e) => setNama(e.target.value)} 
-                className="w-full p-3.5 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white transition-all font-bold text-gray-800" 
-              />
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                Alamat Email (Digunakan Untuk Login)
-              </label>
-              <input 
-                type="email" 
-                required 
-                disabled={!!editModeId} 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                className="w-full p-3.5 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-green-500 bg-gray-100 font-mono text-gray-600 disabled:opacity-60" 
-                placeholder="nama@kerjo.desa.id" 
-              />
-              {editModeId && (
-                <p className="text-[10px] text-red-500 mt-1 font-bold">
-                  Email login sistem tidak dapat diubah.
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                {editModeId ? "Ganti Password Baru" : "Buat Password"}
-              </label>
-              <input 
-                type="password" 
-                required={!editModeId} 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                minLength={6} 
-                placeholder={editModeId ? "Kosongkan jika tidak ingin merubah sandi" : "Minimal 6 Karakter"} 
-                className="w-full p-3.5 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white font-mono tracking-widest text-gray-800" 
-              />
-            </div>
-            
-            {isAdmin ? (
-              <div>
-                <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                  Tetapkan Hak Akses (Role)
-                </label>
-                <select 
-                  value={role} 
-                  onChange={(e) => setRole(e.target.value)} 
-                  className="w-full p-3.5 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 font-black text-gray-800 cursor-pointer"
+            {/* UI UPLOAD FOTO PREMIUM */}
+            <div 
+              className="flex flex-col items-center justify-center mb-8"
+            >
+              <div 
+                className="relative group cursor-pointer"
+              >
+                <div 
+                  className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-blue-100 bg-gray-100 overflow-hidden shadow-lg transition-transform duration-300 group-hover:scale-105"
                 >
-                  <option value="Admin">🟢 Admin Utama (Akses Penuh Keseluruhan)</option>
-                  <option value="Pemerintah Desa">🔵 Pemerintah Desa (Akses Penuh Tanpa Manajemen Akun)</option>
-                  <option value="Kontributor">🟠 Kontributor (Hanya Manajemen Berita & UMKM)</option>
-                </select>
-              </div>
-            ) : (
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-                <span className="block text-xs text-blue-500 font-bold mb-1">
-                  Status Hak Akses Anda Saat Ini:
-                </span>
-                <span className="font-black text-blue-800 uppercase tracking-widest text-lg">
-                  {myProfile?.role || "Tidak Diketahui"}
-                </span>
-              </div>
-            )}
-            
-            <div className="md:col-span-2 flex flex-col md:flex-row items-center gap-6 bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-inner">
-              <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-white shadow-sm flex-shrink-0 bg-gray-200">
-                {fotoLama ? (
-                   <img 
-                     src={fotoLama.startsWith("http") ? fotoLama : `https://wsrv.nl/?url=${fotoLama}`} 
-                     alt="Foto Profil"
-                     className="w-full h-full object-cover" 
-                   />
-                ) : (
-                   <span className="flex items-center justify-center h-full text-3xl opacity-50">👤</span>
-                )}
-              </div>
-              <div className="w-full">
-                <label className="block text-xs font-bold mb-2 text-gray-700">
-                  Ganti Foto Profil (Server Cloudinary)
-                </label>
+                  {profilFotoList && profilFotoList.length > 0 ? (
+                    <img 
+                      src={URL.createObjectURL(profilFotoList[0])} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : profilFotoLama ? (
+                    <img 
+                      src={getSafeImageUrl(profilFotoLama)} 
+                      alt="Foto Profil" 
+                      className="w-full h-full object-cover" 
+                    />
+                  ) : (
+                    <div 
+                      className="w-full h-full flex items-center justify-center text-5xl text-gray-300 bg-gray-50"
+                    >
+                      👤
+                    </div>
+                  )}
+                  
+                  {/* Layer Hitam Transparan Saat Hover */}
+                  <div 
+                    className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  >
+                    <span 
+                      className="text-white text-3xl mb-1"
+                    >
+                      📸
+                    </span>
+                    <span 
+                      className="text-white text-[10px] font-bold tracking-widest uppercase"
+                    >
+                      Ubah Foto
+                    </span>
+                  </div>
+                </div>
                 <input 
                   type="file" 
                   accept="image/*" 
-                  onChange={(e) => setFotoList(e.target.files)} 
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 transition-all cursor-pointer bg-white border border-gray-200 rounded-lg p-1 shadow-sm outline-none" 
+                  onChange={(e) => setProfilFotoList(e.target.files)} 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  title="Klik untuk memilih foto"
                 />
               </div>
-            </div>
-          </div>
-          
-          {status && (
-            <div className={`p-4 rounded-xl text-sm font-bold text-center border shadow-sm ${status.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : status.includes("⚠️") ? "bg-yellow-50 text-yellow-800 border-yellow-300" : "bg-green-100 text-green-800 border-green-300"}`}>
-              {status}
-            </div>
-          )}
-          
-          <div className="flex gap-4 pt-4 border-t border-gray-100">
-            {editModeId && isAdmin && (
-              <button 
-                type="button" 
-                onClick={batalEdit} 
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 py-4 rounded-xl transition-colors"
+              <p 
+                className="text-xs text-gray-500 font-bold mt-4"
               >
-                Batal Edit
-              </button>
-            )}
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="flex-1 bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-transform hover:-translate-y-1 text-lg"
+                Format yang diizinkan: JPG, PNG, WEBP, HEIC.
+              </p>
+            </div>
+
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-              {loading ? "Sistem Sedang Memproses..." : editModeId ? "Simpan Perubahan Profil" : "Daftarkan User Baru"}
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Nama Tampilan
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={profilNama} 
+                  onChange={(e) => setProfilNama(e.target.value)} 
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold transition-all"
+                  placeholder="Nama Lengkap Anda"
+                />
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Alamat Email (Tidak dapat diubah)
+                </label>
+                <input 
+                  type="email" 
+                  disabled 
+                  value={userEmail || ""} 
+                  className="w-full p-4 rounded-xl border border-gray-200 bg-gray-100 text-gray-500 font-mono cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Hak Akses (Role)
+                </label>
+                <input 
+                  type="text" 
+                  disabled 
+                  value={userRole} 
+                  className="w-full p-4 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-black uppercase tracking-widest cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-2"
+                >
+                  Ganti Kata Sandi Baru
+                </label>
+                <input 
+                  type="password" 
+                  value={profilPasswordBaru} 
+                  onChange={(e) => setProfilPasswordBaru(e.target.value)} 
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500 transition-all font-mono"
+                  placeholder="Biarkan kosong jika tidak diganti"
+                />
+                <p 
+                  className="text-[10px] text-gray-500 font-bold mt-1.5"
+                >
+                  *Jika terjadi error, mohon Logout terlebih dahulu dan Login kembali.
+                </p>
+              </div>
+            </div>
+
+            <div 
+              className="pt-6 border-t border-gray-100"
+            >
+              <button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-lg"
+              >
+                {isLoading ? "MENYIMPAN PERUBAHAN..." : "SIMPAN PROFIL SAYA"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ==========================================
+          TAB 2: KELOLA AKUN (HANYA MUNCUL JIKA ADMIN)
+      ========================================== */}
+      {tabAktif === "kelola" && userRole === "Admin" && (
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-red-600 animate-fade-in"
+        >
+          <div 
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8"
+          >
+            <div>
+              <h3 
+                className="text-2xl font-black text-gray-900 flex items-center gap-2 mb-1"
+              >
+                <span>🛡️</span> Manajemen Hak Akses
+              </h3>
+              <p 
+                className="text-gray-500 text-sm font-medium"
+              >
+                Kontrol siapa saja yang dapat mengakses Panel Admin Desa.
+              </p>
+            </div>
+            <button 
+              onClick={() => setIsModalOpen(true)} 
+              className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-colors text-sm w-full md:w-auto"
+            >
+              + Berikan Akses Baru
             </button>
           </div>
-        </form>
-      </div>
 
-      {isAdmin && (
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 overflow-x-auto">
-          <div className="flex justify-between items-center mb-6">
-            <h4 className="text-xl font-bold text-gray-900">👥 Daftar Pengurus Sistem</h4>
-            <span className="bg-blue-100 text-blue-800 font-black text-xs px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm">
-              Total Aktif: {daftarUser.length} Akun
-            </span>
-          </div>
-          <table className="min-w-full text-sm text-left">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="py-4 px-4 font-bold text-gray-600">Profil & Nama User</th>
-                <th className="py-4 px-4 font-bold text-gray-600">Email Login</th>
-                <th className="py-4 px-4 font-bold text-gray-600 text-center">Status Akses (Role)</th>
-                <th className="py-4 px-4 text-center font-bold text-gray-600">Manajemen</th>
-              </tr>
-            </thead>
-            <tbody>
-              {daftarUser.map((u) => (
-                <tr key={u.uid} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
-                  <td className="py-4 px-4 flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 border-2 border-white shadow-sm flex-shrink-0">
-                      {u.foto ? (
-                        <img 
-                          src={u.foto.startsWith("http") ? u.foto : `https://wsrv.nl/?url=${u.foto}`} 
-                          alt="Profil" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex items-center justify-center h-full text-xl opacity-50">👤</span>
-                      )}
-                    </div>
-                    <div>
-                      <div className="font-black text-gray-900 text-base">{u.nama}</div>
-                      {u.email === userEmail && (
-                        <span className="text-[9px] bg-green-500 text-white px-2 py-0.5 rounded font-bold tracking-widest uppercase mt-0.5 inline-block shadow-sm">
-                          Akun Anda
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="py-4 px-4 font-mono text-gray-600 text-xs">
-                    {u.email}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border shadow-sm ${
-                      u.role === "Admin" ? "bg-green-50 text-green-700 border-green-200" : 
-                      u.role === "Pemerintah Desa" ? "bg-blue-50 text-blue-700 border-blue-200" : 
-                      "bg-orange-50 text-orange-700 border-orange-200"
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    <div className="flex flex-col gap-2 items-center">
-                      <button 
-                        onClick={() => mulaiEdit(u)} 
-                        className="w-full max-w-[90px] bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition-colors shadow-sm"
+          <div 
+            className="overflow-x-auto rounded-2xl border border-gray-200 shadow-inner bg-gray-50 p-4"
+          >
+            <table 
+              className="min-w-full text-sm text-left bg-white rounded-xl overflow-hidden shadow-sm"
+            >
+              <thead 
+                className="bg-gray-50 border-b border-gray-200"
+              >
+                <tr>
+                  <th 
+                    className="py-4 px-6 font-bold text-gray-600"
+                  >
+                    Profil Pengguna
+                  </th>
+                  <th 
+                    className="py-4 px-6 font-bold text-gray-600"
+                  >
+                    Kontak Email
+                  </th>
+                  <th 
+                    className="py-4 px-6 font-bold text-gray-600"
+                  >
+                    Role Akses
+                  </th>
+                  <th 
+                    className="py-4 px-6 text-center font-bold text-gray-600 w-32"
+                  >
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {daftarAkun.length === 0 ? (
+                  <tr>
+                    <td 
+                      colSpan={4} 
+                      className="text-center py-10 font-bold text-gray-500"
+                    >
+                      Belum ada data pengguna.
+                    </td>
+                  </tr>
+                ) : (
+                  daftarAkun.map((item) => (
+                    <tr 
+                      key={item.id} 
+                      className="border-b border-gray-50 hover:bg-red-50/20 transition-colors"
+                    >
+                      <td 
+                        className="py-4 px-6 flex items-center gap-4"
                       >
-                        Edit
-                      </button>
-                      {u.email !== userEmail && (
+                        <div 
+                          className="w-10 h-10 rounded-full bg-gray-100 overflow-hidden border border-gray-200 flex-shrink-0"
+                        >
+                          {item.foto ? (
+                            <img 
+                              src={getSafeImageUrl(item.foto)} 
+                              alt="User" 
+                              className="w-full h-full object-cover" 
+                            />
+                          ) : (
+                            <div 
+                              className="w-full h-full flex items-center justify-center text-lg text-gray-400"
+                            >
+                              👤
+                            </div>
+                          )}
+                        </div>
+                        <span 
+                          className="font-black text-gray-900"
+                        >
+                          {item.nama}
+                        </span>
+                      </td>
+                      <td 
+                        className="py-4 px-6 font-mono text-gray-600 text-xs"
+                      >
+                        {item.email}
+                      </td>
+                      <td 
+                        className="py-4 px-6"
+                      >
+                        <span 
+                          className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${
+                            item.role === "Admin" ? "bg-red-100 text-red-800 border-red-300" :
+                            item.role === "Pemerintah Desa" ? "bg-blue-100 text-blue-800 border-blue-300" :
+                            "bg-green-100 text-green-800 border-green-300"
+                          }`}
+                        >
+                          {item.role}
+                        </span>
+                      </td>
+                      <td 
+                        className="py-4 px-6 text-center"
+                      >
                         <button 
-                          onClick={() => hapusUser(u.uid, u.foto)} 
-                          className="w-full max-w-[90px] bg-red-50 hover:bg-red-600 text-red-700 hover:text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 transition-colors shadow-sm"
+                          onClick={() => handleHapusAkun(item.id, item.email)} 
+                          className="bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-600 font-bold px-4 py-2 rounded-lg transition-colors text-xs shadow-sm"
                         >
                           Cabut Akses
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {daftarUser.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="text-center py-10 text-gray-500 font-medium">
-                    Memuat daftar akun...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL TAMBAH AKUN AKSES (HANYA ADMIN)
+      ========================================== */}
+      {isModalOpen && userRole === "Admin" && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6 md:p-8 border-t-8 border-red-600"
+          >
+            <h3 
+              className="text-2xl font-black mb-2 text-gray-900"
+            >
+              Berikan Akses Admin
+            </h3>
+            <p 
+              className="text-xs text-gray-500 font-medium mb-6 leading-relaxed"
+            >
+              Daftarkan email pengguna di sini. Kemudian minta pengguna untuk Sign Up di halaman Login menggunakan Email yang sama persis agar sistem mengaitkan hak akses ini ke akun mereka.
+            </p>
+
+            <form 
+              onSubmit={handleTambahAkun} 
+              className="space-y-4"
+            >
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-1"
+                >
+                  Nama Pengguna
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formAkunBaru.nama} 
+                  onChange={(e) => setFormAkunBaru({...formAkunBaru, nama: e.target.value})} 
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500 font-bold" 
+                  placeholder="Cth: Budi Santoso"
+                />
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-1"
+                >
+                  Alamat Email (Wajib Sama dengan Email Sign Up)
+                </label>
+                <input 
+                  type="email" 
+                  required 
+                  value={formAkunBaru.email} 
+                  onChange={(e) => setFormAkunBaru({...formAkunBaru, email: e.target.value})} 
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500 font-mono text-sm" 
+                  placeholder="budi@gmail.com"
+                />
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold text-gray-700 mb-1"
+                >
+                  Hak Akses (Role)
+                </label>
+                <select 
+                  required 
+                  value={formAkunBaru.role} 
+                  onChange={(e) => setFormAkunBaru({...formAkunBaru, role: e.target.value})} 
+                  className="w-full p-3 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-red-500 font-black text-gray-700 uppercase"
+                >
+                  <option value="Kontributor">KONTRIBUTOR (Kabar, Agenda, UMKM)</option>
+                  <option value="Pemerintah Desa">PEMERINTAH DESA (Semua Kecuali Kelola Akun)</option>
+                  <option value="Admin">SUPER ADMIN (Semua Akses Penuh)</option>
+                </select>
+              </div>
+              
+              <div 
+                className="flex gap-4 mt-8 pt-4 border-t border-gray-100"
+              >
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalOpen(false)} 
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isLoading} 
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                >
+                  {isLoading ? "Memproses..." : "Daftarkan Akun"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

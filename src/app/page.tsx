@@ -1,311 +1,587 @@
 // src/app/page.tsx
 "use client";
 
+import { 
+  useEffect, 
+  useState 
+} from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { collection, getDocs, doc, getDoc, orderBy, query } from "firebase/firestore";
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  getDoc, 
+  query, 
+  orderBy, 
+  limit,
+  where
+} from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 export default function Home() {
-  const [daftarBerita, setDaftarBerita] = useState<any[]>([]);
-  const [daftarAgenda, setDaftarAgenda] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // STATE HERO BEBAS FLICKER
+  
+  // ==========================================
+  // STATE DATA BERANDA
+  // ==========================================
   const [heroData, setHeroData] = useState({
-    judul: "",
-    sub: "",
-    bg: "https://i.ibb.co.com/YFJVHD07/2239715431.webp" 
+    judul: "Selamat Datang Di Desa Kerjo",
+    sub: "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
+    bg: ""
+  });
+  
+  const [statistik, setStatistik] = useState({
+    penduduk: 0,
+    keluarga: 0,
+    laki: 0,
+    perempuan: 0
   });
 
+  const [beritaSlide, setBeritaSlide] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Ambil data Peta (Opsional: Jika nanti diatur dari panel Admin)
+  const petaEmbedUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3950.457193231121!2d111.66699277413645!3d-8.054746480468972!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e791b0f512dc34b%3A0x5027a76e3565540!2sDesa%20Kerjo%2C%20Kec.%20Karangan%2C%20Kabupaten%20Trenggalek%2C%20Jawa%20Timur!5e0!3m2!1sid!2sid!4v1714441584852!5m2!1sid!2sid";
 
   useEffect(() => {
-    const ambilDataBeranda = async () => {
+    const fetchHomeData = async () => {
       try {
-        // 1. Fetch Pengaturan Hero Beranda
-        const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
+        // 1. Fetch Header Beranda
+        const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda_hero"));
         if (snapHero.exists() && snapHero.data()) {
           setHeroData({
-            judul: snapHero.data().judul || "Selamat Datang di\nDesa Kerjo",
-            sub: snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan, inovatif, dan terdigitalisasi.",
-            bg: snapHero.data().bg || "https://i.ibb.co.com/YFJVHD07/2239715431.webp"
+            judul: snapHero.data().judul || "Selamat Datang Di Desa Kerjo",
+            sub: snapHero.data().sub || "Mewujudkan pelayanan masyarakat yang transparan.",
+            bg: snapHero.data().bg || ""
           });
         }
 
-        // 2. Fetch Berita
-        const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
-        const snapKabar = await getDocs(qKabar);
-        const allKabar = snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        
-        const pinnedKabar = allKabar.filter(item => item.is_pinned === true && item.is_featured !== false);
-        const unpinnedKabar = allKabar.filter(item => item.is_pinned !== true && item.is_featured !== false);
-        const kabarTampil = [...pinnedKabar, ...unpinnedKabar].slice(0, 10);
-        setDaftarBerita(kabarTampil);
+        // 2. Fetch Statistik Data Penduduk
+        const snapPenduduk = await getDocs(collection(db, "data_penduduk"));
+        let totalPenduduk = 0;
+        let totalLaki = 0;
+        let totalPerempuan = 0;
+        const setKeluarga = new Set();
 
-        // 3. Fetch Agenda
-        const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "asc"));
-        const snapAgenda = await getDocs(qAgenda);
-        const allAgenda = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        
-        const now = new Date();
-        const agendaTampil = allAgenda.filter(item => {
-          if (!item.tanggal) return false;
-          const tglAgenda = new Date(item.tanggal);
-          return item.is_featured !== false && tglAgenda >= now;
-        }).slice(0, 10);
-        setDaftarAgenda(agendaTampil);
+        snapPenduduk.docs.forEach((doc) => {
+          totalPenduduk++;
+          const data = doc.data();
+          if (data.id_keluarga) {
+            setKeluarga.add(data.id_keluarga);
+          }
+          if (data.jenis_kelamin === "LAKI-LAKI") {
+            totalLaki++;
+          } else if (data.jenis_kelamin === "PEREMPUAN") {
+            totalPerempuan++;
+          }
+        });
+
+        setStatistik({
+          penduduk: totalPenduduk,
+          keluarga: setKeluarga.size,
+          laki: totalLaki,
+          perempuan: totalPerempuan
+        });
+
+        // 3. Fetch Berita (Pin Khusus Beranda)
+        const qBerita = query(
+          collection(db, "kabar_berita"), 
+          where("pin_beranda", "==", true),
+          orderBy("tanggal", "desc"), 
+          limit(5)
+        );
+        const snapBerita = await getDocs(qBerita);
+        setBeritaSlide(snapBerita.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        })));
 
       } catch (error) {
-        console.error("Gagal memuat data beranda", error);
+        console.error("Gagal memuat data beranda:", error);
       } finally {
         setLoading(false);
       }
     };
-    
-    ambilDataBeranda();
+
+    fetchHomeData();
   }, []);
 
+  // Slider Otomatis
   useEffect(() => {
-    if (!isAutoPlay || daftarBerita.length <= 1) return;
+    if (beritaSlide.length <= 1 || isPaused) return;
+    
     const interval = setInterval(() => {
-      setCurrentSlide(prev => (prev === daftarBerita.length - 1 ? 0 : prev + 1));
-    }, 5000);
+      setCurrentSlide((prev) => (prev + 1) % beritaSlide.length);
+    }, 5000); // Ganti gambar tiap 5 detik
+    
     return () => clearInterval(interval);
-  }, [isAutoPlay, daftarBerita.length]);
+  }, [beritaSlide.length, isPaused]);
 
-  const prevSlide = () => {
-    setCurrentSlide(currentSlide === 0 ? daftarBerita.length - 1 : currentSlide - 1);
-  };
-  
-  const nextSlide = () => {
-    setCurrentSlide(currentSlide === daftarBerita.length - 1 ? 0 : currentSlide + 1);
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
   };
 
-  // PENGAMANAN FATAL ERROR (Vercel Crash): Memastikan bg selalu string yang sah
-  let heroBgSafe = "https://i.ibb.co.com/YFJVHD07/2239715431.webp";
-  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
-    heroBgSafe = heroData.bg;
+  if (loading) {
+    return (
+      <div 
+        className="min-h-screen flex items-center justify-center bg-gray-50"
+      >
+        <div 
+          className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"
+        ></div>
+      </div>
+    );
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-gray-50">
+    <div 
+      className="min-h-screen bg-gray-50 font-sans"
+    >
       
-      {/* 1. HERO SECTION (DINAMIS DAN BEBAS FLICKER) */}
-      <section className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-green-900 transition-all duration-700">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
-            alt="Pemandangan Desa" 
-            className="w-full h-full object-cover opacity-40 mix-blend-overlay"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent"></div>
+      {/* ==========================================
+          1. HEADER (HERO SECTION)
+      ========================================== */}
+      {/* PERBAIKAN BUG Z-INDEX: Menambahkan pb-48 (padding bawah ekstra) agar teks aman */}
+      <div 
+        className="relative pt-24 pb-48 md:pt-32 md:pb-56 text-white overflow-hidden bg-gray-900"
+      >
+        <div 
+          className="absolute inset-0 z-0"
+        >
+          {heroData.bg && (
+            <img 
+              src={getSafeImageUrl(heroData.bg)} 
+              alt="Desa Background" 
+              className="w-full h-full object-cover opacity-40 mix-blend-overlay"
+            />
+          )}
+          <div 
+            className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/60 to-transparent"
+          ></div>
         </div>
-        
-        <div className="relative z-10 text-center px-4 max-w-4xl animate-fade-in mt-16">
-          <div className="w-24 h-24 md:w-32 md:h-32 mx-auto mb-6 bg-white p-2 rounded-full shadow-2xl">
-            <img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo Desa" className="w-full h-full object-contain" />
+
+        <div 
+          className="container mx-auto px-4 relative z-10 flex flex-col items-center text-center animate-fade-in"
+        >
+          <div 
+            className="w-20 h-20 md:w-24 md:h-24 bg-white/10 backdrop-blur-md rounded-full p-2 mb-6 shadow-2xl border border-white/20"
+          >
+            <img 
+              src="https://i.ibb.co.com/4ny8JgGm/1.png" 
+              alt="Logo Desa" 
+              className="w-full h-full object-contain" 
+            />
           </div>
-          <span className="bg-yellow-500 text-green-950 font-black px-4 py-1.5 rounded-full text-xs md:text-sm uppercase tracking-widest shadow-md inline-block mb-6">
+          <span 
+            className="text-yellow-400 font-black tracking-widest uppercase text-xs md:text-sm mb-4 bg-gray-900/50 px-4 py-1.5 rounded-full border border-gray-700"
+          >
             Portal Informasi Publik
           </span>
-          <h1 className="text-5xl md:text-7xl font-black text-white mb-6 tracking-tight drop-shadow-lg leading-tight whitespace-pre-wrap transition-all duration-500">
+          <h1 
+            className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight mb-6 drop-shadow-2xl max-w-4xl leading-tight"
+          >
             {heroData.judul}
           </h1>
-          <p className="text-lg md:text-2xl text-green-50 mb-10 font-medium max-w-2xl mx-auto drop-shadow-md whitespace-pre-wrap transition-all duration-500">
+          <p 
+            className="text-lg md:text-xl text-gray-200 max-w-2xl font-medium drop-shadow-lg leading-relaxed"
+          >
             {heroData.sub}
           </p>
         </div>
-      </section>
+      </div>
 
-      {/* 2. QUICK LINKS */}
-      <section className="relative z-20 -mt-16 container mx-auto px-4 lg:px-8 mb-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Link href="/profil" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">🏛️</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Profil & UMKM</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Jelajahi potensi wisata dan dukung produk lokal asli desa.</p>
+      {/* ==========================================
+          2. TOMBOL SHORTCUT MELAYANG (5 KOTAK)
+      ========================================== */}
+      {/* PERBAIKAN: z-20 agar di atas background tapi di bawah Navbar, grid dibuat 5 kolom */}
+      <div 
+        className="container mx-auto px-4 relative z-20 -mt-24 md:-mt-32"
+      >
+        <div 
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6"
+        >
+          
+          <Link 
+            href="/profil" 
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group border-b-4 border-blue-500 flex flex-col items-center text-center"
+          >
+            <div 
+              className="w-12 h-12 md:w-16 md:h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform"
+            >
+              🏛️
+            </div>
+            <h3 
+              className="text-gray-900 font-black text-sm md:text-base mb-2"
+            >
+              Profil & UMKM
+            </h3>
+            <p 
+              className="text-gray-500 text-xs hidden md:block"
+            >
+              Jelajahi potensi wisata dan produk lokal desa.
+            </p>
           </Link>
-          <Link href="/kabar" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📰</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Kabar Desa</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Pantau terus perkembangan berita dan kegiatan terkini.</p>
+
+          {/* TOMBOL BARU: DATA DESA */}
+          <Link 
+            href="/datadesa" 
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group border-b-4 border-purple-500 flex flex-col items-center text-center"
+          >
+            <div 
+              className="w-12 h-12 md:w-16 md:h-16 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform"
+            >
+              📊
+            </div>
+            <h3 
+              className="text-gray-900 font-black text-sm md:text-base mb-2"
+            >
+              Data Desa
+            </h3>
+            <p 
+              className="text-gray-500 text-xs hidden md:block"
+            >
+              Visualisasi statistik kependudukan akurat.
+            </p>
           </Link>
-          <Link href="/transparansi" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-green-100 text-green-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📊</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Transparansi</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Akses grafik rincian APBDes dan laporan anggaran publik.</p>
+
+          <Link 
+            href="/kabar" 
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group border-b-4 border-green-500 flex flex-col items-center text-center"
+          >
+            <div 
+              className="w-12 h-12 md:w-16 md:h-16 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform"
+            >
+              📰
+            </div>
+            <h3 
+              className="text-gray-900 font-black text-sm md:text-base mb-2"
+            >
+              Kabar Desa
+            </h3>
+            <p 
+              className="text-gray-500 text-xs hidden md:block"
+            >
+              Pantau terus perkembangan berita terkini.
+            </p>
           </Link>
-          <Link href="/layanan" className="bg-white p-6 md:p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-gray-100 group flex flex-col items-center text-center transform hover:-translate-y-2">
-            <div className="w-14 h-14 md:w-16 md:h-16 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform">📄</div>
-            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-2">Layanan Surat</h3>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Urus surat pengantar, SKCK, SKTM, dll secara mandiri online.</p>
+
+          <Link 
+            href="/transparansi" 
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group border-b-4 border-yellow-500 flex flex-col items-center text-center"
+          >
+            <div 
+              className="w-12 h-12 md:w-16 md:h-16 bg-yellow-50 text-yellow-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform"
+            >
+              📈
+            </div>
+            <h3 
+              className="text-gray-900 font-black text-sm md:text-base mb-2"
+            >
+              Transparansi
+            </h3>
+            <p 
+              className="text-gray-500 text-xs hidden md:block"
+            >
+              Akses grafik APBDes & dokumen publik.
+            </p>
           </Link>
+
+          <Link 
+            href="/layanan" 
+            className="bg-white rounded-3xl p-6 md:p-8 shadow-xl hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 group border-b-4 border-red-500 flex flex-col items-center text-center col-span-2 md:col-span-1 lg:col-span-1"
+          >
+            <div 
+              className="w-12 h-12 md:w-16 md:h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 group-hover:scale-110 transition-transform"
+            >
+              💌
+            </div>
+            <h3 
+              className="text-gray-900 font-black text-sm md:text-base mb-2"
+            >
+              Layanan Surat
+            </h3>
+            <p 
+              className="text-gray-500 text-xs hidden md:block"
+            >
+              Urus surat pengantar secara mandiri.
+            </p>
+          </Link>
+
+        </div>
+      </div>
+
+      {/* ==========================================
+          3. STATISTIK RINGKAS DESA
+      ========================================== */}
+      <section 
+        className="py-16 md:py-24"
+      >
+        <div 
+          className="container mx-auto px-4"
+        >
+          <div 
+            className="text-center mb-12"
+          >
+            <span 
+              className="text-green-600 font-black tracking-widest uppercase text-xs"
+            >
+              Data Real-Time
+            </span>
+            <h2 
+              className="text-3xl md:text-4xl font-black text-gray-900 mt-2"
+            >
+              Statistik Kependudukan
+            </h2>
+          </div>
+          
+          <div 
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8 max-w-5xl mx-auto"
+          >
+            <div 
+              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-center flex flex-col items-center"
+            >
+              <div 
+                className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-xl mb-3"
+              >
+                👥
+              </div>
+              <h4 
+                className="text-3xl md:text-4xl font-black text-gray-900 mb-1"
+              >
+                {statistik.penduduk}
+              </h4>
+              <p 
+                className="text-gray-500 text-xs font-bold uppercase tracking-widest"
+              >
+                Total Warga
+              </p>
+            </div>
+            
+            <div 
+              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-center flex flex-col items-center"
+            >
+              <div 
+                className="w-12 h-12 bg-purple-50 rounded-full flex items-center justify-center text-xl mb-3"
+              >
+                👨‍👩‍👧‍👦
+              </div>
+              <h4 
+                className="text-3xl md:text-4xl font-black text-gray-900 mb-1"
+              >
+                {statistik.keluarga}
+              </h4>
+              <p 
+                className="text-gray-500 text-xs font-bold uppercase tracking-widest"
+              >
+                Kepala Keluarga
+              </p>
+            </div>
+
+            <div 
+              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-center flex flex-col items-center"
+            >
+              <div 
+                className="w-12 h-12 bg-cyan-50 rounded-full flex items-center justify-center text-xl mb-3"
+              >
+                👨
+              </div>
+              <h4 
+                className="text-3xl md:text-4xl font-black text-gray-900 mb-1"
+              >
+                {statistik.laki}
+              </h4>
+              <p 
+                className="text-gray-500 text-xs font-bold uppercase tracking-widest"
+              >
+                Laki-Laki
+              </p>
+            </div>
+
+            <div 
+              className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 text-center flex flex-col items-center"
+            >
+              <div 
+                className="w-12 h-12 bg-pink-50 rounded-full flex items-center justify-center text-xl mb-3"
+              >
+                👩
+              </div>
+              <h4 
+                className="text-3xl md:text-4xl font-black text-gray-900 mb-1"
+              >
+                {statistik.perempuan}
+              </h4>
+              <p 
+                className="text-gray-500 text-xs font-bold uppercase tracking-widest"
+              >
+                Perempuan
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      {/* 3. BERITA & AGENDA SLIDER */}
-      <section className="py-16 bg-white border-t border-gray-200">
-        <div className="container mx-auto px-4 lg:px-8 max-w-7xl">
-          <div className="flex justify-between items-end mb-10">
-            <div>
-              <span className="text-green-600 font-extrabold tracking-widest uppercase text-sm mb-2 block">Informasi Publik</span>
-              <h2 className="text-3xl md:text-5xl font-black text-gray-900">Kabar & Agenda</h2>
+      {/* ==========================================
+          4. SLIDER BERITA DESA
+      ========================================== */}
+      {beritaSlide.length > 0 && (
+        <section 
+          className="py-12 bg-gray-900 text-white"
+        >
+          <div 
+            className="container mx-auto px-4"
+          >
+            <div 
+              className="flex justify-between items-end mb-8"
+            >
+              <div>
+                <span 
+                  className="text-green-400 font-bold tracking-widest uppercase text-xs"
+                >
+                  Informasi Publik
+                </span>
+                <h2 
+                  className="text-3xl font-black mt-1"
+                >
+                  Kabar & Agenda
+                </h2>
+              </div>
+              <Link 
+                href="/kabar" 
+                className="hidden md:flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-white transition-colors"
+              >
+                Lihat Semua Berita <span>→</span>
+              </Link>
             </div>
-            <Link href="/kabar" className="hidden md:inline-flex items-center gap-2 font-bold text-green-700 hover:text-green-800 bg-green-50 px-5 py-2.5 rounded-full transition-colors">
-              Lihat Semua Informasi <span className="text-xl">→</span>
-            </Link>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 flex flex-col h-full">
-              {loading ? (
-                 <div className="w-full h-96 bg-gray-100 rounded-3xl flex items-center justify-center shadow-inner">
-                   <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-                 </div>
-              ) : daftarBerita.length === 0 ? (
-                <div className="w-full h-96 bg-gray-50 border-2 border-dashed border-gray-300 rounded-3xl flex flex-col items-center justify-center text-center p-10">
-                   <span className="text-5xl mb-4">📰</span>
-                   <p className="text-gray-500 font-medium text-lg">Belum ada berita yang ditampilkan di beranda.</p>
-                </div>
-              ) : (
-                <div className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-lg group bg-black">
-                  {daftarBerita.map((berita, index) => {
-                    let gambarSlide = "";
-                    if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
-                      gambarSlide = berita.gambar[0];
-                    } else if (typeof berita.gambar === "string") {
-                      gambarSlide = berita.gambar;
-                    }
-
-                    return (
-                      <div 
-                        key={berita.id} 
-                        className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"}`}
-                      >
-                        {gambarSlide ? (
-                          <img 
-                            src={gambarSlide.startsWith("http") ? gambarSlide : `https://wsrv.nl/?url=${gambarSlide}`} 
-                            alt={berita.judul} 
-                            className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-[10000ms] ease-out" 
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-800 flex items-center justify-center text-6xl opacity-80">📸</div>
-                        )}
-                        
-                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"></div>
-                        
-                        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-10 text-white">
-                          <div className="flex items-center gap-2 mb-3">
-                            {berita.is_pinned && (
-                              <span className="bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded-md shadow-sm">
-                                🔒 PINNED
-                              </span>
-                            )}
-                            <span className="bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-md shadow-sm">
-                              Berita Terbaru
-                            </span>
-                          </div>
-                          <h3 className="text-2xl md:text-3xl font-black mb-2 leading-tight drop-shadow-md line-clamp-2">
-                            {berita.judul}
-                          </h3>
-                          <div className="flex items-center gap-4 text-xs md:text-sm font-medium text-gray-300 mb-4">
-                            <span className="flex items-center gap-1"><span>📅</span> {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString("id-ID", { day:'numeric', month:'long', year:'numeric'}) : ""}</span>
-                            <span className="flex items-center gap-1"><span>👤</span> Oleh: {berita.penulis}</span>
-                          </div>
-                          
-                          <Link href={`/kabar/${berita.id}`} className="inline-block bg-white text-gray-900 font-bold px-6 py-2.5 rounded-xl text-sm hover:bg-yellow-400 transition-colors shadow-lg">
-                            Baca Selengkapnya
-                          </Link>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <button 
-                    onClick={prevSlide} 
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
+            <div 
+              className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl bg-gray-800 group"
+              onMouseEnter={() => setIsPaused(true)}
+              onMouseLeave={() => setIsPaused(false)}
+            >
+              {beritaSlide.map((slide, index) => (
+                <div
+                  key={slide.id}
+                  className={`absolute inset-0 transition-opacity duration-1000 ${
+                    index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"
+                  }`}
+                >
+                  <img
+                    src={getSafeImageUrl(slide.gambar)}
+                    alt={slide.judul}
+                    className="w-full h-full object-cover"
+                  />
+                  <div 
+                    className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"
+                  ></div>
+                  
+                  <div 
+                    className="absolute bottom-0 left-0 w-full p-6 md:p-12"
                   >
-                    &#10094;
-                  </button>
-                  <button 
-                    onClick={nextSlide} 
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/40 hover:bg-white text-white hover:text-green-900 w-10 h-10 flex items-center justify-center rounded-full backdrop-blur-md opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all z-20 font-black shadow-lg border border-white/20"
-                  >
-                    &#10095;
-                  </button>
-
-                  <button 
-                    onClick={() => setIsAutoPlay(!isAutoPlay)} 
-                    className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 text-white px-3 py-1.5 rounded-full backdrop-blur-md z-20 text-xs font-bold flex items-center gap-1.5 transition-colors border border-white/20"
-                  >
-                    {isAutoPlay ? "⏸️ Pause Slide" : "▶️ Play Slide"}
-                  </button>
-
-                  <div className="absolute bottom-4 right-6 flex space-x-1.5 z-20">
-                    {daftarBerita.map((_, idx) => (
-                      <button 
-                        key={idx} 
-                        onClick={() => setCurrentSlide(idx)} 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentSlide ? "bg-yellow-400 w-6" : "bg-white/50 w-2 hover:bg-white"}`}
-                      ></button>
-                    ))}
+                    <span 
+                      className="bg-green-600 text-white text-[10px] md:text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest mb-4 inline-block"
+                    >
+                      Berita Terbaru
+                    </span>
+                    <h3 
+                      className="text-2xl md:text-4xl font-black text-white leading-tight mb-3 drop-shadow-md"
+                    >
+                      {slide.judul}
+                    </h3>
+                    <p 
+                      className="text-gray-300 text-sm md:text-base line-clamp-2 md:line-clamp-3 max-w-3xl drop-shadow-sm"
+                    >
+                      {slide.isi_berita}
+                    </p>
                   </div>
+                </div>
+              ))}
+
+              {isPaused && (
+                <div 
+                  className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 text-white"
+                >
+                  <span 
+                    className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"
+                  ></span> 
+                  Pause Slide
+                </div>
+              )}
+
+              {beritaSlide.length > 1 && (
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 left-4 right-4 z-20 flex justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <button 
+                    onClick={() => setCurrentSlide(currentSlide === 0 ? beritaSlide.length - 1 : currentSlide - 1)}
+                    className="w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                  >
+                    ◀
+                  </button>
+                  <button 
+                    onClick={() => setCurrentSlide((currentSlide + 1) % beritaSlide.length)}
+                    className="w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                  >
+                    ▶
+                  </button>
                 </div>
               )}
             </div>
-
-            <div className="lg:col-span-1 bg-yellow-50 p-6 md:p-8 rounded-3xl border border-yellow-200 shadow-inner flex flex-col h-[400px] md:h-[500px]">
-              <h3 className="text-xl font-black text-yellow-900 mb-6 flex items-center gap-2 border-b border-yellow-300 pb-4">
-                <span className="text-2xl">📅</span> Agenda Terdekat
-              </h3>
-              
-              <div className="flex-1 overflow-y-auto pr-2 space-y-4">
-                {loading ? (
-                  <p className="text-center text-gray-500 font-medium py-10 animate-pulse">Memuat agenda...</p>
-                ) : daftarAgenda.length === 0 ? (
-                  <div className="text-center py-10">
-                    <span className="text-4xl block mb-2 text-yellow-700 opacity-50">🗓️</span>
-                    <p className="text-sm font-medium text-yellow-800">Tidak ada agenda / jadwal kegiatan dalam waktu dekat.</p>
-                  </div>
-                ) : (
-                  daftarAgenda.map((agenda) => {
-                    if (!agenda.tanggal) return null;
-                    const tgl = new Date(agenda.tanggal);
-                    return (
-                      <div key={agenda.id} className="bg-white p-4 rounded-2xl shadow-sm border border-yellow-100 flex gap-4 hover:border-yellow-400 transition-colors group">
-                        <div className="flex-shrink-0 w-14 h-16 bg-yellow-100 rounded-xl flex flex-col items-center justify-center text-yellow-800 border border-yellow-200">
-                          <span className="text-[10px] font-black uppercase">{tgl.toLocaleDateString('id-ID', { month: 'short' })}</span>
-                          <span className="text-xl font-black leading-none my-0.5">{tgl.getDate()}</span>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 group-hover:text-green-700 transition-colors">
-                            {agenda.nama}
-                          </h4>
-                          <div className="text-xs text-gray-500 mt-1.5 flex flex-col gap-0.5 font-medium">
-                            <span className="flex items-center gap-1"><span>🕒</span> {tgl.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })} WIB</span>
-                            <span className="flex items-center gap-1 truncate w-40"><span>📍</span> {agenda.lokasi}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-              <Link href="/kabar?tab=agenda" className="block text-center bg-yellow-200 hover:bg-yellow-300 text-yellow-900 font-bold py-3 mt-4 rounded-xl transition-colors text-sm">
-                Lihat Kalender Lengkap
+            
+            <div 
+              className="md:hidden mt-6 text-center"
+            >
+              <Link 
+                href="/kabar" 
+                className="inline-block bg-gray-800 text-white font-bold py-3 px-8 rounded-xl"
+              >
+                Lihat Semua Berita
               </Link>
             </div>
           </div>
+        </section>
+      )}
 
-          <div className="mt-8 text-center md:hidden">
-            <Link href="/kabar" className="inline-flex items-center gap-2 font-bold text-green-700 bg-green-50 px-6 py-3 rounded-full transition-colors border border-green-200">
-              Lihat Semua Informasi
-            </Link>
-          </div>
+      {/* ==========================================
+          5. GOOGLE MAPS EMBED
+      ========================================== */}
+      <section 
+        className="w-full h-96 md:h-[500px] bg-gray-200 relative"
+      >
+        <div 
+          className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-gray-900/50 to-transparent z-10 pointer-events-none flex justify-center"
+        >
+          <span 
+            className="bg-white text-gray-900 font-black px-6 py-2 rounded-full shadow-lg text-sm flex items-center gap-2"
+          >
+            <span 
+              className="text-red-500"
+            >
+              📍
+            </span> 
+            Peta Lokasi Desa Kerjo
+          </span>
         </div>
+        <iframe 
+          src={petaEmbedUrl} 
+          width="100%" 
+          height="100%" 
+          style={{ border: 0 }} 
+          allowFullScreen={false} 
+          loading="lazy" 
+          referrerPolicy="no-referrer-when-downgrade"
+          className="w-full h-full"
+        ></iframe>
       </section>
-    </main>
+
+    </div>
   );
 }

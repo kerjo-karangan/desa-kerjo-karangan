@@ -116,7 +116,7 @@ export default function Navbar() {
             href="/" 
             className={`${getActiveStyle("/")}`}
           >
-            Beranda
+            Beranda Utama
           </Link>
 
           {/* Menu Profil & Lembaga */}
@@ -164,12 +164,74 @@ export default function Navbar() {
             </div>
           </div>
 
-          <Link 
-            href="/datadesa" 
-            className={`${getActiveStyle("/datadesa")}`}
+          {/* Menu Data Penduduk / Desa */}
+          <div 
+            className="relative group"
           >
-            Data Desa
-          </Link>
+            <Link 
+              href="/datadesa" 
+              className={`flex items-center gap-1.5 py-2 ${getActiveStyle("/datadesa")}`}
+            >
+              Data Penduduk / Desa
+              <span 
+                className="text-[10px] transform transition-transform duration-300 group-hover:rotate-180"
+              >
+                ▼
+              </span>
+            </Link>
+            <div 
+              className="absolute top-full left-0 mt-0 w-64 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col overflow-hidden transform origin-top scale-95 group-hover:scale-100"
+            >
+              <Link 
+                href="/datadesa?tab=wilayah" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Wilayah Administratif
+              </Link>
+              <Link 
+                href="/datadesa?tab=pendidikan" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Pendidikan
+              </Link>
+              <Link 
+                href="/datadesa?tab=pekerjaan" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Pekerjaan
+              </Link>
+              <Link 
+                href="/datadesa?tab=agama" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Agama
+              </Link>
+              <Link 
+                href="/datadesa?tab=gender" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Jenis Kelamin
+              </Link>
+              <Link 
+                href="/datadesa?tab=umur" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Kelompok Umur
+              </Link>
+              <Link 
+                href="/datadesa?tab=warga" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Warga Negara
+              </Link>
+              <Link 
+                href="/datadesa?tab=kawin" 
+                className={`px-5 py-3.5 text-sm font-bold text-gray-600 transition-colors ${getDropdownHoverStyle("/datadesa")}`}
+              >
+                Data Status Perkawinan
+              </Link>
+            </div>
+          </div>
 
           {/* Menu Kabar Desa */}
           <div 
@@ -204,7 +266,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Menu Transparansi (Diperbaiki: 2 Tab Saja) */}
+          {/* Menu Transparansi */}
           <div 
             className="relative group"
           >
@@ -226,18 +288,18 @@ export default function Navbar() {
                 href="/transparansi?tab=apbdes" 
                 className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/transparansi")}`}
               >
-                Info Grafis APBDes
+                Info APBdes
               </Link>
               <Link 
                 href="/transparansi?tab=regulasi" 
                 className={`px-5 py-3.5 text-sm font-bold text-gray-600 transition-colors ${getDropdownHoverStyle("/transparansi")}`}
               >
-                Regulasi & Peraturan
+                Regulasi & Perdes
               </Link>
             </div>
           </div>
 
-          {/* Menu Layanan (Diperbaiki: Animasi Dropdown dengan 3 Tab) */}
+          {/* Menu Layanan Warga */}
           <div 
             className="relative group"
           >
@@ -245,7 +307,7 @@ export default function Navbar() {
               href="/layanan" 
               className={`flex items-center gap-1.5 py-2 ${getActiveStyle("/layanan")}`}
             >
-              Layanan Surat
+              Layanan Warga
               <span 
                 className="text-[10px] transform transition-transform duration-300 group-hover:rotate-180"
               >
@@ -374,17 +436,91 @@ export default function Navbar() {
               )}
             </div>
 
-            <Link 
-              href="/datadesa" 
-              onClick={() => setIsMobileMenuOpen(false)}
-              className={`p-4 rounded-xl ${
-                pathname === "/datadesa" 
-                ? "bg-yellow-50 text-yellow-700 font-black" 
-                : "text-gray-700 font-bold hover:bg-gray-50"
-              }`}
-            >
-              📊 Data Desa
-            </Link>
+            <div>
+              <button 
+                onClick={() => toggleMobileDropdown("datadesa")}
+                className={`w-full flex items-center justify-between p-4 rounded-xl font-bold ${
+                  pathname === "/datadesa" 
+                  ? "bg-yellow-50 text-yellow-700" 
+                  : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                <div 
+                  className="flex items-center gap-2"
+                >
+                  <span>📊</span> Data Penduduk / Desa
+                </div>
+                <span 
+                  className={`text-[10px] transform transition-transform duration-300 ${
+                    mobileDropdown === "datadesa" ? "rotate-180" : ""
+                  }`}
+                >
+                  ▼
+                </span>
+              </button>
+              {mobileDropdown === "datadesa" && (
+                <div 
+                  className="flex flex-col pl-10 pr-4 py-2 space-y-1 border-l-2 border-yellow-100 ml-6 mt-1"
+                >
+                  <Link 
+                    href="/datadesa?tab=wilayah" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Wilayah Administratif
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=pendidikan" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Pendidikan
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=pekerjaan" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Pekerjaan
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=agama" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Agama
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=gender" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Jenis Kelamin
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=umur" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Kelompok Umur
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=warga" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Warga Negara
+                  </Link>
+                  <Link 
+                    href="/datadesa?tab=kawin" 
+                    onClick={() => setIsMobileMenuOpen(false)} 
+                    className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
+                  >
+                    Data Status Perkawinan
+                  </Link>
+                </div>
+              )}
+            </div>
 
             <div>
               <button 
@@ -461,14 +597,14 @@ export default function Navbar() {
                     onClick={() => setIsMobileMenuOpen(false)} 
                     className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
                   >
-                    Info Grafis APBDes
+                    Info APBdes
                   </Link>
                   <Link 
                     href="/transparansi?tab=regulasi" 
                     onClick={() => setIsMobileMenuOpen(false)} 
                     className="py-2.5 text-sm font-bold text-gray-600 hover:text-yellow-600"
                   >
-                    Regulasi & Peraturan
+                    Regulasi & Perdes
                   </Link>
                 </div>
               )}
@@ -486,7 +622,7 @@ export default function Navbar() {
                 <div 
                   className="flex items-center gap-2"
                 >
-                  <span>💌</span> Layanan Surat
+                  <span>💌</span> Layanan Warga
                 </div>
                 <span 
                   className={`text-[10px] transform transition-transform duration-300 ${

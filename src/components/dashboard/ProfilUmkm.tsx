@@ -1,44 +1,36 @@
 // src/components/dashboard/ProfilUmkm.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { 
+  useEffect, 
+  useState 
+} from "react";
 import { 
   collection, 
-  addDoc, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  query, 
-  orderBy, 
   getDocs, 
-  deleteDoc, 
-  updateDoc 
+  doc, 
+  getDoc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc 
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-
-const DEFAULT_JAM = {
-  Senin: { buka: "08:00", tutup: "16:00", libur: false },
-  Selasa: { buka: "08:00", tutup: "16:00", libur: false },
-  Rabu: { buka: "08:00", tutup: "16:00", libur: false },
-  Kamis: { buka: "08:00", tutup: "16:00", libur: false },
-  Jumat: { buka: "08:00", tutup: "16:00", libur: false },
-  Sabtu: { buka: "08:00", tutup: "16:00", libur: false },
-  Minggu: { buka: "08:00", tutup: "16:00", libur: true },
-};
 
 interface ProfilUmkmProps {
   activeSubMenu?: string;
 }
 
-export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
+export default function ProfilUmkm({ 
+  activeSubMenu 
+}: ProfilUmkmProps) {
   
-  // LOGIKA DEFAULT TAB: Pengaturan Header Berada Paling Atas
   const defaultTab = activeSubMenu === "profil-teks" ? "teks"
                    : activeSubMenu === "profil-sotk" ? "sotk"
                    : activeSubMenu === "profil-lembaga" ? "lembaga"
                    : activeSubMenu === "profil-umkm" ? "umkm"
-                   : "hero"; // Default ke Header
-                   
+                   : "hero";
+
   const [tabAktif, setTabAktif] = useState(defaultTab);
 
   useEffect(() => {
@@ -46,127 +38,133 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     else if (activeSubMenu === "profil-sotk") setTabAktif("sotk");
     else if (activeSubMenu === "profil-lembaga") setTabAktif("lembaga");
     else if (activeSubMenu === "profil-umkm") setTabAktif("umkm");
-    else setTabAktif("hero");
+    else if (activeSubMenu === "profil-hero") setTabAktif("hero");
   }, [activeSubMenu]);
 
-  // STATE HEADER PROFIL
-  const [heroProfilBgLama, setHeroProfilBgLama] = useState("");
-  const [heroProfilBgList, setHeroProfilBgList] = useState<FileList | null>(null);
-  const [statusHero, setStatusHero] = useState("");
-  const [isLoadingHero, setIsLoadingHero] = useState(false);
+  const [statusProses, setStatusProses] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  // STATE SEJARAH & VISI MISI
-  const [sejarahDesa, setSejarahDesa] = useState("");
-  const [visiMisiDesa, setVisiMisiDesa] = useState("");
-  const [statusProfil, setStatusProfil] = useState("");
-  const [isLoadingProfil, setIsLoadingProfil] = useState(false);
-  
-  // STATE SOTK / APARATUR
-  const [namaAparatur, setNamaAparatur] = useState("");
-  const [jabatanAparatur, setJabatanAparatur] = useState("");
-  const [urutanAparatur, setUrutanAparatur] = useState<number>(1);
-  const [jalurAtas, setJalurAtas] = useState("");
-  const [jenisGaris, setJenisGaris] = useState("Instruksi");
-  const [fotoAparatur, setFotoAparatur] = useState<FileList | null>(null);
-  const [daftarAparatur, setDaftarAparatur] = useState<any[]>([]);
-  const [statusAparatur, setStatusAparatur] = useState("");
-  const [isLoadingAparatur, setIsLoadingAparatur] = useState(false);
-  const [editAparaturId, setEditAparaturId] = useState<string | null>(null);
-  const [fotoLamaAparatur, setFotoLamaAparatur] = useState("");
+  // ==========================================
+  // STATE: HERO PROFIL
+  // ==========================================
+  const [heroJudul, setHeroJudul] = useState("");
+  const [heroSub, setHeroSub] = useState("");
+  const [heroBgLama, setHeroBgLama] = useState("");
+  const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
 
-  // STATE LEMBAGA
-  const [namaLembaga, setNamaLembaga] = useState("");
-  const [singkatanLembaga, setSingkatanLembaga] = useState("");
-  const [deskripsiLembaga, setDeskripsiLembaga] = useState("");
-  const [fotoLembaga, setFotoLembaga] = useState<FileList | null>(null);
-  const [daftarLembaga, setDaftarLembaga] = useState<any[]>([]);
-  const [statusLembaga, setStatusLembaga] = useState("");
-  const [isLoadingLembaga, setIsLoadingLembaga] = useState(false);
-  const [editLembagaId, setEditLembagaId] = useState<string | null>(null);
-  const [fotoLamaLembaga, setFotoLamaLembaga] = useState("");
+  // ==========================================
+  // STATE: TEKS SEJARAH & VISI MISI
+  // ==========================================
+  const [teksProfil, setTeksProfil] = useState({
+    sejarah: "",
+    visi: "",
+    misi: ""
+  });
 
-  const [selectedLembaga, setSelectedLembaga] = useState<any>(null);
-  const [namaAnggotaLem, setNamaAnggotaLem] = useState("");
-  const [jabatanAnggotaLem, setJabatanAnggotaLem] = useState("");
-  const [urutanAnggotaLem, setUrutanAnggotaLem] = useState<number>(1);
-  const [jalurAtasAnggotaLem, setJalurAtasAnggotaLem] = useState("");
-  const [jenisGarisAnggotaLem, setJenisGarisAnggotaLem] = useState("Instruksi");
-  const [fotoAnggotaLem, setFotoAnggotaLem] = useState<FileList | null>(null);
-  const [editAnggotaLemId, setEditAnggotaLemId] = useState<string | null>(null);
-  const [fotoLamaAnggotaLem, setFotoLamaAnggotaLem] = useState("");
+  // ==========================================
+  // STATE: DATA LIST (SOTK, LEMBAGA, UMKM)
+  // ==========================================
+  const [dataSotk, setDataSotk] = useState<any[]>([]);
+  const [dataLembaga, setDataLembaga] = useState<any[]>([]);
+  const [dataUmkm, setDataUmkm] = useState<any[]>([]);
 
-  // STATE UMKM
-  const [kategoriPotensi, setKategoriPotensi] = useState("UMKM");
-  const [namaPotensi, setNamaPotensi] = useState("");
-  const [pengelola, setPengelola] = useState("");
-  const [hargaMulai, setHargaMulai] = useState<number | string>("");
-  const [hargaSampai, setHargaSampai] = useState<number | string>("");
-  const [kontak, setKontak] = useState("");
-  const [linkMaps, setLinkMaps] = useState("");
-  const [deskripsiPotensi, setDeskripsiPotensi] = useState("");
-  const [jamOperasional, setJamOperasional] = useState<any>(DEFAULT_JAM);
-  const [fotoPotensiList, setFotoPotensiList] = useState<FileList | null>(null);
-  const [gambarLamaPotensi, setGambarLamaPotensi] = useState<string[]>([]);
-  const [daftarUmkm, setDaftarUmkm] = useState<any[]>([]);
-  const [statusUmkm, setStatusUmkm] = useState("");
-  const [isLoadingUmkm, setIsLoadingUmkm] = useState(false);
-  const [editUmkmId, setEditUmkmId] = useState<string | null>(null);
+  // ==========================================
+  // STATE MODAL: SOTK
+  // ==========================================
+  const [isModalSotkOpen, setIsModalSotkOpen] = useState(false);
+  const [editIdSotk, setEditIdSotk] = useState<string | null>(null);
+  const [formSotk, setFormSotk] = useState({
+    nama: "",
+    jabatan: "",
+    keterangan: ""
+  });
+  const [fotoSotk, setFotoSotk] = useState<FileList | null>(null);
+  const [fotoSotkLama, setFotoSotkLama] = useState("");
 
+  // ==========================================
+  // STATE MODAL: LEMBAGA
+  // ==========================================
+  const [isModalLembagaOpen, setIsModalLembagaOpen] = useState(false);
+  const [editIdLembaga, setEditIdLembaga] = useState<string | null>(null);
+  const [formLembaga, setFormLembaga] = useState({
+    nama_lembaga: "",
+    ketua: "",
+    deskripsi: ""
+  });
+  const [logoLembaga, setLogoLembaga] = useState<FileList | null>(null);
+  const [logoLembagaLama, setLogoLembagaLama] = useState("");
+
+  // ==========================================
+  // STATE MODAL: UMKM
+  // ==========================================
+  const [isModalUmkmOpen, setIsModalUmkmOpen] = useState(false);
+  const [editIdUmkm, setEditIdUmkm] = useState<string | null>(null);
+  const [formUmkm, setFormUmkm] = useState({
+    nama_toko: "",
+    pemilik: "",
+    kategori: "",
+    deskripsi_produk: "",
+    alamat: "",
+    jam_operasional: "",
+    no_wa: ""
+  });
+  const [fotoUmkm, setFotoUmkm] = useState<FileList | null>(null);
+  const [fotoUmkmLama, setFotoUmkmLama] = useState("");
+
+  // ==========================================
+  // FUNGSI FETCH DATA
+  // ==========================================
   const ambilData = async () => {
     try {
       const snapHero = await getDoc(doc(db, "pengaturan_web", "profil_hero"));
-      if (snapHero.exists()) {
-        setHeroProfilBgLama(snapHero.data().bg || "");
+      if (snapHero.exists() && snapHero.data()) {
+        setHeroJudul(snapHero.data().judul || "");
+        setHeroSub(snapHero.data().sub || "");
+        setHeroBgLama(snapHero.data().bg || "");
       }
 
-      const snapProfil = await getDoc(doc(db, "profil_desa", "utama"));
-      if (snapProfil.exists()) {
-        setSejarahDesa(snapProfil.data().sejarah || "");
-        setVisiMisiDesa(snapProfil.data().visi_misi || "");
+      const snapTeks = await getDoc(doc(db, "pengaturan_web", "profil_teks"));
+      if (snapTeks.exists() && snapTeks.data()) {
+        setTeksProfil({
+          sejarah: snapTeks.data().sejarah || "",
+          visi: snapTeks.data().visi || "",
+          misi: snapTeks.data().misi || ""
+        });
       }
 
-      const qAparatur = query(collection(db, "aparatur_desa"), orderBy("urutan", "asc"));
-      setDaftarAparatur((await getDocs(qAparatur)).docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      
-      const qLembaga = await getDocs(collection(db, "lembaga_desa"));
-      const dataLemb = qLembaga.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setDaftarLembaga(dataLemb);
+      const snapSotk = await getDocs(collection(db, "profil_sotk"));
+      setDataSotk(snapSotk.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      if (selectedLembaga) {
-        const upToDateLembaga = dataLemb.find(l => l.id === selectedLembaga.id);
-        if (upToDateLembaga) {
-          setSelectedLembaga(upToDateLembaga);
-        }
-      }
+      const snapLembaga = await getDocs(collection(db, "profil_lembaga"));
+      setDataLembaga(snapLembaga.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      const qUmkm = query(collection(db, "potensi_desa"), orderBy("tanggal_input", "desc"));
-      setDaftarUmkm((await getDocs(qUmkm)).docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (error) { 
-      console.error("Gagal mengambil data", error); 
+      const snapUmkm = await getDocs(collection(db, "katalog_umkm"));
+      setDataUmkm(snapUmkm.docs.map(d => ({ id: d.id, ...d.data() })));
+
+    } catch (error) {
+      console.error("Gagal ambil data:", error);
     }
   };
 
-  useEffect(() => { 
-    ambilData(); 
+  useEffect(() => {
+    ambilData();
   }, []);
 
+  // ==========================================
+  // CLOUDINARY UPLOADER
+  // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const formData = new FormData();
       formData.append("file", file);
-
-      const res = await fetch("/api/cloudinary", {
-        method: "POST",
-        body: formData,
+      const res = await fetch("/api/cloudinary", { 
+        method: "POST", 
+        body: formData 
       });
-      
       const data = await res.json();
-      if (data.success) {
-        return data.url;
-      }
+      if (data.success) return data.url;
       throw new Error(data.error);
     } catch (error) {
-      console.error("Upload error:", error);
       return null;
     }
   };
@@ -179,1686 +177,1232 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-    } catch (error) {
-      console.error("Delete error:", error);
-    }
+    } catch (error) {}
   };
 
   // ==========================================
-  // MANAJEMEN HEADER PROFIL
+  // HANDLERS (HERO & TEKS)
   // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingHero(true); 
-    setStatusHero("Menyimpan Header...");
-    
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Menyimpan Header Profil...");
+
     try {
-      let imageUrl = heroProfilBgLama;
-      
-      if (heroProfilBgList && heroProfilBgList.length > 0) {
-        setStatusHero("Mengunggah Background ke Cloudinary...");
-        const newBg = await uploadFotoKeCloudinary(heroProfilBgList[0]);
+      let imageUrl = heroBgLama;
+      if (heroBgList && heroBgList.length > 0) {
+        setStatusProses("Mengunggah Background...");
+        const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
         if (newBg) {
-          if (heroProfilBgLama) {
-            await hapusFotoDiCloudinary(heroProfilBgLama);
-          }
+          if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
           imageUrl = newBg;
         }
       }
-      
-      await setDoc(doc(db, "pengaturan_web", "profil_hero"), { 
-        bg: imageUrl, 
-        terakhir_diperbarui: new Date().toISOString() 
+
+      await setDoc(doc(db, "pengaturan_web", "profil_hero"), {
+        judul: heroJudul,
+        sub: heroSub,
+        bg: imageUrl,
+        terakhir_diperbarui: new Date().toISOString()
       });
 
-      setStatusHero("✅ Background Header berhasil diperbarui!"); 
-      setHeroProfilBgLama(imageUrl); 
-      setHeroProfilBgList(null);
-      
-      const input = document.getElementById("inputHeroProfil") as HTMLInputElement;
-      if (input) input.value = "";
-      
-      setTimeout(() => setStatusHero(""), 4000);
-    } catch (error) { 
-      setStatusHero("❌ Gagal menyimpan header."); 
-    } finally { 
-      setIsLoadingHero(false); 
-    }
-  };
-
-  const handleHapusBackgroundHero = async () => {
-    if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
-    setIsLoadingHero(true);
-    setStatusHero("Menghapus gambar dari server...");
-    
-    try {
-      if (heroProfilBgLama) {
-        await hapusFotoDiCloudinary(heroProfilBgLama);
-      }
-      
-      await setDoc(doc(db, "pengaturan_web", "profil_hero"), { 
-        bg: "", 
-        terakhir_diperbarui: new Date().toISOString() 
-      });
-      
-      setHeroProfilBgLama("");
-      setStatusHero("✅ Background dihapus.");
-      setTimeout(() => setStatusHero(""), 4000);
+      setHeroBgLama(imageUrl);
+      setHeroBgList(null);
+      setStatusProses("✅ Header Profil berhasil diperbarui!");
+      setTimeout(() => setStatusProses(""), 4000);
     } catch (error) {
-      setStatusHero("❌ Gagal menghapus background.");
+      setStatusProses("❌ Gagal menyimpan header.");
     } finally {
-      setIsLoadingHero(false);
+      setIsLoading(false);
     }
   };
 
-  // ==========================================
-  // MANAJEMEN TEKS SEJARAH & VISI MISI
-  // ==========================================
-  const handleSimpanProfil = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingProfil(true); 
-    setStatusProfil("Menyimpan...");
+  const handleSimpanTeks = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Menyimpan Teks Sejarah & Visi Misi...");
+
     try {
-      await setDoc(doc(db, "profil_desa", "utama"), { 
-        sejarah: sejarahDesa, 
-        visi_misi: visiMisiDesa, 
-        terakhir_diperbarui: new Date().toISOString() 
+      await setDoc(doc(db, "pengaturan_web", "profil_teks"), {
+        ...teksProfil,
+        terakhir_diperbarui: new Date().toISOString()
       });
-      setStatusProfil("✅ Profil Teks berhasil diperbarui!"); 
-      setTimeout(() => setStatusProfil(""), 4000);
-    } catch (error) { 
-      setStatusProfil("❌ Gagal menyimpan profil."); 
-    } finally { 
-      setIsLoadingProfil(false); 
+      setStatusProses("✅ Teks berhasil diperbarui!");
+      setTimeout(() => setStatusProses(""), 4000);
+    } catch (error) {
+      setStatusProses("❌ Gagal menyimpan teks.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // ==========================================
-  // MANAJEMEN SOTK APARATUR
+  // HANDLERS MODAL SOTK
   // ==========================================
-  const handleSimpanAparatur = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingAparatur(true); 
-    setStatusAparatur("Memproses...");
-    
-    try {
-      let imageUrl = fotoLamaAparatur;
-      
-      if (fotoAparatur && fotoAparatur.length > 0) { 
-        setStatusAparatur("Upload foto wajah..."); 
-        const uploadedUrl = await uploadFotoKeCloudinary(fotoAparatur[0]);
-        if (uploadedUrl) {
-          if (fotoLamaAparatur) {
-            await hapusFotoDiCloudinary(fotoLamaAparatur);
-          }
-          imageUrl = uploadedUrl;
-        }
-      }
-      
-      const dataAparatur = { 
-        nama: namaAparatur, 
-        jabatan: jabatanAparatur, 
-        urutan: Number(urutanAparatur), 
-        jalurAtas, 
-        jenisGaris, 
-        foto: imageUrl 
-      };
-      
-      if (editAparaturId) { 
-        await updateDoc(doc(db, "aparatur_desa", editAparaturId), dataAparatur); 
-        setStatusAparatur("✅ Perangkat Desa diperbarui!");
-      } else { 
-        await addDoc(collection(db, "aparatur_desa"), dataAparatur); 
-        setStatusAparatur("✅ Perangkat Desa ditambahkan!"); 
-      }
-      
-      batalEditAparatur(); 
-      ambilData(); 
-      setTimeout(() => setStatusAparatur(""), 4000);
-    } catch (error) { 
-      setStatusAparatur("❌ Gagal memproses data SOTK."); 
-    } finally { 
-      setIsLoadingAparatur(false); 
+  const bukaModalSotk = (item: any = null) => {
+    if (item) {
+      setEditIdSotk(item.id);
+      setFormSotk({ nama: item.nama, jabatan: item.jabatan, keterangan: item.keterangan || "" });
+      setFotoSotkLama(item.foto || "");
+    } else {
+      setEditIdSotk(null);
+      setFormSotk({ nama: "", jabatan: "", keterangan: "" });
+      setFotoSotkLama("");
     }
+    setFotoSotk(null);
+    setIsModalSotkOpen(true);
   };
 
-  const mulaiEditAparatur = (item: any) => {
-    setEditAparaturId(item.id); 
-    setNamaAparatur(item.nama); 
-    setJabatanAparatur(item.jabatan); 
-    setUrutanAparatur(item.urutan); 
-    setJalurAtas(item.jalurAtas || ""); 
-    setJenisGaris(item.jenisGaris || "Instruksi"); 
-    setFotoLamaAparatur(item.foto || ""); 
-    setFotoAparatur(null);
-  };
-
-  const batalEditAparatur = () => { 
-    setEditAparaturId(null); 
-    setNamaAparatur(""); 
-    setJabatanAparatur(""); 
-    setUrutanAparatur(daftarAparatur.length + 2); 
-    setJalurAtas(""); 
-    setJenisGaris("Instruksi"); 
-    setFotoLamaAparatur(""); 
-    setFotoAparatur(null);
-  };
-
-  const hapusAparatur = async (org: any) => { 
-    if (confirm("Yakin menghapus anggota aparatur ini? Foto akan dihapus dari server.")) { 
-      if (org.foto) {
-        await hapusFotoDiCloudinary(org.foto);
-      }
-      await deleteDoc(doc(db, "aparatur_desa", org.id)); 
-      ambilData(); 
-    } 
-  };
-
-  const daftarAtasan = daftarAparatur.filter((org) => org.id !== editAparaturId && org.urutan < urutanAparatur);
-
-  // ==========================================
-  // MANAJEMEN LEMBAGA & SOTK LEMBAGA
-  // ==========================================
-  const handleSimpanLembagaUtama = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingLembaga(true); 
-    setStatusLembaga("Memproses...");
-    
+  const simpanSotk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Menyimpan Data Aparatur...");
     try {
-      let imageUrl = fotoLamaLembaga;
-      
-      if (fotoLembaga && fotoLembaga.length > 0) { 
-        setStatusLembaga("Upload logo lembaga..."); 
-        const uploadedUrl = await uploadFotoKeCloudinary(fotoLembaga[0]);
-        if (uploadedUrl) {
-          if (fotoLamaLembaga) {
-            await hapusFotoDiCloudinary(fotoLamaLembaga);
-          }
-          imageUrl = uploadedUrl;
+      let imageUrl = fotoSotkLama;
+      if (fotoSotk && fotoSotk.length > 0) {
+        const newImg = await uploadFotoKeCloudinary(fotoSotk[0]);
+        if (newImg) {
+          if (fotoSotkLama) await hapusFotoDiCloudinary(fotoSotkLama);
+          imageUrl = newImg;
         }
       }
-      
-      const dataLembaga = { 
-        nama: namaLembaga, 
-        singkatan: singkatanLembaga, 
-        deskripsi: deskripsiLembaga, 
-        foto: imageUrl 
-      };
-      
-      if (editLembagaId) { 
-        await updateDoc(doc(db, "lembaga_desa", editLembagaId), dataLembaga); 
-        setStatusLembaga("✅ Lembaga diperbarui!");
-      } else { 
-        await addDoc(collection(db, "lembaga_desa"), { 
-          ...dataLembaga, 
-          anggota_sotk: [] 
-        }); 
-        setStatusLembaga("✅ Lembaga ditambahkan!"); 
-      }
-      
-      batalEditLembagaUtama(); 
-      ambilData(); 
-      setTimeout(() => setStatusLembaga(""), 4000);
-    } catch (error) { 
-      setStatusLembaga("❌ Gagal menyimpan Lembaga."); 
-    } finally { 
-      setIsLoadingLembaga(false); 
-    }
-  };
 
-  const mulaiEditLembagaUtama = (item: any) => { 
-    setEditLembagaId(item.id); 
-    setNamaLembaga(item.nama); 
-    setSingkatanLembaga(item.singkatan); 
-    setDeskripsiLembaga(item.deskripsi); 
-    setFotoLamaLembaga(item.foto || ""); 
-    setFotoLembaga(null); 
-  };
+      const payload = { ...formSotk, foto: imageUrl };
 
-  const batalEditLembagaUtama = () => { 
-    setEditLembagaId(null); 
-    setNamaLembaga(""); 
-    setSingkatanLembaga(""); 
-    setDeskripsiLembaga(""); 
-    setFotoLamaLembaga(""); 
-    setFotoLembaga(null); 
-  };
-
-  const hapusLembagaUtama = async (lem: any) => { 
-    if (confirm("Yakin menghapus lembaga ini? Semua pengurus dan foto akan dihapus permanen.")) { 
-      if (lem.foto) {
-        await hapusFotoDiCloudinary(lem.foto);
-      }
-      if (lem.anggota_sotk && lem.anggota_sotk.length > 0) {
-        for (const anggota of lem.anggota_sotk) {
-          if (anggota.foto) {
-            await hapusFotoDiCloudinary(anggota.foto);
-          }
-        }
-      }
-      await deleteDoc(doc(db, "lembaga_desa", lem.id)); 
-      ambilData(); 
-    } 
-  };
-
-  const masukModeKeanggotaan = (lembaga: any) => { 
-    setSelectedLembaga(lembaga); 
-    batalEditAnggotaLem(); 
-  };
-  
-  const keluarModeKeanggotaan = () => { 
-    setSelectedLembaga(null); 
-    batalEditAnggotaLem(); 
-  };
-  
-  const handleSimpanAnggotaLem = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingLembaga(true); 
-    setStatusLembaga("Menyimpan Anggota...");
-    
-    try {
-      let imageUrl = fotoLamaAnggotaLem;
-      
-      if (fotoAnggotaLem && fotoAnggotaLem.length > 0) { 
-        const uploadedUrl = await uploadFotoKeCloudinary(fotoAnggotaLem[0]);
-        if (uploadedUrl) {
-          if (fotoLamaAnggotaLem) {
-            await hapusFotoDiCloudinary(fotoLamaAnggotaLem);
-          }
-          imageUrl = uploadedUrl;
-        }
-      }
-      
-      let anggotaSOTKSekarang = selectedLembaga.anggota_sotk || [];
-      
-      const newAnggota = {
-        id: editAnggotaLemId || Date.now().toString(),
-        nama: namaAnggotaLem, 
-        jabatan: jabatanAnggotaLem, 
-        urutan: Number(urutanAnggotaLem), 
-        jalurAtas: jalurAtasAnggotaLem, 
-        jenisGaris: jenisGarisAnggotaLem, 
-        foto: imageUrl
-      };
-
-      if (editAnggotaLemId) {
-        anggotaSOTKSekarang = anggotaSOTKSekarang.map((a:any) => 
-          a.id === editAnggotaLemId ? newAnggota : a
-        );
+      if (editIdSotk) {
+        await updateDoc(doc(db, "profil_sotk", editIdSotk), payload);
       } else {
-        anggotaSOTKSekarang.push(newAnggota);
+        await addDoc(collection(db, "profil_sotk"), payload);
       }
-      
-      await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
-        anggota_sotk: anggotaSOTKSekarang 
-      });
-      
-      setStatusLembaga("✅ SOTK Lembaga diperbarui!");
-      batalEditAnggotaLem(); 
-      ambilData(); 
-      setTimeout(() => setStatusLembaga(""), 4000);
-    } catch (error) { 
-      setStatusLembaga("❌ Gagal menyimpan anggota."); 
-    } finally { 
-      setIsLoadingLembaga(false); 
+
+      setIsModalSotkOpen(false);
+      ambilData();
+      setStatusProses("");
+    } catch (error) {
+      setStatusProses("❌ Gagal menyimpan SOTK.");
+    } finally {
+      setIsLoading(false);
     }
   };
-  
-  const mulaiEditAnggotaLem = (anggota: any) => {
-    setEditAnggotaLemId(anggota.id); 
-    setNamaAnggotaLem(anggota.nama); 
-    setJabatanAnggotaLem(anggota.jabatan); 
-    setUrutanAnggotaLem(anggota.urutan); 
-    setJalurAtasAnggotaLem(anggota.jalurAtas || ""); 
-    setJenisGarisAnggotaLem(anggota.jenisGaris || "Instruksi"); 
-    setFotoLamaAnggotaLem(anggota.foto || ""); 
-    setFotoAnggotaLem(null);
-  };
 
-  const batalEditAnggotaLem = () => {
-    setEditAnggotaLemId(null); 
-    setNamaAnggotaLem(""); 
-    setJabatanAnggotaLem(""); 
-    setUrutanAnggotaLem(selectedLembaga?.anggota_sotk?.length ? selectedLembaga.anggota_sotk.length + 1 : 1); 
-    setJalurAtasAnggotaLem(""); 
-    setJenisGarisAnggotaLem("Instruksi"); 
-    setFotoLamaAnggotaLem(""); 
-    setFotoAnggotaLem(null);
-  };
-
-  const hapusAnggotaLem = async (id: string) => {
-    if (!confirm("Yakin hapus anggota ini? Foto akan dihapus permanen.")) return;
-    
-    const anggotaTarget = selectedLembaga.anggota_sotk.find((a:any) => a.id === id);
-    if (anggotaTarget && anggotaTarget.foto) {
-      await hapusFotoDiCloudinary(anggotaTarget.foto);
+  const hapusSotk = async (id: string, urlFoto: string) => {
+    if (confirm("Hapus Aparatur ini?")) {
+      if (urlFoto) await hapusFotoDiCloudinary(urlFoto);
+      await deleteDoc(doc(db, "profil_sotk", id));
+      ambilData();
     }
-
-    const anggotaSOTKSekarang = selectedLembaga.anggota_sotk.filter((a:any) => a.id !== id);
-    
-    await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
-      anggota_sotk: anggotaSOTKSekarang 
-    });
-    
-    ambilData();
   };
 
-  const daftarAtasanLem = (selectedLembaga?.anggota_sotk || []).filter((org:any) => 
-    org.id !== editAnggotaLemId && org.urutan < urutanAnggotaLem
-  );
-
   // ==========================================
-  // MANAJEMEN UMKM & WISATA
+  // HANDLERS MODAL LEMBAGA
   // ==========================================
-  const handleJamChange = (hari: string, field: string, value: any) => { 
-    setJamOperasional((prev: any) => ({ 
-      ...prev, 
-      [hari]: { 
-        ...prev[hari], 
-        [field]: value 
-      } 
-    })); 
+  const bukaModalLembaga = (item: any = null) => {
+    if (item) {
+      setEditIdLembaga(item.id);
+      setFormLembaga({ nama_lembaga: item.nama_lembaga, ketua: item.ketua, deskripsi: item.deskripsi || "" });
+      setLogoLembagaLama(item.logo || "");
+    } else {
+      setEditIdLembaga(null);
+      setFormLembaga({ nama_lembaga: "", ketua: "", deskripsi: "" });
+      setLogoLembagaLama("");
+    }
+    setLogoLembaga(null);
+    setIsModalLembagaOpen(true);
   };
-  
-  const handleSimpanUmkm = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingUmkm(true); 
-    setStatusUmkm("Memproses...");
-    
+
+  const simpanLembaga = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Menyimpan Data Lembaga...");
     try {
-      let tautanGambarBaru: string[] = [];
-      
-      if (fotoPotensiList && fotoPotensiList.length > 0) {
-        setStatusUmkm(`Mengunggah foto...`);
-        const uploadPromises = Array.from(fotoPotensiList).map((file) => uploadFotoKeCloudinary(file));
-        const hasilUpload = await Promise.all(uploadPromises);
-        tautanGambarBaru = hasilUpload.filter((url) => url !== null) as string[];
-      }
-      
-      const gambarFinal = [...gambarLamaPotensi, ...tautanGambarBaru];
-      
-      const dataUmkm = { 
-        kategori: kategoriPotensi, 
-        nama_produk: namaPotensi, 
-        pemilik: pengelola, 
-        harga_mulai: Number(hargaMulai), 
-        harga_sampai: Number(hargaSampai), 
-        wa: kontak, 
-        link_maps: linkMaps, 
-        deskripsi: deskripsiPotensi, 
-        jam_operasional: jamOperasional, 
-        gambar: gambarFinal, 
-        tanggal_input: new Date().toISOString() 
-      };
-
-      if (editUmkmId) { 
-        await updateDoc(doc(db, "potensi_desa", editUmkmId), dataUmkm); 
-        setStatusUmkm(`✅ ${kategoriPotensi} diperbarui!`);
-      } else { 
-        await addDoc(collection(db, "potensi_desa"), dataUmkm); 
-        setStatusUmkm(`✅ ${kategoriPotensi} ditambahkan!`); 
-      }
-      
-      batalEditUmkm(); 
-      ambilData(); 
-      setTimeout(() => setStatusUmkm(""), 4000);
-    } catch (error) { 
-      setStatusUmkm("❌ Gagal menyimpan data."); 
-    } finally { 
-      setIsLoadingUmkm(false); 
-    }
-  };
-  
-  const mulaiEditUmkm = (item: any) => { 
-    setEditUmkmId(item.id); 
-    setKategoriPotensi(item.kategori || "UMKM"); 
-    setNamaPotensi(item.nama_produk || ""); 
-    setPengelola(item.pemilik || ""); 
-    setHargaMulai(item.harga_mulai || item.harga || ""); 
-    setHargaSampai(item.harga_sampai || ""); 
-    setKontak(item.wa || ""); 
-    setLinkMaps(item.link_maps || ""); 
-    setDeskripsiPotensi(item.deskripsi || ""); 
-    setJamOperasional(item.jam_operasional || DEFAULT_JAM);
-    setGambarLamaPotensi(Array.isArray(item.gambar) ? item.gambar : (item.foto ? [item.foto] : [])); 
-    setFotoPotensiList(null);
-  };
-  
-  const hapusGambarLamaPotensi = async (index: number) => { 
-    if (!confirm("Yakin hapus foto ini dari Cloudinary?")) return;
-    
-    const urlTarget = gambarLamaPotensi[index];
-    await hapusFotoDiCloudinary(urlTarget);
-
-    const sisaGambar = gambarLamaPotensi.filter((_, i) => i !== index);
-    setGambarLamaPotensi(sisaGambar);
-
-    if (editUmkmId) {
-      await updateDoc(doc(db, "potensi_desa", editUmkmId), { 
-        gambar: sisaGambar 
-      });
-    }
-  };
-  
-  const batalEditUmkm = () => { 
-    setEditUmkmId(null); 
-    setKategoriPotensi("UMKM"); 
-    setNamaPotensi(""); 
-    setPengelola(""); 
-    setHargaMulai(""); 
-    setHargaSampai(""); 
-    setKontak(""); 
-    setLinkMaps(""); 
-    setDeskripsiPotensi(""); 
-    setJamOperasional(DEFAULT_JAM); 
-    setGambarLamaPotensi([]); 
-    setFotoPotensiList(null); 
-    
-    const input = document.getElementById('inputFotoPotensi') as HTMLInputElement; 
-    if(input) {
-      input.value = ''; 
-    }
-  };
-  
-  const hapusUmkm = async (umkm: any) => { 
-    if (confirm("Yakin menghapus data Potensi ini secara permanen?")) { 
-      if (umkm.gambar && umkm.gambar.length > 0) {
-        for (const url of umkm.gambar) {
-          await hapusFotoDiCloudinary(url);
+      let imageUrl = logoLembagaLama;
+      if (logoLembaga && logoLembaga.length > 0) {
+        const newImg = await uploadFotoKeCloudinary(logoLembaga[0]);
+        if (newImg) {
+          if (logoLembagaLama) await hapusFotoDiCloudinary(logoLembagaLama);
+          imageUrl = newImg;
         }
-      } else if (umkm.foto) {
-        await hapusFotoDiCloudinary(umkm.foto);
       }
-      
-      await deleteDoc(doc(db, "potensi_desa", umkm.id)); 
-      ambilData(); 
-    } 
+
+      const payload = { ...formLembaga, logo: imageUrl };
+
+      if (editIdLembaga) {
+        await updateDoc(doc(db, "profil_lembaga", editIdLembaga), payload);
+      } else {
+        await addDoc(collection(db, "profil_lembaga"), payload);
+      }
+
+      setIsModalLembagaOpen(false);
+      ambilData();
+      setStatusProses("");
+    } catch (error) {
+      setStatusProses("❌ Gagal menyimpan Lembaga.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const hapusLembaga = async (id: string, urlLogo: string) => {
+    if (confirm("Hapus Lembaga ini?")) {
+      if (urlLogo) await hapusFotoDiCloudinary(urlLogo);
+      await deleteDoc(doc(db, "profil_lembaga", id));
+      ambilData();
+    }
+  };
+
+  // ==========================================
+  // HANDLERS MODAL UMKM
+  // ==========================================
+  const bukaModalUmkm = (item: any = null) => {
+    if (item) {
+      setEditIdUmkm(item.id);
+      setFormUmkm({ 
+        nama_toko: item.nama_toko, 
+        pemilik: item.pemilik, 
+        kategori: item.kategori,
+        deskripsi_produk: item.deskripsi_produk,
+        alamat: item.alamat,
+        jam_operasional: item.jam_operasional || "",
+        no_wa: item.no_wa
+      });
+      setFotoUmkmLama(item.foto_produk || "");
+    } else {
+      setEditIdUmkm(null);
+      setFormUmkm({ 
+        nama_toko: "", pemilik: "", kategori: "", deskripsi_produk: "", alamat: "", jam_operasional: "", no_wa: "" 
+      });
+      setFotoUmkmLama("");
+    }
+    setFotoUmkm(null);
+    setIsModalUmkmOpen(true);
+  };
+
+  const simpanUmkm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setStatusProses("Menyimpan Katalog UMKM...");
+    try {
+      let imageUrl = fotoUmkmLama;
+      if (fotoUmkm && fotoUmkm.length > 0) {
+        const newImg = await uploadFotoKeCloudinary(fotoUmkm[0]);
+        if (newImg) {
+          if (fotoUmkmLama) await hapusFotoDiCloudinary(fotoUmkmLama);
+          imageUrl = newImg;
+        }
+      }
+
+      const payload = { ...formUmkm, foto_produk: imageUrl };
+
+      if (editIdUmkm) {
+        await updateDoc(doc(db, "katalog_umkm", editIdUmkm), payload);
+      } else {
+        await addDoc(collection(db, "katalog_umkm"), payload);
+      }
+
+      setIsModalUmkmOpen(false);
+      ambilData();
+      setStatusProses("");
+    } catch (error) {
+      setStatusProses("❌ Gagal menyimpan UMKM.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const hapusUmkm = async (id: string, urlFoto: string) => {
+    if (confirm("Hapus Katalog UMKM ini?")) {
+      if (urlFoto) await hapusFotoDiCloudinary(urlFoto);
+      await deleteDoc(doc(db, "katalog_umkm", id));
+      ambilData();
+    }
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 font-sans">
+    <div 
+      className="space-y-8 animate-fade-in pb-20 font-sans"
+    >
       
-      {/* MENU NAVIGASI INTERNAL UNTUK MOBILE */}
-      {!activeSubMenu && (
-        <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-          <button 
-            onClick={() => setTabAktif("hero")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "hero" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-xl">🖼️</span> Header Profil
-          </button>
-          <button 
-            onClick={() => setTabAktif("teks")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "teks" ? "bg-green-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-xl">📖</span> Sejarah & Visi
-          </button>
-          <button 
-            onClick={() => setTabAktif("sotk")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "sotk" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-xl">👔</span> Aparatur (SOTK)
-          </button>
-          <button 
-            onClick={() => setTabAktif("lembaga")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "lembaga" ? "bg-indigo-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-xl">🤝</span> Lembaga Desa
-          </button>
-          <button 
-            onClick={() => setTabAktif("umkm")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "umkm" ? "bg-yellow-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
-          >
-            <span className="text-xl">🛍️</span> Katalog UMKM
-          </button>
+      {/* 
+        PERBAIKAN: Tombol Tab ini sekarang SELALU TAMPIL di panel Admin, 
+        sehingga memudahkan navigasi dan tidak membingungkan.
+      */}
+      <div 
+        className="flex flex-wrap gap-2 md:gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
+      >
+        <button 
+          onClick={() => setTabAktif("hero")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "hero" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>🖼️</span> Header Profil
+        </button>
+        <button 
+          onClick={() => setTabAktif("teks")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "teks" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>📖</span> Sejarah & Visi
+        </button>
+        <button 
+          onClick={() => setTabAktif("sotk")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "sotk" ? "bg-purple-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>🏛️</span> Aparatur (SOTK)
+        </button>
+        <button 
+          onClick={() => setTabAktif("lembaga")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "lembaga" ? "bg-green-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>🤝</span> Lembaga Desa
+        </button>
+        <button 
+          onClick={() => setTabAktif("umkm")} 
+          className={`flex-1 min-w-[140px] py-3 px-3 rounded-xl font-bold text-xs md:text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "umkm" ? "bg-red-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span>🛍️</span> Katalog UMKM
+        </button>
+      </div>
+
+      {statusProses && (
+        <div 
+          className={`p-4 rounded-xl text-sm font-bold text-center border shadow-sm ${
+            statusProses.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-blue-50 text-blue-800 border-blue-200"
+          }`}
+        >
+          {statusProses}
         </div>
       )}
 
-      {/* 1. PENGATURAN HEADER PROFIL (DIPINDAH KE PALING ATAS SESUAI SIDEBAR) */}
+      {/* ==========================================
+          TAB 1: HEADER PROFIL (DENGAN EDIT TEKS)
+      ========================================== */}
       {tabAktif === "hero" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 mb-8">
-          <h3 className="text-2xl font-bold mb-2">
-            <span className="mr-2">🖼️</span> 
-            Pengaturan Header Profil Desa (Cloudinary)
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in"
+        >
+          <h3 
+            className="text-2xl font-bold mb-2 flex items-center gap-2"
+          >
+            <span>🖼️</span> Pengaturan Header Profil Desa (Cloudinary)
           </h3>
-          <p className="text-gray-500 text-sm mb-6">
-            Ubah gambar background (Hero) yang akan menjadi wajah utama di halaman Publik Profil.
+          <p 
+            className="text-gray-500 text-sm mb-8"
+          >
+            Sesuaikan teks sambutan dan gambar background di halaman Profil Publik.
           </p>
-          <form onSubmit={handleSimpanHero} className="space-y-6">
-            <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200">
-              <label className="block text-sm font-bold text-yellow-900 border-b border-yellow-200 pb-2 mb-4">
-                Gambar Background
-              </label>
+          
+          <form 
+            onSubmit={handleSimpanHero} 
+            className="space-y-6"
+          >
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
               
-              {heroProfilBgLama && (
-                <div className="relative w-full h-40 md:h-64 rounded-xl overflow-hidden shadow-inner border border-gray-200 group mb-4">
-                  <img 
-                    src={heroProfilBgLama.startsWith("http") ? heroProfilBgLama : `https://wsrv.nl/?url=${heroProfilBgLama}`} 
-                    alt="Background Profil" 
-                    className="w-full h-full object-cover" 
+              <div 
+                className="space-y-6"
+              >
+                <div>
+                  <label 
+                    className="block text-sm font-bold mb-2 text-gray-800"
+                  >
+                    Judul Utama Header
+                  </label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={heroJudul} 
+                    onChange={(e) => setHeroJudul(e.target.value)} 
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg"
+                    placeholder="Contoh: Profil Desa Kerjo"
                   />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                    <button 
-                      type="button" 
-                      onClick={handleHapusBackgroundHero} 
-                      className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
-                    >
-                      Hapus Permanen
-                    </button>
-                  </div>
                 </div>
-              )}
-              
-              <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
-                <span className="text-3xl mb-2">📸</span>
-                <span className="font-bold text-yellow-800 text-sm">
-                  Ganti Gambar Baru
-                </span>
-                <input 
-                  id="inputHeroProfil"
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => setHeroProfilBgList(e.target.files)} 
-                  className="hidden" 
-                />
-              </label>
-              
-              {heroProfilBgList && (
-                <div className="text-xs font-bold text-green-700 mt-2">
-                  ✅ 1 Gambar siap diunggah.
+                <div>
+                  <label 
+                    className="block text-sm font-bold mb-2 text-gray-800"
+                  >
+                    Teks Sub-Judul (Deskripsi Singkat)
+                  </label>
+                  <textarea 
+                    required 
+                    rows={4} 
+                    value={heroSub} 
+                    onChange={(e) => setHeroSub(e.target.value)} 
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                    placeholder="Mengenal lebih dekat sejarah, visi misi..."
+                  ></textarea>
                 </div>
-              )}
-            </div>
-            
-            {statusHero && (
-              <div className="p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border border-green-300">
-                {statusHero}
               </div>
-            )}
+
+              <div 
+                className="space-y-4"
+              >
+                <label 
+                  className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2"
+                >
+                  Gambar Background Profil
+                </label>
+                {heroBgLama && (
+                  <div 
+                    className="relative w-full h-40 md:h-48 rounded-xl overflow-hidden shadow-inner border border-gray-200 group"
+                  >
+                    <img 
+                      src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                      alt="Hero Profil"
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                )}
+                <label 
+                  className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"
+                >
+                  <span 
+                    className="text-3xl mb-2"
+                  >
+                    📸
+                  </span>
+                  <span 
+                    className="font-bold text-yellow-800 text-sm"
+                  >
+                    {heroBgLama ? "Ganti Gambar Baru" : "Upload Background"}
+                  </span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={(e) => setHeroBgList(e.target.files)} 
+                    className="hidden" 
+                  />
+                </label>
+                {heroBgList && (
+                  <div 
+                    className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200"
+                  >
+                    ✅ Gambar siap diunggah.
+                  </div>
+                )}
+              </div>
+            </div>
             
             <button 
               type="submit" 
-              disabled={isLoadingHero} 
-              className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+              disabled={isLoading} 
+              className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg mt-4"
             >
-              {isLoadingHero ? "Menyimpan Perubahan..." : "Simpan Header Baru"}
+              {isLoading ? "Menyimpan..." : "Simpan Header Profil"}
             </button>
           </form>
         </div>
       )}
 
-      {/* 2. TEKS SEJARAH & VISI MISI */}
+      {/* ==========================================
+          TAB 2: SEJARAH & VISI MISI
+      ========================================== */}
       {tabAktif === "teks" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 mb-8">
-          <h3 className="text-2xl font-bold mb-2">
-            <span className="mr-2">📖</span>
-            Sejarah & Visi Misi
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in"
+        >
+          <h3 
+            className="text-2xl font-bold mb-6 flex items-center gap-2"
+          >
+            <span>📖</span> Pengaturan Teks Sejarah & Visi Misi
           </h3>
-          <p className="text-gray-500 text-sm mb-6">
-            Sesuaikan teks Sejarah dan Visi Misi Desa Kerjo secara lengkap.
-          </p>
-          <form onSubmit={handleSimpanProfil} className="space-y-6">
+          <form 
+            onSubmit={handleSimpanTeks} 
+            className="space-y-6"
+          >
             <div>
-              <label className="block text-sm font-bold mb-2 text-gray-800">
+              <label 
+                className="block text-sm font-bold mb-2 text-gray-800"
+              >
                 Sejarah Desa
               </label>
               <textarea 
                 required 
                 rows={8} 
-                value={sejarahDesa} 
-                onChange={(e) => setSejarahDesa(e.target.value)} 
-                className="w-full px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"
+                value={teksProfil.sejarah} 
+                onChange={(e) => setTeksProfil({...teksProfil, sejarah: e.target.value})} 
+                className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
               ></textarea>
             </div>
-            <div>
-              <label className="block text-sm font-bold mb-2 text-gray-800">
-                Visi & Misi
-              </label>
-              <textarea 
-                required 
-                rows={6} 
-                value={visiMisiDesa} 
-                onChange={(e) => setVisiMisiDesa(e.target.value)} 
-                className="w-full px-4 py-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-green-500 bg-gray-50 focus:bg-white outline-none leading-relaxed"
-              ></textarea>
-            </div>
-            
-            {statusProfil && (
-              <div className="p-4 rounded-xl font-bold text-center bg-green-100 text-green-800 border border-green-300">
-                {statusProfil}
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            >
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-2 text-gray-800"
+                >
+                  Visi Desa
+                </label>
+                <textarea 
+                  required 
+                  rows={5} 
+                  value={teksProfil.visi} 
+                  onChange={(e) => setTeksProfil({...teksProfil, visi: e.target.value})} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                ></textarea>
               </div>
-            )}
-            
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-2 text-gray-800"
+                >
+                  Misi Desa
+                </label>
+                <textarea 
+                  required 
+                  rows={5} 
+                  value={teksProfil.misi} 
+                  onChange={(e) => setTeksProfil({...teksProfil, misi: e.target.value})} 
+                  className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                ></textarea>
+              </div>
+            </div>
             <button 
               type="submit" 
-              disabled={isLoadingProfil} 
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
+              disabled={isLoading} 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-md transition-colors text-lg"
             >
-              {isLoadingProfil ? "Menyimpan Perubahan..." : "Simpan Teks Profil"}
+              {isLoading ? "Menyimpan..." : "Simpan Teks Profil"}
             </button>
           </form>
         </div>
       )}
 
-      {/* 3. SOTK PEMERINTAH DESA */}
+      {/* ==========================================
+          TAB 3: APARATUR / SOTK
+      ========================================== */}
       {tabAktif === "sotk" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-blue-600 mb-8">
-          <h3 className="text-2xl font-bold mb-2">
-            <span className="mr-2">👔</span>
-            Susunan Pemerintah Desa (SOTK)
-          </h3>
-          <p className="text-gray-500 text-sm mb-6">
-            Kelola hierarki aparatur desa beserta garis komando.
-          </p>
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-600 animate-fade-in"
+        >
+          <div 
+            className="flex justify-between items-center mb-6"
+          >
+            <h3 
+              className="text-2xl font-bold flex items-center gap-2"
+            >
+              <span>🏛️</span> Aparatur (SOTK)
+            </h3>
+            <button 
+              onClick={() => bukaModalSotk()} 
+              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm"
+            >
+              + Tambah Aparatur
+            </button>
+          </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-blue-50 p-6 rounded-2xl border border-blue-100 shadow-inner h-fit">
-              <div className="flex justify-between items-center mb-6 border-b border-blue-200 pb-3">
-                <h4 className="font-bold text-blue-900 text-lg">
-                  {editAparaturId ? "✏️ Edit Aparatur" : "Tambah Aparatur"}
-                </h4>
-                {editAparaturId && (
-                  <button 
-                    onClick={batalEditAparatur} 
-                    type="button" 
-                    className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1.5 rounded-lg font-bold transition-colors"
-                  >
-                    Batal
-                  </button>
-                )}
-              </div>
-              <form onSubmit={handleSimpanAparatur} className="space-y-5">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Nama Lengkap & Gelar
-                  </label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={namaAparatur} 
-                    onChange={(e) => setNamaAparatur(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Nama Jabatan
-                  </label>
-                  <input 
-                    type="text" 
-                    required 
-                    value={jabatanAparatur} 
-                    onChange={(e) => setJabatanAparatur(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" 
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                      No. Urut Hierarki
-                    </label>
-                    <input 
-                      type="number" 
-                      required 
-                      value={urutanAparatur} 
-                      onChange={(e) => setUrutanAparatur(Number(e.target.value))} 
-                      className="w-full p-3 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white text-center font-black text-xl text-blue-900" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                      Foto Wajah
-                    </label>
-                    <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-blue-300 rounded-xl hover:bg-blue-100 transition-all overflow-hidden shadow-sm">
-                      <span className="font-bold text-blue-800 text-xs flex items-center gap-2">
-                        <span className="text-xl">📸</span> 
-                        {fotoAparatur ? "Siap" : "Pilih File"}
-                      </span>
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={(e) => { setFotoAparatur(e.target.files) }} 
-                        className="hidden" 
-                      />
-                    </label>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-4">
-                  <div className="flex gap-2 items-center mb-1">
-                    <span className="text-xl">🔗</span>
-                    <h5 className="font-bold text-gray-800 text-sm">
-                      Garis Komando
-                    </h5>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1 text-gray-600">
-                      Jalur Atas (Atasan)
-                    </label>
-                    <select 
-                      value={jalurAtas} 
-                      onChange={(e) => setJalurAtas(e.target.value)} 
-                      className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-gray-50 text-sm"
-                    >
-                      <option value="">
-                        -- Puncak (Tanpa Atasan) --
-                      </option>
-                      {daftarAtasan.map(atasan => (
-                        <option key={atasan.id} value={atasan.id}>
-                          {atasan.jabatan} - {atasan.nama}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1 text-gray-600">
-                      Sifat Hubungan
-                    </label>
-                    <select 
-                      value={jenisGaris} 
-                      onChange={(e) => setJenisGaris(e.target.value)} 
-                      className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-gray-50 text-sm"
-                    >
-                      <option value="Instruksi">
-                        Garis Instruksi (Tegak)
-                      </option>
-                      <option value="Koordinasi">
-                        Garis Koordinasi (Putus-putus)
-                      </option>
-                    </select>
-                  </div>
-                </div>
-                
-                {editAparaturId && fotoLamaAparatur && (
-                  <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-blue-200 shadow-sm">
+          <div 
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {dataSotk.map((item) => (
+              <div 
+                key={item.id} 
+                className="border border-gray-200 rounded-2xl p-5 flex items-center gap-4 bg-gray-50 hover:shadow-md transition-all"
+              >
+                <div 
+                  className="w-16 h-16 rounded-full overflow-hidden bg-white border-2 border-purple-100 flex-shrink-0"
+                >
+                  {item.foto ? (
                     <img 
-                      src={fotoLamaAparatur.startsWith("http") ? fotoLamaAparatur : `https://wsrv.nl/?url=${fotoLamaAparatur}`} 
-                      className="w-12 h-12 rounded-full object-cover border-2 border-blue-100" 
-                      alt="Lama"
+                      src={item.foto.startsWith("http") ? item.foto : `https://wsrv.nl/?url=${item.foto}`} 
+                      className="w-full h-full object-cover" 
                     />
-                    <div>
-                      <span className="text-xs font-bold text-blue-800 block">
-                        Foto Tersimpan
-                      </span>
+                  ) : (
+                    <div 
+                      className="w-full h-full flex items-center justify-center text-gray-400 text-2xl"
+                    >
+                      👤
                     </div>
-                  </div>
-                )}
-                
-                {statusAparatur && (
-                  <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
-                    {statusAparatur}
-                  </div>
-                )}
-                
-                <button 
-                  type="submit" 
-                  disabled={isLoadingAparatur} 
-                  className="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 shadow-md transition-colors text-lg"
+                  )}
+                </div>
+                <div 
+                  className="flex-1"
                 >
-                  {isLoadingAparatur ? "Memproses..." : editAparaturId ? "Simpan Perubahan SOTK" : "Tambahkan ke SOTK"}
-                </button>
-              </form>
-            </div>
-            
-            <div className="lg:col-span-2 overflow-x-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-4">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="py-4 px-4 font-bold text-gray-600 text-center">No</th>
-                    <th className="py-4 px-4 font-bold text-gray-600">Identitas & Jabatan</th>
-                    <th className="py-4 px-4 font-bold text-gray-600">Koordinasi</th>
-                    <th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {daftarAparatur.map((org) => {
-                    const atasan = daftarAparatur.find(a => a.id === org.jalurAtas);
-                    return (
-                      <tr key={org.id} className="border-b hover:bg-blue-50 transition-colors">
-                        <td className="py-4 px-4">
-                          <div className="w-10 h-10 mx-auto bg-blue-100 text-blue-800 rounded-full flex items-center justify-center font-black text-lg shadow-sm border border-blue-200">
-                            {org.urutan}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 flex items-center gap-4">
-                          <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md">
-                            {org.foto ? (
-                              <img 
-                                src={org.foto.startsWith("http") ? org.foto : `https://wsrv.nl/?url=${org.foto}`} 
-                                alt="profil" 
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex items-center justify-center w-full h-full text-2xl text-gray-400">👤</span>
-                            )}
-                          </div>
-                          <div>
-                            <div className="font-bold text-gray-900 text-base">
-                              {org.nama}
-                            </div>
-                            <div className="text-xs text-blue-700 uppercase font-black tracking-widest mt-1 bg-blue-50 inline-block px-2 py-1 rounded border border-blue-100">
-                              {org.jabatan}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          {org.jalurAtas ? (
-                            <div className="text-xs">
-                              <span className="text-gray-500 block mb-0.5">Lapor Ke:</span>
-                              <span className="font-bold text-gray-800">{atasan ? atasan.jabatan : "Atasan Dihapus"}</span>
-                              <div className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${org.jenisGaris === "Instruksi" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                                {org.jenisGaris}
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">
-                              Puncak Hierarki
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex flex-col gap-2 items-center">
-                            <button 
-                              onClick={() => mulaiEditAparatur(org)} 
-                              className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              Edit
-                            </button>
-                            <button 
-                              onClick={() => hapusAparatur(org)} 
-                              className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              Hapus
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  <h4 
+                    className="font-bold text-gray-900 line-clamp-1"
+                  >
+                    {item.nama}
+                  </h4>
+                  <p 
+                    className="text-xs text-purple-600 font-bold bg-purple-100 inline-block px-2 py-0.5 rounded mt-1 mb-2"
+                  >
+                    {item.jabatan}
+                  </p>
+                  <div 
+                    className="flex gap-2"
+                  >
+                    <button 
+                      onClick={() => bukaModalSotk(item)} 
+                      className="text-xs bg-gray-200 hover:bg-gray-300 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      onClick={() => hapusSotk(item.id, item.foto)} 
+                      className="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-lg font-bold transition-colors"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* 4. LEMBAGA MASYARAKAT */}
+      {/* ==========================================
+          TAB 4: LEMBAGA DESA
+      ========================================== */}
       {tabAktif === "lembaga" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-indigo-500 mb-8 transition-all">
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 animate-fade-in"
+        >
+          <div 
+            className="flex justify-between items-center mb-6"
+          >
+            <h3 
+              className="text-2xl font-bold flex items-center gap-2"
+            >
+              <span>🤝</span> Lembaga Desa
+            </h3>
+            <button 
+              onClick={() => bukaModalLembaga()} 
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm"
+            >
+              + Tambah Lembaga
+            </button>
+          </div>
           
-          {!selectedLembaga ? (
-            <>
-              <h3 className="text-2xl font-bold mb-2">
-                <span className="mr-2">🤝</span> 
-                Lembaga Kemasyarakatan Desa
-              </h3>
-              <p className="text-gray-500 text-sm mb-6">
-                Kelola data Lembaga (PKK, Karang Taruna) dan struktur hierarki anggota.
-              </p>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-1 bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-inner h-fit">
-                  <div className="flex justify-between items-center mb-6 border-b border-indigo-200 pb-3">
-                    <h4 className="font-bold text-indigo-900 text-lg">
-                      {editLembagaId ? "✏️ Edit Lembaga" : "Daftarkan Lembaga"}
-                    </h4>
-                    {editLembagaId && (
-                      <button 
-                        type="button" 
-                        onClick={batalEditLembagaUtama} 
-                        className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1.5 rounded-lg font-bold transition-colors"
-                      >
-                        Batal
-                      </button>
-                    )}
-                  </div>
-                  <form onSubmit={handleSimpanLembagaUtama} className="space-y-5">
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                        Nama Organisasi
-                      </label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={namaLembaga} 
-                        onChange={(e)=>setNamaLembaga(e.target.value)} 
-                        className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                          Singkatan
-                        </label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={singkatanLembaga} 
-                          onChange={(e)=>setSingkatanLembaga(e.target.value)} 
-                          className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-black text-center text-indigo-900 text-xl tracking-widest" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                          Logo
-                        </label>
-                        <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-indigo-300 rounded-xl hover:bg-indigo-100 transition-all overflow-hidden shadow-sm">
-                          <span className="font-bold text-indigo-800 text-xs flex items-center gap-2">
-                            <span className="text-xl">📸</span> 
-                            {fotoLembaga ? "Siap" : "Upload"}
-                          </span>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={(e) => setFotoLembaga(e.target.files)} 
-                            className="hidden" 
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                        Deskripsi / Tupoksi
-                      </label>
-                      <textarea 
-                        required 
-                        rows={3} 
-                        value={deskripsiLembaga} 
-                        onChange={(e)=>setDeskripsiLembaga(e.target.value)} 
-                        className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-white leading-relaxed"
-                      ></textarea>
-                    </div>
-                    
-                    {editLembagaId && fotoLamaLembaga && (
-                      <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-indigo-200 shadow-sm">
-                        <img 
-                          src={fotoLamaLembaga.startsWith("http") ? fotoLamaLembaga : `https://wsrv.nl/?url=${fotoLamaLembaga}`} 
-                          className="w-10 h-10 rounded-md object-contain" 
-                          alt="Logo Lama"
-                        />
-                        <div>
-                          <span className="text-xs font-bold text-indigo-800 block">
-                            Logo Tersimpan
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {statusLembaga && (
-                      <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
-                        {statusLembaga}
-                      </div>
-                    )}
-                    
-                    <button 
-                      type="submit" 
-                      disabled={isLoadingLembaga} 
-                      className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-700 shadow-md transition-colors text-lg"
+          <div 
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+          >
+            {dataLembaga.map((item) => (
+              <div 
+                key={item.id} 
+                className="border border-gray-200 rounded-2xl p-5 flex gap-4 bg-gray-50 hover:shadow-md transition-all"
+              >
+                <div 
+                  className="w-20 h-20 rounded-xl overflow-hidden bg-white border border-gray-200 flex-shrink-0 p-2"
+                >
+                  {item.logo ? (
+                    <img 
+                      src={item.logo.startsWith("http") ? item.logo : `https://wsrv.nl/?url=${item.logo}`} 
+                      className="w-full h-full object-contain" 
+                    />
+                  ) : (
+                    <div 
+                      className="w-full h-full flex items-center justify-center text-gray-400 text-3xl"
                     >
-                      {isLoadingLembaga ? "Memproses..." : editLembagaId ? "Simpan Profil Lembaga" : "Tambahkan Lembaga"}
-                    </button>
-                  </form>
+                      🏛️
+                    </div>
+                  )}
                 </div>
-                
-                <div className="lg:col-span-2 overflow-x-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-4">
-                  <table className="min-w-full text-sm text-left">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="py-4 px-4 font-bold text-gray-600">Lembaga Masyarakat</th>
-                        <th className="py-4 px-4 font-bold text-gray-600">Status Anggota</th>
-                        <th className="py-4 px-4 text-center font-bold text-gray-600">Manajemen Lembaga</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {daftarLembaga.map((lem) => (
-                        <tr key={lem.id} className="border-b hover:bg-indigo-50 transition-colors">
-                          <td className="py-4 px-4 flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md p-1">
-                              {lem.foto ? (
-                                <img 
-                                  src={lem.foto.startsWith("http") ? lem.foto : `https://wsrv.nl/?url=${lem.foto}`} 
-                                  className="w-full h-full object-contain" 
-                                  alt="Logo"
-                                />
-                              ) : (
-                                <span className="flex items-center justify-center h-full text-3xl">🤝</span>
-                              )}
-                            </div>
-                            <div>
-                              <div className="font-black text-indigo-900 text-lg tracking-wide">
-                                {lem.singkatan}
-                              </div>
-                              <div className="text-xs font-bold text-gray-500 uppercase mt-1 leading-snug w-40">
-                                {lem.nama}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="text-xs font-bold bg-indigo-100 text-indigo-800 px-3 py-1.5 rounded-lg border border-indigo-200 inline-block shadow-sm">
-                              👥 {lem.anggota_sotk ? lem.anggota_sotk.length : 0} Pengurus
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex flex-col gap-2 items-center">
-                              <button 
-                                onClick={() => masukModeKeanggotaan(lem)} 
-                                className="w-full max-w-[120px] bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition-transform hover:-translate-y-0.5"
-                              >
-                                Edit Keanggotaan
-                              </button>
-                              <div className="flex gap-2 w-full max-w-[120px]">
-                                <button 
-                                  onClick={() => mulaiEditLembagaUtama(lem)} 
-                                  className="flex-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 text-xs font-bold px-2 py-1.5 rounded-lg"
-                                >
-                                  Edit
-                                </button>
-                                <button 
-                                  onClick={() => hapusLembagaUtama(lem)} 
-                                  className="flex-1 bg-red-50 hover:bg-red-600 border border-red-200 hover:text-white text-red-700 text-xs font-bold px-2 py-1.5 rounded-lg"
-                                >
-                                  Hapus
-                                </button>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="animate-fade-in">
-              <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
-                <div>
-                  <button 
-                    onClick={keluarModeKeanggotaan} 
-                    className="text-indigo-600 font-bold text-sm hover:underline mb-2 flex items-center gap-1"
+                <div 
+                  className="flex-1"
+                >
+                  <h4 
+                    className="font-bold text-gray-900"
                   >
-                    ← Kembali ke Daftar Lembaga
-                  </button>
-                  <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                    <span className="text-3xl">👥</span> 
-                    SOTK: {selectedLembaga.singkatan}
-                  </h3>
-                  <p className="text-gray-500 text-sm mt-1">
-                    Bangun struktur hierarki pengurus khusus lembaga ini.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-1 bg-white p-6 rounded-2xl border-2 border-indigo-200 shadow-sm h-fit">
-                  <div className="flex justify-between items-center mb-6 border-b border-indigo-100 pb-3">
-                    <h4 className="font-bold text-indigo-900 text-lg">
-                      {editAnggotaLemId ? "✏️ Edit Pengurus" : "Tambah Pengurus"}
-                    </h4>
-                    {editAnggotaLemId && (
-                      <button 
-                        onClick={batalEditAnggotaLem} 
-                        type="button" 
-                        className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1.5 rounded-lg font-bold transition-colors"
-                      >
-                        Batal
-                      </button>
-                    )}
-                  </div>
-                  <form onSubmit={handleSimpanAnggotaLem} className="space-y-5">
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                        Nama Lengkap
-                      </label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={namaAnggotaLem} 
-                        onChange={(e) => setNamaAnggotaLem(e.target.value)} 
-                        className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white" 
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                        Jabatan
-                      </label>
-                      <input 
-                        type="text" 
-                        required 
-                        value={jabatanAnggotaLem} 
-                        onChange={(e) => setJabatanAnggotaLem(e.target.value)} 
-                        className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white" 
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                          No. Urut Hierarki
-                        </label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={urutanAnggotaLem} 
-                          onChange={(e) => setUrutanAnggotaLem(Number(e.target.value))} 
-                          className="w-full p-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white text-center font-black text-xl text-indigo-900" 
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                          Foto
-                        </label>
-                        <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-indigo-300 rounded-xl hover:bg-indigo-100 transition-all overflow-hidden shadow-sm">
-                          <span className="font-bold text-indigo-800 text-xs flex items-center gap-2">
-                            <span className="text-xl">📸</span> 
-                            {fotoAnggotaLem ? "Siap" : "Pilih File"}
-                          </span>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={(e) => setFotoAnggotaLem(e.target.files)} 
-                            className="hidden" 
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-inner space-y-4">
-                      <div className="flex gap-2 items-center mb-1">
-                        <span className="text-xl">🔗</span>
-                        <h5 className="font-bold text-indigo-900 text-sm">
-                          Garis Koordinasi
-                        </h5>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1 text-gray-600">
-                          Jalur Atas (Lapor ke siapa?)
-                        </label>
-                        <select 
-                          value={jalurAtasAnggotaLem} 
-                          onChange={(e) => setJalurAtasAnggotaLem(e.target.value)} 
-                          className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-white text-sm"
-                        >
-                          <option value="">
-                            -- Puncak Lembaga --
-                          </option>
-                          {daftarAtasanLem.map((atasan:any) => (
-                            <option key={atasan.id} value={atasan.id}>
-                              {atasan.jabatan} - {atasan.nama}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold mb-1 text-gray-600">
-                          Sifat Garis Hubungan
-                        </label>
-                        <select 
-                          value={jenisGarisAnggotaLem} 
-                          onChange={(e) => setJenisGarisAnggotaLem(e.target.value)} 
-                          className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-white text-sm"
-                        >
-                          <option value="Instruksi">
-                            Garis Instruksi (Tegak)
-                          </option>
-                          <option value="Koordinasi">
-                            Garis Koordinasi (Putus-putus)
-                          </option>
-                        </select>
-                      </div>
-                    </div>
-                    
-                    {editAnggotaLemId && fotoLamaAnggotaLem && (
-                      <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-indigo-200 shadow-sm">
-                        <img 
-                          src={fotoLamaAnggotaLem.startsWith("http") ? fotoLamaAnggotaLem : `https://wsrv.nl/?url=${fotoLamaAnggotaLem}`} 
-                          className="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" 
-                          alt="Foto Lama"
-                        />
-                        <div>
-                          <span className="text-xs font-bold text-indigo-800 block">
-                            Foto Tersimpan
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {statusLembaga && (
-                      <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
-                        {statusLembaga}
-                      </div>
-                    )}
-                    
-                    <button 
-                      type="submit" 
-                      disabled={isLoadingLembaga} 
-                      className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-700 shadow-md transition-colors text-lg"
+                    {item.nama_lembaga}
+                  </h4>
+                  <p 
+                    className="text-xs text-gray-600 font-medium mb-3 line-clamp-2"
+                  >
+                    <span 
+                      className="font-bold"
                     >
-                      {isLoadingLembaga ? "Memproses..." : editAnggotaLemId ? "Simpan Perubahan SOTK" : "Tambahkan Pengurus"}
+                      Ketua:
+                    </span> {item.ketua}
+                  </p>
+                  <div 
+                    className="flex gap-2"
+                  >
+                    <button 
+                      onClick={() => bukaModalLembaga(item)} 
+                      className="text-xs bg-gray-200 hover:bg-gray-300 px-4 py-1.5 rounded-lg font-bold transition-colors"
+                    >
+                      Edit
                     </button>
-                  </form>
-                </div>
-                
-                <div className="lg:col-span-2 overflow-x-auto bg-gray-50 rounded-3xl border border-gray-200 shadow-inner p-4">
-                  <table className="min-w-full text-sm text-left bg-white rounded-2xl overflow-hidden shadow-sm">
-                    <thead className="bg-indigo-100 border-b border-indigo-200">
-                      <tr>
-                        <th className="py-4 px-4 font-bold text-indigo-900 text-center">No</th>
-                        <th className="py-4 px-4 font-bold text-indigo-900">Identitas Pengurus</th>
-                        <th className="py-4 px-4 font-bold text-indigo-900">Garis Koordinasi</th>
-                        <th className="py-4 px-4 text-center font-bold text-indigo-900">Aksi</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(selectedLembaga.anggota_sotk || []).sort((a:any, b:any) => a.urutan - b.urutan).map((org:any) => {
-                        const atasan = (selectedLembaga.anggota_sotk || []).find((a:any) => a.id === org.jalurAtas);
-                        return (
-                          <tr key={org.id} className="border-b border-gray-100 hover:bg-indigo-50 transition-colors">
-                            <td className="py-4 px-4">
-                              <div className="w-10 h-10 mx-auto bg-indigo-100 text-indigo-800 rounded-full flex items-center justify-center font-black text-lg shadow-sm border border-indigo-200">
-                                {org.urutan}
-                              </div>
-                            </td>
-                            <td className="py-4 px-4 flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-300 shadow-sm">
-                                {org.foto ? (
-                                  <img 
-                                    src={org.foto.startsWith("http") ? org.foto : `https://wsrv.nl/?url=${org.foto}`} 
-                                    alt="profil" 
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="flex items-center justify-center w-full h-full text-xl text-gray-400">👤</span>
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-bold text-gray-900 text-sm">
-                                  {org.nama}
-                                </div>
-                                <div className="text-[10px] text-indigo-700 uppercase font-black tracking-widest mt-1 bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">
-                                  {org.jabatan}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-4 px-4">
-                              {org.jalurAtas ? (
-                                <div className="text-xs">
-                                  <span className="text-gray-500 block mb-0.5">Lapor Ke:</span>
-                                  <span className="font-bold text-gray-800">{atasan ? atasan.jabatan : "Atasan Dihapus"}</span>
-                                  <div className={`mt-1 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${org.jenisGaris === "Instruksi" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
-                                    {org.jenisGaris}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400 italic">
-                                  Puncak Hierarki
-                               </span>
-                              )}
-                            </td>
-                            <td className="py-4 px-4">
-                              <div className="flex flex-col gap-2 items-center">
-                                <button 
-                                  onClick={() => mulaiEditAnggotaLem(org)} 
-                                  className="w-full max-w-[80px] bg-indigo-50 hover:bg-indigo-600 hover:text-white border border-indigo-200 text-indigo-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button 
-                                  onClick={() => hapusAnggotaLem(org.id)} 
-                                  className="w-full max-w-[80px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                                >
-                                  Hapus
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                    <button 
+                      onClick={() => hapusLembaga(item.id, item.logo)} 
+                      className="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-4 py-1.5 rounded-lg font-bold transition-colors"
+                    >
+                      Hapus
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* 5. MODUL KATALOG UMKM & WISATA */}
+      {/* ==========================================
+          TAB 5: KATALOG UMKM
+      ========================================== */}
       {tabAktif === "umkm" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-yellow-600">
-          <h3 className="text-2xl font-bold mb-2">
-            <span className="mr-2">🛍️</span>
-            Katalog Potensi, Wisata & UMKM
-          </h3>
-          <p className="text-gray-500 text-sm mb-6">
-            Kelola promosi pariwisata, produk UMKM, fasilitas, beserta jam operasional dan lokasi.
-          </p>
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-red-500 animate-fade-in"
+        >
+          <div 
+            className="flex justify-between items-center mb-6"
+          >
+            <h3 
+              className="text-2xl font-bold flex items-center gap-2"
+            >
+              <span>🛍️</span> Katalog UMKM
+            </h3>
+            <button 
+              onClick={() => bukaModalUmkm()} 
+              className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm"
+            >
+              + Tambah UMKM
+            </button>
+          </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-yellow-50 p-6 rounded-2xl border border-yellow-200 shadow-inner">
-              <div className="flex justify-between items-center mb-6 border-b border-yellow-300 pb-3">
-                <h4 className="font-bold text-yellow-900 text-lg">
-                  {editUmkmId ? "✏️ Edit Potensi" : "Tambah Potensi"}
-                </h4>
-                {editUmkmId && (
-                  <button 
-                    type="button" 
-                    onClick={batalEditUmkm} 
-                    className="text-xs bg-gray-300 hover:bg-gray-400 px-3 py-1.5 rounded-lg font-bold transition-colors"
+          <div 
+            className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm"
+          >
+            <table 
+              className="min-w-full text-sm text-left bg-white"
+            >
+              <thead 
+                className="bg-gray-50 border-b border-gray-200"
+              >
+                <tr>
+                  <th 
+                    className="py-3 px-4 font-bold text-gray-600"
                   >
-                    Batal
-                  </button>
+                    Toko / Pemilik
+                  </th>
+                  <th 
+                    className="py-3 px-4 font-bold text-gray-600"
+                  >
+                    Kategori & Deskripsi
+                  </th>
+                  {/* PERBAIKAN: Lebar Kolom Jam Operasional ditambah & gunakan pre-wrap di <tbody> */}
+                  <th 
+                    className="py-3 px-4 font-bold text-gray-600 min-w-[200px]"
+                  >
+                    Info Kontak & Jam Operasional
+                  </th>
+                  <th 
+                    className="py-3 px-4 text-center font-bold text-gray-600"
+                  >
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataUmkm.map((item) => (
+                  <tr 
+                    key={item.id} 
+                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  >
+                    <td 
+                      className="py-3 px-4 align-top"
+                    >
+                      <div 
+                        className="flex items-center gap-3"
+                      >
+                        <div 
+                          className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0"
+                        >
+                          {item.foto_produk ? (
+                            <img 
+                              src={item.foto_produk.startsWith("http") ? item.foto_produk : `https://wsrv.nl/?url=${item.foto_produk}`} 
+                              className="w-full h-full object-cover" 
+                            />
+                          ) : (
+                            <div 
+                              className="w-full h-full flex items-center justify-center text-gray-400"
+                            >
+                              🏪
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p 
+                            className="font-black text-gray-900"
+                          >
+                            {item.nama_toko}
+                          </p>
+                          <p 
+                            className="text-xs text-gray-500 font-bold"
+                          >
+                            Bpk/Ibu {item.pemilik}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td 
+                      className="py-3 px-4 align-top"
+                    >
+                      <span 
+                        className="text-[10px] font-black uppercase tracking-widest text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 mb-1 inline-block"
+                      >
+                        {item.kategori}
+                      </span>
+                      <p 
+                        className="text-xs text-gray-600 line-clamp-2"
+                      >
+                        {item.deskripsi_produk}
+                      </p>
+                    </td>
+                    <td 
+                      className="py-3 px-4 align-top"
+                    >
+                      <div 
+                        className="text-xs text-gray-600"
+                      >
+                        <p 
+                          className="mb-1"
+                        >
+                          <span 
+                            className="font-bold text-green-700"
+                          >
+                            WA:
+                          </span> {item.no_wa}
+                        </p>
+                        <p 
+                          className="mb-1 line-clamp-1"
+                        >
+                          <span 
+                            className="font-bold"
+                          >
+                            Alamat:
+                          </span> {item.alamat}
+                        </p>
+                        {/* PERBAIKAN: Menggunakan whitespace-pre-wrap agar text format baris baru terbaca */}
+                        <div 
+                          className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-100 whitespace-pre-wrap font-mono text-[11px] text-gray-700"
+                        >
+                          {item.jam_operasional}
+                        </div>
+                      </div>
+                    </td>
+                    <td 
+                      className="py-3 px-4 align-top text-center"
+                    >
+                      <div 
+                        className="flex flex-col gap-2 items-center"
+                      >
+                        <button 
+                          onClick={() => bukaModalUmkm(item)} 
+                          className="w-[70px] bg-gray-200 hover:bg-gray-300 text-gray-800 text-[11px] font-bold px-2 py-1.5 rounded transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => hapusUmkm(item.id, item.foto_produk)} 
+                          className="w-[70px] bg-red-100 text-red-600 hover:bg-red-200 text-[11px] font-bold px-2 py-1.5 rounded transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL SOTK
+      ========================================== */}
+      {isModalSotkOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-6 md:p-8"
+          >
+            <h3 
+              className="text-2xl font-black mb-6"
+            >
+              {editIdSotk ? "Edit Aparatur" : "Tambah Aparatur"}
+            </h3>
+            <form 
+              onSubmit={simpanSotk} 
+              className="space-y-4"
+            >
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Nama Lengkap
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formSotk.nama} 
+                  onChange={(e) => setFormSotk({...formSotk, nama: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Jabatan
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formSotk.jabatan} 
+                  onChange={(e) => setFormSotk({...formSotk, jabatan: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Keterangan Singkat
+                </label>
+                <input 
+                  type="text" 
+                  value={formSotk.keterangan} 
+                  onChange={(e) => setFormSotk({...formSotk, keterangan: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Foto Pegawai
+                </label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => setFotoSotk(e.target.files)} 
+                  className="w-full p-3 rounded-xl border bg-gray-50" 
+                />
+                {fotoSotkLama && (
+                  <p 
+                    className="text-xs text-blue-600 mt-1 font-bold"
+                  >
+                    Foto sudah ada, biarkan kosong jika tidak ingin mengganti.
+                  </p>
                 )}
               </div>
-              <form onSubmit={handleSimpanUmkm} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Kategori
-                  </label>
-                  <select 
-                    value={kategoriPotensi} 
-                    onChange={(e) => setKategoriPotensi(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white font-bold"
+              <div 
+                className="flex gap-4 mt-6"
+              >
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalSotkOpen(false)} 
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isLoading} 
+                  className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl"
+                >
+                  {isLoading ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL LEMBAGA
+      ========================================== */}
+      {isModalLembagaOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-lg shadow-2xl p-6 md:p-8"
+          >
+            <h3 
+              className="text-2xl font-black mb-6"
+            >
+              {editIdLembaga ? "Edit Lembaga" : "Tambah Lembaga"}
+            </h3>
+            <form 
+              onSubmit={simpanLembaga} 
+              className="space-y-4"
+            >
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Nama Lembaga
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formLembaga.nama_lembaga} 
+                  onChange={(e) => setFormLembaga({...formLembaga, nama_lembaga: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Nama Ketua
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formLembaga.ketua} 
+                  onChange={(e) => setFormLembaga({...formLembaga, ketua: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Deskripsi / Tugas
+                </label>
+                <textarea 
+                  rows={3} 
+                  value={formLembaga.deskripsi} 
+                  onChange={(e) => setFormLembaga({...formLembaga, deskripsi: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none"
+                ></textarea>
+              </div>
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Logo Lembaga
+                </label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => setLogoLembaga(e.target.files)} 
+                  className="w-full p-3 rounded-xl border bg-gray-50" 
+                />
+                {logoLembagaLama && (
+                  <p 
+                    className="text-xs text-blue-600 mt-1 font-bold"
                   >
-                    <option value="UMKM">Produk UMKM / Jasa</option>
-                    <option value="Wisata">Pariwisata / Potensi</option>
-                    <option value="Fasilitas">Fasilitas Publik Desa</option>
-                  </select>
-                </div>
+                    Logo sudah ada, biarkan kosong jika tidak ingin mengganti.
+                  </p>
+                )}
+              </div>
+              <div 
+                className="flex gap-4 mt-6"
+              >
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalLembagaOpen(false)} 
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={isLoading} 
+                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl"
+                >
+                  {isLoading ? "Menyimpan..." : "Simpan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL UMKM (PERBAIKAN TEXTAREA JAM OPERASIONAL)
+      ========================================== */}
+      {isModalUmkmOpen && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 my-8"
+          >
+            <h3 
+              className="text-2xl font-black mb-6"
+            >
+              {editIdUmkm ? "Edit Katalog UMKM" : "Tambah Katalog UMKM"}
+            </h3>
+            <form 
+              onSubmit={simpanUmkm} 
+              className="space-y-4"
+            >
+              <div 
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    {kategoriPotensi === "UMKM" ? "Nama Produk / Usaha" : "Nama Tempat Wisata"}
+                  <label 
+                    className="block text-sm font-bold mb-1"
+                  >
+                    Nama Toko / Usaha
                   </label>
                   <input 
                     type="text" 
                     required 
-                    value={namaPotensi} 
-                    onChange={(e)=>setNamaPotensi(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white" 
+                    value={formUmkm.nama_toko} 
+                    onChange={(e) => setFormUmkm({...formUmkm, nama_toko: e.target.value})} 
+                    className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                      Pemilik / Pengelola
-                    </label>
-                    <input 
-                      type="text" 
-                      value={pengelola} 
-                      onChange={(e)=>setPengelola(e.target.value)} 
-                      className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                      No. Kontak / WA
-                    </label>
-                    <input 
-                      type="number" 
-                      value={kontak} 
-                      onChange={(e)=>setKontak(e.target.value)} 
-                      placeholder="62812..." 
-                      className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white" 
-                    />
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm">
-                  <label className="block text-xs font-bold mb-2 text-yellow-900 border-b border-yellow-100 pb-1">
-                    Estimasi Harga (Rp) - Isi 0 jika Gratis
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input 
-                      type="number" 
-                      required 
-                      value={hargaMulai} 
-                      onChange={(e)=>setHargaMulai(e.target.value)} 
-                      placeholder="Mulai" 
-                      className="w-full p-2 text-sm rounded-lg border border-gray-200 outline-none focus:border-yellow-400" 
-                    />
-                    <span className="font-bold text-gray-400">-</span>
-                    <input 
-                      type="number" 
-                      required 
-                      value={hargaSampai} 
-                      onChange={(e)=>setHargaSampai(e.target.value)} 
-                      placeholder="Sampai" 
-                      className="w-full p-2 text-sm rounded-lg border border-gray-200 outline-none focus:border-yellow-400" 
-                    />
-                  </div>
-                </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Tautan Google Maps
+                  <label 
+                    className="block text-sm font-bold mb-1"
+                  >
+                    Nama Pemilik
                   </label>
                   <input 
-                    type="url" 
-                    value={linkMaps} 
-                    onChange={(e)=>setLinkMaps(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white text-xs text-blue-600 font-mono" 
+                    type="text" 
+                    required 
+                    value={formUmkm.pemilik} 
+                    onChange={(e) => setFormUmkm({...formUmkm, pemilik: e.target.value})} 
+                    className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
                   />
                 </div>
-                
-                <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm overflow-hidden">
-                  <label className="block text-xs font-bold mb-3 text-yellow-900 border-b border-yellow-100 pb-1">
-                    Jadwal Operasional (Per Hari)
-                  </label>
-                  <div className="space-y-3">
-                    {Object.keys(jamOperasional).map((hari) => (
-                      <div key={hari} className="flex flex-col xl:flex-row xl:items-center gap-2 justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                        <div className="flex justify-between xl:justify-start items-center gap-2 w-full xl:w-28 flex-shrink-0">
-                          <span className="font-bold text-xs text-gray-700">{hari}</span>
-                          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={jamOperasional[hari].libur} 
-                              onChange={(e) => handleJamChange(hari, 'libur', e.target.checked)} 
-                              className="w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 flex-shrink-0" 
-                            />
-                            <span className={jamOperasional[hari].libur ? "text-red-600 font-bold" : "text-gray-500"}>
-                              Libur
-                            </span>
-                          </label>
-                        </div>
-                        {!jamOperasional[hari].libur ? (
-                          <div className="flex items-center justify-between xl:justify-end gap-1.5 w-full">
-                            <input 
-                              type="time" 
-                              value={jamOperasional[hari].buka} 
-                              onChange={(e) => handleJamChange(hari, 'buka', e.target.value)} 
-                              className="w-full xl:w-20 border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" 
-                            />
-                            <span className="text-gray-400 font-bold">-</span>
-                            <input 
-                              type="time" 
-                              value={jamOperasional[hari].tutup} 
-                              onChange={(e) => handleJamChange(hari, 'tutup', e.target.value)} 
-                              className="w-full xl:w-20 border border-gray-300 p-1.5 text-xs rounded outline-none focus:border-yellow-500 bg-white" 
-                            />
-                          </div>
-                        ) : (
-                           <div className="w-full text-center text-xs font-bold text-red-500 bg-red-100 rounded py-1.5 mt-1 xl:mt-0 border border-red-200">
-                             TUTUP / LIBUR
-                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
+              </div>
+              
+              <div 
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Deskripsi Daya Tarik
+                  <label 
+                    className="block text-sm font-bold mb-1"
+                  >
+                    Kategori (Cth: Kuliner)
                   </label>
-                  <textarea 
+                  <input 
+                    type="text" 
                     required 
-                    rows={3} 
-                    value={deskripsiPotensi} 
-                    onChange={(e)=>setDeskripsiPotensi(e.target.value)} 
-                    className="w-full p-3 rounded-xl border border-yellow-300 outline-none focus:ring-2 focus:ring-yellow-500 bg-white leading-relaxed"
-                  ></textarea>
+                    value={formUmkm.kategori} 
+                    onChange={(e) => setFormUmkm({...formUmkm, kategori: e.target.value})} 
+                    className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
-                    Galeri Foto (Cloudinary)
+                  <label 
+                    className="block text-sm font-bold mb-1"
+                  >
+                    Nomor WhatsApp
                   </label>
-                  <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
-                    <span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2">
-                      <span className="text-3xl">📸</span> Klik Pilih File
-                    </span>
-                    <input 
-                      id="inputFotoPotensi" 
-                      type="file" 
-                      accept="image/*" 
-                      multiple 
-                      onChange={(e) => { if(e.target.files) setFotoPotensiList(e.target.files)}} 
-                      className="hidden" 
-                    />
-                  </label>
+                  <input 
+                    type="number" 
+                    value={formUmkm.no_wa} 
+                    onChange={(e) => setFormUmkm({...formUmkm, no_wa: e.target.value})} 
+                    placeholder="62812..."
+                    className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none font-mono" 
+                  />
                 </div>
-                
-                {editUmkmId && gambarLamaPotensi.length > 0 && (
-                  <div className="bg-orange-50 p-3 rounded-xl border border-orange-200">
-                    <p className="text-xs font-bold text-orange-900 mb-2">
-                      Foto Tersimpan (Klik X untuk hapus permanen):
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {gambarLamaPotensi.map((url, idx) => (
-                        <div key={idx} className="relative w-16 h-16 border-2 border-white rounded-lg overflow-hidden group shadow-md">
-                          <img 
-                            src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} 
-                            className="w-full h-full object-cover" 
-                            alt="UMKM"
-                          />
-                          <button 
-                            type="button" 
-                            onClick={() => hapusGambarLamaPotensi(idx)} 
-                            className="absolute top-1 right-1 bg-red-600 text-white w-5 h-5 rounded-full text-[10px] font-black flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity border border-red-800"
-                          >
-                            X
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Deskripsi Produk
+                </label>
+                <textarea 
+                  rows={2} 
+                  required 
+                  value={formUmkm.deskripsi_produk} 
+                  onChange={(e) => setFormUmkm({...formUmkm, deskripsi_produk: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none"
+                ></textarea>
+              </div>
+              
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Alamat Lengkap
+                </label>
+                <input 
+                  type="text" 
+                  required 
+                  value={formUmkm.alamat} 
+                  onChange={(e) => setFormUmkm({...formUmkm, alamat: e.target.value})} 
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none" 
+                />
+              </div>
+
+              <div>
+                {/* PERBAIKAN: Menggunakan TEXTAREA agar bisa tekan 'Enter' (Multibaris) */}
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Hari & Jam Operasional
+                </label>
+                <textarea 
+                  rows={2} 
+                  value={formUmkm.jam_operasional} 
+                  onChange={(e) => setFormUmkm({...formUmkm, jam_operasional: e.target.value})} 
+                  placeholder="Baris 1: Senin - Sabtu&#10;Baris 2: 08:00 - 17:00"
+                  className="w-full p-3 rounded-xl border bg-gray-50 focus:bg-white outline-none font-mono text-sm leading-relaxed"
+                ></textarea>
+                <p 
+                  className="text-[10px] text-gray-500 mt-1 font-bold"
+                >
+                  Tekan 'Enter' untuk memisahkan Hari dan Jam agar tidak terpotong saat ditampilkan di layar laptop.
+                </p>
+              </div>
+
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-1"
+                >
+                  Foto Produk Utama
+                </label>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => setFotoUmkm(e.target.files)} 
+                  className="w-full p-3 rounded-xl border bg-gray-50" 
+                />
+                {fotoUmkmLama && (
+                  <p 
+                    className="text-xs text-blue-600 mt-1 font-bold"
+                  >
+                    Foto sudah ada, biarkan kosong jika tidak ingin mengganti.
+                  </p>
                 )}
-                
-                {statusUmkm && (
-                  <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
-                    {statusUmkm}
-                  </div>
-                )}
-                
+              </div>
+
+              <div 
+                className="flex gap-4 mt-6 pt-4 border-t border-gray-100"
+              >
+                <button 
+                  type="button" 
+                  onClick={() => setIsModalUmkmOpen(false)} 
+                  className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl"
+                >
+                  Batal
+                </button>
                 <button 
                   type="submit" 
-                  disabled={isLoadingUmkm} 
-                  className="w-full bg-yellow-600 text-white font-bold py-3.5 rounded-xl hover:bg-yellow-700 shadow-md transition-colors text-lg"
+                  disabled={isLoading} 
+                  className="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl"
                 >
-                  {isLoadingUmkm ? "Memproses Data..." : editUmkmId ? "Simpan Perubahan Potensi" : "Tambahkan ke Katalog"}
+                  {isLoading ? "Menyimpan..." : "Simpan UMKM"}
                 </button>
-              </form>
-            </div>
-            
-            <div className="lg:col-span-2 overflow-x-auto bg-white rounded-3xl border border-gray-100 shadow-sm p-4">
-              <table className="min-w-full text-sm text-left">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="py-4 px-4 font-bold text-gray-600">Info & Gambar</th>
-                    <th className="py-4 px-4 font-bold text-gray-600">Harga & Jam</th>
-                    <th className="py-4 px-4 text-center font-bold text-gray-600">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {daftarUmkm.map((umkm) => {
-                    const fotonya = Array.isArray(umkm.gambar) && umkm.gambar.length > 0 ? umkm.gambar[0] : (umkm.foto || "");
-                    return (
-                      <tr key={umkm.id} className="border-b hover:bg-yellow-50 transition-colors">
-                        <td className="py-4 px-4 flex items-start gap-4">
-                          <div className="w-20 h-20 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md relative">
-                            {fotonya ? (
-                              <img 
-                                src={fotonya.startsWith("http") ? fotonya : `https://wsrv.nl/?url=${fotonya}`} 
-                                className="w-full h-full object-cover"
-                                alt="Fotonya"
-                              />
-                            ) : (
-                              <span className="flex items-center justify-center h-full text-3xl text-gray-400">🏞️</span>
-                            )}
-                            {Array.isArray(umkm.gambar) && umkm.gambar.length > 1 && (
-                              <div className="absolute bottom-1 right-1 bg-black bg-opacity-60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
-                                +{umkm.gambar.length - 1}
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black uppercase tracking-widest inline-block mb-1 border border-yellow-200">
-                              {umkm.kategori || "UMKM"}
-                            </div>
-                            <div className="font-bold text-gray-900 text-base leading-tight">
-                              {umkm.nama_produk}
-                            </div>
-                            <div className="text-[10px] text-blue-600 font-mono mt-1 font-bold">
-                              WA: {umkm.wa || "-"}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-top">
-                          <div className="text-xs bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded font-bold inline-block mb-2">
-                            {umkm.harga_mulai === 0 && umkm.harga_sampai === 0 
-                              ? "GRATIS" 
-                              : `Rp ${new Intl.NumberFormat("id-ID").format(umkm.harga_mulai || umkm.harga)} - Rp ${new Intl.NumberFormat("id-ID").format(umkm.harga_sampai || 0)}`
-                            }
-                          </div>
-                          <div className="text-[10px] bg-gray-50 border border-gray-200 p-2 rounded-lg text-gray-600">
-                            <span className="font-bold block mb-1">Jam Operasional:</span>
-                            {umkm.jam_operasional ? (
-                              Object.keys(umkm.jam_operasional).slice(0, 2).map(h => (
-                                <div key={h} className="flex justify-between w-32 border-b border-gray-100 last:border-0 pb-0.5 mb-0.5">
-                                  <span>{h}:</span> 
-                                  {umkm.jam_operasional[h].libur ? (
-                                    <span className="text-red-500 font-bold">Libur</span>
-                                  ) : (
-                                    <span>{umkm.jam_operasional[h].buka} - {umkm.jam_operasional[h].tutup}</span>
-                                  )}
-                                </div>
-                              ))
-                            ) : "Belum diatur"}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 align-top">
-                          <div className="flex flex-col gap-2 items-center">
-                            <button 
-                              onClick={() => mulaiEditUmkm(umkm)} 
-                              className="w-full max-w-[100px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-                            >
-                              Edit Data
-                            </button>
-                            <button 
-                              onClick={() => hapusUmkm(umkm)} 
-                              className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm"
-                            >
-                              Hapus Permanen
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
-      
+
     </div>
   );
 }

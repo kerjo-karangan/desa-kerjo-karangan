@@ -8,7 +8,11 @@ import {
 import { 
   doc, 
   getDoc, 
-  setDoc 
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
@@ -33,11 +37,14 @@ export default function PengaturanBeranda({
       setTabAktif("kontak");
     } else if (activeSubMenu === "beranda-slide") {
       setTabAktif("slide");
-    } else {
+    } else if (activeSubMenu === "beranda-hero") {
       setTabAktif("hero");
     }
   }, [activeSubMenu]);
 
+  // ==========================================
+  // STATE: HEADER BERANDA (HERO)
+  // ==========================================
   const [judulHero, setJudulHero] = useState("");
   const [subHero, setSubHero] = useState("");
   const [bgHeroLama, setBgHeroLama] = useState("");
@@ -45,6 +52,9 @@ export default function PengaturanBeranda({
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
+  // ==========================================
+  // STATE: KONTAK & MAPS
+  // ==========================================
   const [kontak, setKontak] = useState({
     alamat: "",
     email: "",
@@ -53,14 +63,24 @@ export default function PengaturanBeranda({
     ig: "",
     fb: "",
     yt: "",
-    tiktok: ""
+    tiktok: "",
+    peta_embed: "" // Penambahan Form Embed Google Maps
   });
   const [statusKontak, setStatusKontak] = useState("");
   const [isLoadingKontak, setIsLoadingKontak] = useState(false);
 
+  // ==========================================
+  // STATE: BERITA SLIDE
+  // ==========================================
+  const [beritaTampil, setBeritaTampil] = useState<any[]>([]);
+
+  // ==========================================
+  // FETCH DATA AWAL
+  // ==========================================
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Ambil Data Header Beranda
         const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda_hero"));
         if (snapHero.exists() && snapHero.data()) {
           setJudulHero(snapHero.data().judul || "");
@@ -68,6 +88,7 @@ export default function PengaturanBeranda({
           setBgHeroLama(snapHero.data().bg || "");
         }
 
+        // Ambil Data Kontak & Maps
         const snapKontak = await getDoc(doc(db, "pengaturan_web", "kontak"));
         if (snapKontak.exists() && snapKontak.data()) {
           setKontak({
@@ -78,9 +99,22 @@ export default function PengaturanBeranda({
             ig: snapKontak.data().ig || "",
             fb: snapKontak.data().fb || "",
             yt: snapKontak.data().yt || "",
-            tiktok: snapKontak.data().tiktok || ""
+            tiktok: snapKontak.data().tiktok || "",
+            peta_embed: snapKontak.data().peta_embed || ""
           });
         }
+
+        // Ambil Data Berita yang di-Pin
+        const qBerita = query(
+          collection(db, "kabar_berita"), 
+          where("pin_beranda", "==", true)
+        );
+        const snapBerita = await getDocs(qBerita);
+        setBeritaTampil(snapBerita.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        })));
+
       } catch (error) {
         console.error("Gagal memuat data:", error);
       }
@@ -122,6 +156,9 @@ export default function PengaturanBeranda({
     }
   };
 
+  // ==========================================
+  // HANDLER SIMPAN DATA
+  // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingHero(true);
@@ -169,7 +206,7 @@ export default function PengaturanBeranda({
   const handleSimpanKontak = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKontak(true);
-    setStatusKontak("Menyimpan kontak & sosial media...");
+    setStatusKontak("Menyimpan kontak & peta...");
 
     try {
       await setDoc(doc(db, "pengaturan_web", "kontak"), {
@@ -192,60 +229,65 @@ export default function PengaturanBeranda({
       className="space-y-8 animate-fade-in pb-20 font-sans"
     >
       
-      {!activeSubMenu && (
-        <div 
-          className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
+      {/* 
+        PERBAIKAN: Tombol Tab ini sekarang SELALU TAMPIL, 
+        tidak lagi disembunyikan meskipun diakses via Sidebar.
+      */}
+      <div 
+        className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
+      >
+        <button 
+          onClick={() => setTabAktif("hero")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "hero" 
+            ? "bg-yellow-500 text-white shadow-md" 
+            : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
         >
-          <button 
-            onClick={() => setTabAktif("hero")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "hero" 
-              ? "bg-yellow-500 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
+          <span 
+            className="text-xl"
           >
-            <span 
-              className="text-xl"
-            >
-              🖼️
-            </span> 
-            Header Beranda
-          </button>
-          
-          <button 
-            onClick={() => setTabAktif("kontak")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "kontak" 
-              ? "bg-purple-600 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
+            🖼️
+          </span> 
+          Header Beranda
+        </button>
+        
+        <button 
+          onClick={() => setTabAktif("kontak")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "kontak" 
+            ? "bg-purple-600 text-white shadow-md" 
+            : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span 
+            className="text-xl"
           >
-            <span 
-              className="text-xl"
-            >
-              📞
-            </span> 
-            Kontak & Sosmed
-          </button>
-          
-          <button 
-            onClick={() => setTabAktif("slide")} 
-            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              tabAktif === "slide" 
-              ? "bg-blue-600 text-white shadow-md" 
-              : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-            }`}
+            📞
+          </span> 
+          Kontak & Sosmed
+        </button>
+        
+        <button 
+          onClick={() => setTabAktif("slide")} 
+          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+            tabAktif === "slide" 
+            ? "bg-blue-600 text-white shadow-md" 
+            : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <span 
+            className="text-xl"
           >
-            <span 
-              className="text-xl"
-            >
-              📰
-            </span> 
-            Berita Slide
-          </button>
-        </div>
-      )}
+            📰
+          </span> 
+          Berita Slide
+        </button>
+      </div>
 
+      {/* ==========================================
+          TAB 1: PENGATURAN HEADER BERANDA
+      ========================================== */}
       {tabAktif === "hero" && (
         <div 
           className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in"
@@ -385,6 +427,9 @@ export default function PengaturanBeranda({
         </div>
       )}
 
+      {/* ==========================================
+          TAB 2: KONTAK & SOSIAL MEDIA
+      ========================================== */}
       {tabAktif === "kontak" && (
         <div 
           className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-600 animate-fade-in"
@@ -397,7 +442,7 @@ export default function PengaturanBeranda({
             >
               📞
             </span> 
-            Identitas Kontak & Media Sosial
+            Identitas Kontak & Peta
           </h3>
           <p 
             className="text-gray-500 text-sm mb-8"
@@ -433,11 +478,31 @@ export default function PengaturanBeranda({
                   </label>
                   <textarea 
                     required 
-                    rows={3} 
+                    rows={2} 
                     value={kontak.alamat} 
                     onChange={(e) => setKontak({...kontak, alamat: e.target.value})} 
                     className="w-full p-3 border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all text-sm leading-relaxed"
                   ></textarea>
+                </div>
+
+                <div>
+                  <label 
+                    className="block text-xs font-bold mb-2 text-purple-800"
+                  >
+                    Link Peta Google Maps (Embed src)
+                  </label>
+                  <textarea 
+                    rows={3} 
+                    value={kontak.peta_embed} 
+                    onChange={(e) => setKontak({...kontak, peta_embed: e.target.value})} 
+                    placeholder="https://www.google.com/maps/embed?pb=..."
+                    className="w-full p-3 border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all text-sm font-mono text-gray-700"
+                  ></textarea>
+                  <p 
+                    className="text-[9px] mt-1 text-purple-600 font-bold"
+                  >
+                    Hanya masukkan URL (link) yang ada di dalam atribut src="" pada kode embed Google Maps.
+                  </p>
                 </div>
                 
                 <div>
@@ -589,25 +654,90 @@ export default function PengaturanBeranda({
         </div>
       )}
 
+      {/* ==========================================
+          TAB 3: BERITA SLIDE (PREVIEW SINKRON)
+      ========================================== */}
       {tabAktif === "slide" && (
         <div 
-          className="bg-white p-6 md:p-12 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in text-center"
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in"
         >
-          <span 
-            className="text-6xl mb-4 block opacity-50"
-          >
-            📰
-          </span>
           <h3 
-            className="text-2xl font-black text-gray-900 mb-2"
+            className="text-2xl font-bold mb-2 flex items-center gap-2"
           >
-            Pengaturan Berita Slide
+            <span 
+              className="text-3xl"
+            >
+              📰
+            </span> 
+            Pratinjau Berita Slide Beranda
           </h3>
           <p 
-            className="text-gray-500 font-medium max-w-lg mx-auto"
+            className="text-gray-500 text-sm mb-8"
           >
-            Fitur ini secara otomatis menarik berita terbaru dari menu "Kabar & Agenda" yang ditandai sebagai <b>Pin/Info Penting</b>. Anda tidak perlu mengatur slide secara manual di sini.
+            Data di bawah ini ditarik otomatis dari menu <b>Kabar & Agenda</b>. Untuk mengubah daftar ini, silakan tandai (Pin) berita yang Anda inginkan di halaman manajemen berita.
           </p>
+
+          {beritaTampil.length === 0 ? (
+            <div 
+              className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50"
+            >
+              <p 
+                className="text-gray-500 font-bold"
+              >
+                Belum ada berita yang ditandai untuk tampil di Beranda.
+              </p>
+            </div>
+          ) : (
+            <div 
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {beritaTampil.map((berita) => (
+                <div 
+                  key={berita.id} 
+                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                >
+                  <div 
+                    className="h-32 bg-gray-200 relative"
+                  >
+                    {berita.gambar ? (
+                      <img 
+                        src={berita.gambar.startsWith("http") ? berita.gambar : `https://wsrv.nl/?url=${berita.gambar}`} 
+                        alt="Preview"
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full flex items-center justify-center text-gray-400 text-2xl"
+                      >
+                        🖼️
+                      </div>
+                    )}
+                    <span 
+                      className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm uppercase"
+                    >
+                      PINNED
+                    </span>
+                  </div>
+                  <div 
+                    className="p-4"
+                  >
+                    <h4 
+                      className="font-bold text-gray-900 text-sm line-clamp-2 mb-2"
+                    >
+                      {berita.judul}
+                    </h4>
+                    <p 
+                      className="text-xs text-gray-500 mb-2"
+                    >
+                      {new Date(berita.tanggal).toLocaleDateString('id-ID', {
+                        day: 'numeric', month: 'long', year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

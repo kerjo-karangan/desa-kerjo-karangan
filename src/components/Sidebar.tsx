@@ -41,7 +41,6 @@ export default function Sidebar({
   const router = useRouter();
   
   const activeMenu = searchParams.get("menu") || "beranda";
-  // PERBAIKAN ERROR TYPESCRIPT: Mendeklarasikan activeSubMenu
   const activeSubMenu = searchParams.get("submenu") || "";
   
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
@@ -80,6 +79,7 @@ export default function Sidebar({
     }
   };
 
+  // STRUKTUR URUTAN MENU PERSIS SESUAI PERMINTAAN
   const menuList = [
     { 
       id: "beranda", 
@@ -87,18 +87,9 @@ export default function Sidebar({
       label: "Beranda Utama", 
       path: "/dashboard?menu=beranda", 
       sub: [
-        { 
-          id: "beranda-hero", 
-          label: "Header Beranda" 
-        },
-        { 
-          id: "beranda-kontak", 
-          label: "Kontak & Sosmed" 
-        },
-        { 
-          id: "beranda-slide", 
-          label: "Berita Slide" 
-        }
+        { id: "beranda-hero", label: "Pengaturan Header" },
+        { id: "beranda-kontak", label: "Kontak & Sosmed" },
+        { id: "beranda-slide", label: "Berita Slide" }
       ] 
     },
     { 
@@ -107,46 +98,23 @@ export default function Sidebar({
       label: "Profil & UMKM", 
       path: "/dashboard?menu=profil",
       sub: [
-        { 
-          id: "profil-hero", 
-          label: "Pengaturan Header" 
-        },
-        { 
-          id: "profil-teks", 
-          label: "Sejarah & Visi Misi" 
-        },
-        { 
-          id: "profil-sotk", 
-          label: "Susunan SOTK" 
-        },
-        { 
-          id: "profil-lembaga", 
-          label: "Lembaga Desa" 
-        },
-        { 
-          id: "profil-umkm", 
-          label: "Katalog UMKM" 
-        }
+        { id: "profil-hero", label: "Pengaturan Header" },
+        { id: "profil-teks", label: "Sejarah & Visi Misi" },
+        { id: "profil-sotk", label: "Susunan SOTK" },
+        { id: "profil-lembaga", label: "Lembaga Masyarakat" },
+        { id: "profil-umkm", label: "Katalog UMKM" }
       ]
     },
     { 
       id: "datadesa", 
       icon: "📊", 
-      label: "Data Desa", 
+      label: "Data Penduduk / Desa", 
       path: "/dashboard?menu=datadesa", 
       sub: [
-        { 
-          id: "data-kelola", 
-          label: "Daftar Penduduk" 
-        },
-        { 
-          id: "data-upload", 
-          label: "Impor Excel" 
-        },
-        { 
-          id: "data-hero", 
-          label: "Pengaturan Publik" 
-        }
+        { id: "data-hero", label: "Pengaturan Header" },
+        { id: "data-input", label: "Pengaturan Input Data" },
+        { id: "data-kelola", label: "Data Penduduk" },
+        { id: "data-upload", label: "Import & Ekspor Excel" }
       ] 
     },
     { 
@@ -155,18 +123,9 @@ export default function Sidebar({
       label: "Kabar & Agenda", 
       path: "/dashboard?menu=kabar",
       sub: [
-        { 
-          id: "kabar-hero", 
-          label: "Pengaturan Header" 
-        },
-        { 
-          id: "kabar-berita", 
-          label: "Manajemen Berita" 
-        },
-        { 
-          id: "kabar-agenda", 
-          label: "Manajemen Agenda" 
-        }
+        { id: "kabar-hero", label: "Pengaturan Header" },
+        { id: "kabar-berita", label: "Manajemen Berita" },
+        { id: "kabar-agenda", label: "Manajemen Agenda" }
       ]
     },
     { 
@@ -175,18 +134,9 @@ export default function Sidebar({
       label: "Transparansi", 
       path: "/dashboard?menu=transparansi",
       sub: [
-        { 
-          id: "trans-hero", 
-          label: "Pengaturan Header" 
-        },
-        { 
-          id: "trans-apbdes", 
-          label: "Data APBDes" 
-        },
-        { 
-          id: "trans-regulasi", 
-          label: "Regulasi & Perdes" 
-        }
+        { id: "trans-hero", label: "Pengaturan Header" },
+        { id: "trans-apbdes", label: "Data APBdes" },
+        { id: "trans-regulasi", label: "Regulasi & Perdes" }
       ]
     },
     { 
@@ -195,22 +145,10 @@ export default function Sidebar({
       label: "Layanan Warga", 
       path: "/dashboard?menu=layanan",
       sub: [
-        { 
-          id: "layan-hero", 
-          label: "Pengaturan Header" 
-        },
-        { 
-          id: "layan-antrean", 
-          label: "Antrean Surat" 
-        },
-        { 
-          id: "layan-master", 
-          label: "Daftar Jenis Surat" 
-        },
-        { 
-          id: "layan-pengaduan", 
-          label: "Kotak Pengaduan" 
-        }
+        { id: "layan-hero", label: "Pengaturan Header" },
+        { id: "layan-master", label: "Daftar Jenis Surat" },
+        { id: "layan-antrean", label: "Antrean Surat" },
+        { id: "layan-pengaduan", label: "Kotak Pengaduan" }
       ]
     },
     { 
@@ -222,49 +160,46 @@ export default function Sidebar({
     },
   ];
 
+  // FILTER MENU BERDASARKAN ROLE (KONTRIBUTOR VS PEMDES VS ADMIN)
   const filteredMenus = menuList.filter((item) => {
-    if (userRole === "Admin") {
+    if (userRole === "Admin" || userRole === "Pemerintah Desa") {
       return true;
     }
-    if (userRole === "Pemerintah Desa") {
-      return item.id !== "akun";
-    }
     if (userRole === "Kontributor") {
-      return item.id === "beranda" || item.id === "profil" || item.id === "kabar";
+      // Kontributor hanya boleh akses Profil, Kabar, dan Akun
+      return item.id === "profil" || item.id === "kabar" || item.id === "akun";
     }
     return item.id === "beranda"; 
   });
 
   return (
     <>
-      {/* Layar Gelap (Overlay) untuk Mobile saat Sidebar terbuka */}
       {isMobileOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm"
           onClick={() => setIsMobileOpen(false)}
         ></div>
       )}
 
-      {/* Container Utama Sidebar (Flex Column & H-Screen) */}
+      {/* Container utama dengan tinggi h-screen dan flex column agar bisa di-scroll */}
       <aside 
         className={`w-64 bg-gray-900 text-white h-screen fixed top-0 left-0 z-50 flex flex-col transform transition-transform duration-300 shadow-2xl ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
         
-        {/* BAGIAN ATAS: Logo & Profil Login (Terkunci / Tidak ikut di-scroll) */}
+        {/* BAGIAN ATAS: Identitas & Panel Tombol Akun / Logout */}
         <div 
-          className="p-5 border-b border-gray-800 bg-gray-950 flex-shrink-0"
+          className="p-4 border-b border-gray-800 bg-gray-950 flex-shrink-0"
         >
-          
           <div 
-            className="flex items-center justify-between mb-5"
+            className="flex items-center justify-between mb-4"
           >
             <div 
               className="flex items-center gap-3"
             >
               <div 
-                className="w-10 h-10 bg-white rounded-full p-1 flex-shrink-0 shadow-lg"
+                className="w-9 h-9 bg-white rounded-full p-1 flex-shrink-0 shadow-md"
               >
                 <img 
                   src="https://i.ibb.co.com/4ny8JgGm/1.png" 
@@ -274,20 +209,20 @@ export default function Sidebar({
               </div>
               <div>
                 <h2 
-                  className="font-black text-lg tracking-wide text-white leading-tight"
+                  className="font-black text-base tracking-wide text-white leading-tight"
                 >
                   Desa Kerjo
                 </h2>
                 <span 
-                  className="text-[10px] text-green-400 font-bold uppercase tracking-widest"
+                  className="text-[9px] text-green-400 font-bold uppercase tracking-widest"
                 >
                   Panel Admin
                 </span>
               </div>
             </div>
-            {/* Tombol Tutup Khusus Mobile */}
+            
             <button 
-              className="lg:hidden text-gray-400 hover:text-white text-3xl font-black transition-colors"
+              className="lg:hidden text-gray-400 hover:text-white text-2xl font-black transition-colors px-2 py-1"
               onClick={() => setIsMobileOpen(false)}
             >
               ×
@@ -295,11 +230,11 @@ export default function Sidebar({
           </div>
 
           <div 
-            className="bg-gray-800 rounded-xl p-3 flex flex-col gap-3 shadow-inner"
+            className="bg-gray-800 rounded-xl p-3 flex flex-col gap-2.5 shadow-inner border border-gray-700/50"
           >
             <div>
               <p 
-                className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-0.5"
+                className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-0.5"
               >
                 Login Aktif:
               </p>
@@ -311,20 +246,17 @@ export default function Sidebar({
             </div>
             <button 
               onClick={handleLogout} 
-              className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+              className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
-              <span>
-                🚪
-              </span> 
+              <span>🚪</span> 
               Keluar Sesi
             </button>
           </div>
-
         </div>
 
-        {/* BAGIAN TENGAH: Menu Navigasi (Bisa di-scroll ke bawah) */}
+        {/* BAGIAN TENGAH: Menu Navigasi (Diberi overflow-y-auto agar bisa digeser di HP) */}
         <nav 
-          className="flex-1 overflow-y-auto p-4 space-y-2 pb-8"
+          className="flex-1 overflow-y-auto p-4 space-y-2 pb-24"
         >
           {filteredMenus.map((item) => {
             const isActive = activeMenu === item.id;
@@ -341,7 +273,7 @@ export default function Sidebar({
                 <Link 
                   href={item.path} 
                   onClick={() => setIsMobileOpen(false)} 
-                  className={`flex items-center justify-between px-4 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl font-bold text-sm transition-all duration-300 ${
                     isActive 
                     ? "bg-green-600 text-white shadow-lg shadow-green-900/50" 
                     : "text-gray-400 hover:bg-gray-800 hover:text-green-400"
@@ -351,7 +283,7 @@ export default function Sidebar({
                     className="flex items-center gap-3"
                   >
                     <span 
-                      className="text-xl"
+                      className="text-lg"
                     >
                       {item.icon}
                     </span>
@@ -376,26 +308,26 @@ export default function Sidebar({
                   <div 
                     className={`overflow-hidden transition-all duration-300 ease-in-out ${
                       isHovered || isActive 
-                      ? 'max-h-96 opacity-100 mt-2 mb-2' 
+                      ? 'max-h-96 opacity-100 mt-1.5 mb-1.5' 
                       : 'max-h-0 opacity-0'
                     }`}
                   >
                     <div 
-                      className="pl-12 flex flex-col gap-1 border-l-2 border-gray-800 ml-6 relative"
+                      className="pl-10 flex flex-col gap-1 border-l-2 border-gray-800 ml-6 relative"
                     >
                       {item.sub.map((subItem, idx) => (
                         <Link 
                           key={idx} 
                           href={`${item.path}&submenu=${subItem.id}`}
                           onClick={() => setIsMobileOpen(false)}
-                          className={`text-xs font-bold py-2.5 px-4 rounded-r-lg transition-colors relative ${
+                          className={`text-xs font-bold py-2 px-3 rounded-r-lg transition-colors relative ${
                             activeSubMenu === subItem.id 
                             ? "text-white bg-gray-800" 
                             : "text-gray-400 hover:text-white hover:bg-gray-800"
                           }`}
                         >
                           <span 
-                            className="absolute left-[-2px] top-1/2 w-3 h-[2px] bg-gray-700"
+                            className="absolute left-[-2px] top-1/2 w-2.5 h-[2px] bg-gray-700"
                           ></span>
                           {subItem.label}
                         </Link>
@@ -407,6 +339,17 @@ export default function Sidebar({
             );
           })}
         </nav>
+
+        {/* Footer Kecil di Bawah Sidebar */}
+        <div 
+          className="p-3 bg-gray-950 border-t border-gray-800 flex-shrink-0 text-center"
+        >
+          <span 
+            className="text-[10px] text-gray-500 font-bold uppercase tracking-widest"
+          >
+            Role: {userRole || "Admin"}
+          </span>
+        </div>
 
       </aside>
     </>
