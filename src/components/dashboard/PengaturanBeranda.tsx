@@ -64,15 +64,30 @@ export default function PengaturanBeranda({
     fb: "",
     yt: "",
     tiktok: "",
-    peta_embed: "" // Penambahan Form Embed Google Maps
+    peta_embed: ""
   });
   const [statusKontak, setStatusKontak] = useState("");
   const [isLoadingKontak, setIsLoadingKontak] = useState(false);
 
   // ==========================================
-  // STATE: BERITA SLIDE
+  // STATE: BERITA SLIDE (DATABASE: kabar_desa)
   // ==========================================
   const [beritaTampil, setBeritaTampil] = useState<any[]>([]);
+
+  // ==========================================
+  // FUNGSI KONVERSI GAMBAR HEIC -> JPG (WSVR)
+  // ==========================================
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
+  };
 
   // ==========================================
   // FETCH DATA AWAL
@@ -104,10 +119,10 @@ export default function PengaturanBeranda({
           });
         }
 
-        // Ambil Data Berita yang di-Pin
+        // Ambil Data Berita yang di-Pin (DATABASE: kabar_desa)
         const qBerita = query(
-          collection(db, "kabar_berita"), 
-          where("pin_beranda", "==", true)
+          collection(db, "kabar_desa"), 
+          where("is_pinned", "==", true)
         );
         const snapBerita = await getDocs(qBerita);
         setBeritaTampil(snapBerita.docs.map(doc => ({ 
@@ -229,10 +244,6 @@ export default function PengaturanBeranda({
       className="space-y-8 animate-fade-in pb-20 font-sans"
     >
       
-      {/* 
-        PERBAIKAN: Tombol Tab ini sekarang SELALU TAMPIL, 
-        tidak lagi disembunyikan meskipun diakses via Sidebar.
-      */}
       <div 
         className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
       >
@@ -323,16 +334,16 @@ export default function PengaturanBeranda({
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-800"
                   >
-                    Judul Utama
+                    Judul Utama (Mendukung Multi-Baris)
                   </label>
-                  <input 
-                    type="text" 
+                  <textarea 
                     required 
+                    rows={3}
                     value={judulHero} 
                     onChange={(e) => setJudulHero(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg"
-                    placeholder="Contoh: Selamat Datang Di Desa Kerjo"
-                  />
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg whitespace-pre-wrap"
+                    placeholder="Contoh: Selamat Datang Di&#10;Desa Kerjo"
+                  ></textarea>
                 </div>
                 <div>
                   <label 
@@ -345,7 +356,7 @@ export default function PengaturanBeranda({
                     rows={4} 
                     value={subHero} 
                     onChange={(e) => setSubHero(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed"
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all text-sm leading-relaxed whitespace-pre-wrap"
                     placeholder="Mewujudkan pelayanan masyarakat yang transparan..."
                   ></textarea>
                 </div>
@@ -360,12 +371,13 @@ export default function PengaturanBeranda({
                   Gambar Background Beranda
                 </label>
                 
+                {/* VARIABEL TELAH DIPERBAIKI MENJADI bgHeroLama */}
                 {bgHeroLama && (
                   <div 
                     className="relative w-full h-40 md:h-48 rounded-xl overflow-hidden shadow-inner border border-gray-200 group"
                   >
                     <img 
-                      src={bgHeroLama.startsWith("http") ? bgHeroLama : `https://wsrv.nl/?url=${bgHeroLama}`} 
+                      src={getSafeImageUrl(bgHeroLama)} 
                       alt="Hero Beranda"
                       className="w-full h-full object-cover" 
                     />
@@ -383,6 +395,7 @@ export default function PengaturanBeranda({
                   <span 
                     className="font-bold text-yellow-800 text-sm"
                   >
+                    {/* VARIABEL TELAH DIPERBAIKI MENJADI bgHeroLama */}
                     {bgHeroLama ? "Ganti Gambar Baru" : "Upload Background ke Cloudinary"}
                   </span>
                   <input 
@@ -655,7 +668,7 @@ export default function PengaturanBeranda({
       )}
 
       {/* ==========================================
-          TAB 3: BERITA SLIDE (PREVIEW SINKRON)
+          TAB 3: BERITA SLIDE (PREVIEW SINKRON KABAR_DESA)
       ========================================== */}
       {tabAktif === "slide" && (
         <div 
@@ -674,7 +687,7 @@ export default function PengaturanBeranda({
           <p 
             className="text-gray-500 text-sm mb-8"
           >
-            Data di bawah ini ditarik otomatis dari menu <b>Kabar & Agenda</b>. Untuk mengubah daftar ini, silakan tandai (Pin) berita yang Anda inginkan di halaman manajemen berita.
+            Data di bawah ini ditarik otomatis dari menu <b>Kabar & Agenda</b> (Database: <code>kabar_desa</code>). Untuk mengubah daftar ini, silakan tandai (Pin) berita yang Anda inginkan di halaman manajemen berita.
           </p>
 
           {beritaTampil.length === 0 ? (
@@ -691,51 +704,61 @@ export default function PengaturanBeranda({
             <div 
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
             >
-              {beritaTampil.map((berita) => (
-                <div 
-                  key={berita.id} 
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-                >
+              {beritaTampil.map((berita) => {
+                
+                let imgUrl = "";
+                if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
+                  imgUrl = berita.gambar[0];
+                } else if (typeof berita.gambar === "string") {
+                  imgUrl = berita.gambar;
+                }
+
+                return (
                   <div 
-                    className="h-32 bg-gray-200 relative"
+                    key={berita.id} 
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
                   >
-                    {berita.gambar ? (
-                      <img 
-                        src={berita.gambar.startsWith("http") ? berita.gambar : `https://wsrv.nl/?url=${berita.gambar}`} 
-                        alt="Preview"
-                        className="w-full h-full object-cover" 
-                      />
-                    ) : (
-                      <div 
-                        className="w-full h-full flex items-center justify-center text-gray-400 text-2xl"
+                    <div 
+                      className="h-32 bg-gray-200 relative"
+                    >
+                      {imgUrl ? (
+                        <img 
+                          src={getSafeImageUrl(imgUrl)} 
+                          alt="Preview"
+                          className="w-full h-full object-cover" 
+                        />
+                      ) : (
+                        <div 
+                          className="w-full h-full flex items-center justify-center text-gray-400 text-2xl"
+                        >
+                          🖼️
+                        </div>
+                      )}
+                      <span 
+                        className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm uppercase"
                       >
-                        🖼️
-                      </div>
-                    )}
-                    <span 
-                      className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm uppercase"
+                        PINNED
+                      </span>
+                    </div>
+                    <div 
+                      className="p-4"
                     >
-                      PINNED
-                    </span>
+                      <h4 
+                        className="font-bold text-gray-900 text-sm line-clamp-2 mb-2"
+                      >
+                        {berita.judul}
+                      </h4>
+                      <p 
+                        className="text-xs text-gray-500 mb-2"
+                      >
+                        {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString('id-ID', {
+                          day: 'numeric', month: 'long', year: 'numeric'
+                        }) : "-"}
+                      </p>
+                    </div>
                   </div>
-                  <div 
-                    className="p-4"
-                  >
-                    <h4 
-                      className="font-bold text-gray-900 text-sm line-clamp-2 mb-2"
-                    >
-                      {berita.judul}
-                    </h4>
-                    <p 
-                      className="text-xs text-gray-500 mb-2"
-                    >
-                      {new Date(berita.tanggal).toLocaleDateString('id-ID', {
-                        day: 'numeric', month: 'long', year: 'numeric'
-                      })}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

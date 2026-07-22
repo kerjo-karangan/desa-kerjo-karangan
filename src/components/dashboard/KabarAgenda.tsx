@@ -43,6 +43,7 @@ export default function KabarAgenda({
 
   const [statusProses, setStatusProses] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingFoto, setIsUploadingFoto] = useState(false);
 
   // ==========================================
   // STATE: HERO
@@ -53,7 +54,7 @@ export default function KabarAgenda({
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
 
   // ==========================================
-  // STATE: BERITA
+  // STATE: BERITA (DATABASE: kabar_desa)
   // ==========================================
   const [dataBerita, setDataBerita] = useState<any[]>([]);
   const [searchBerita, setSearchBerita] = useState("");
@@ -62,17 +63,18 @@ export default function KabarAgenda({
   
   const [isModalBeritaOpen, setIsModalBeritaOpen] = useState(false);
   const [editIdBerita, setEditIdBerita] = useState<string | null>(null);
+  
+  // Struktur Form disesuaikan dengan database asli
   const [formBerita, setFormBerita] = useState({
     judul: "",
-    kategori: "",
-    isi_berita: "",
-    tanggal: ""
+    kategori: "", 
+    isi: "",
+    tanggal_posting: "",
+    gambar: [] as string[] // Array of strings untuk daftar foto
   });
-  const [fotoBerita, setFotoBerita] = useState<FileList | null>(null);
-  const [fotoBeritaLama, setFotoBeritaLama] = useState("");
 
   // ==========================================
-  // STATE: AGENDA
+  // STATE: AGENDA (DATABASE: agenda_desa)
   // ==========================================
   const [dataAgenda, setDataAgenda] = useState<any[]>([]);
   const [searchAgenda, setSearchAgenda] = useState("");
@@ -81,13 +83,37 @@ export default function KabarAgenda({
 
   const [isModalAgendaOpen, setIsModalAgendaOpen] = useState(false);
   const [editIdAgenda, setEditIdAgenda] = useState<string | null>(null);
+  
+  // Struktur Form disesuaikan dengan database asli
   const [formAgenda, setFormAgenda] = useState({
-    nama_kegiatan: "",
+    nama: "",
     tanggal: "",
-    waktu: "",
-    lokasi: "",
-    deskripsi: ""
+    lokasi: ""
   });
+
+  // ==========================================
+  // FUNGSI KONVERSI TANGGAL (DATETIME-LOCAL)
+  // ==========================================
+  // Mengubah string ISO ke format YYYY-MM-DDTHH:mm untuk input datetime-local
+  const toDateTimeLocal = (isoString: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    // Menghindari timezone offset issue dengan mengambil komponen lokal
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
+  };
 
   // ==========================================
   // FUNGSI FETCH DATA
@@ -101,11 +127,13 @@ export default function KabarAgenda({
         setHeroBgLama(snapHero.data().bg || "");
       }
 
-      const qBerita = query(collection(db, "kabar_berita"), orderBy("tanggal", "desc"));
+      // Mengambil data dari kabar_desa
+      const qBerita = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
       const snapBerita = await getDocs(qBerita);
       setDataBerita(snapBerita.docs.map(d => ({ id: d.id, ...d.data() })));
 
-      const qAgenda = query(collection(db, "kabar_agenda"), orderBy("tanggal", "desc"));
+      // Mengambil data dari agenda_desa
+      const qAgenda = query(collection(db, "agenda_desa"), orderBy("tanggal", "desc"));
       const snapAgenda = await getDocs(qAgenda);
       setDataAgenda(snapAgenda.docs.map(d => ({ id: d.id, ...d.data() })));
 
@@ -119,7 +147,7 @@ export default function KabarAgenda({
   }, []);
 
   // ==========================================
-  // CLOUDINARY UPLOADER
+  // CLOUDINARY UPLOADER & DELETER
   // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
@@ -142,7 +170,9 @@ export default function KabarAgenda({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-    } catch (error) {}
+    } catch (error) {
+      console.error("Gagal hapus di Cloudinary", error);
+    }
   };
 
   // ==========================================
@@ -180,12 +210,12 @@ export default function KabarAgenda({
   };
 
   // ==========================================
-  // HANDLER BERITA & PROTEKSI PIN 10 SLIDE
+  // HANDLER BERITA (KABAR DESA)
   // ==========================================
   const togglePinBeranda = async (id: string, currentStatus: boolean) => {
-    // PROTEKSI: Cek jumlah pin jika mencoba menambah Pin baru
+    // Proteksi gembok 10 slide tetap berjalan
     if (!currentStatus) {
-      const jumlahDiPin = dataBerita.filter(b => b.pin_beranda === true).length;
+      const jumlahDiPin = dataBerita.filter(b => b.is_pinned === true).length;
       if (jumlahDiPin >= 10) {
         alert("⚠️ BATAS MAKSIMAL TERCAPAI!\n\nAnda sudah menyematkan (Pin) 10 berita di Beranda Utama.\n\nSilakan lepas (Unpin) salah satu berita lama terlebih dahulu untuk menggantikannya dengan berita ini.");
         return;
@@ -193,8 +223,8 @@ export default function KabarAgenda({
     }
 
     try {
-      await updateDoc(doc(db, "kabar_berita", id), {
-        pin_beranda: !currentStatus
+      await updateDoc(doc(db, "kabar_desa", id), {
+        is_pinned: !currentStatus
       });
       ambilData();
     } catch (error) {
@@ -205,53 +235,102 @@ export default function KabarAgenda({
   const bukaModalBerita = (item: any = null) => {
     if (item) {
       setEditIdBerita(item.id);
+      
+      // Mengamankan data array gambar
+      let existingImages: string[] = [];
+      if (Array.isArray(item.gambar)) {
+        existingImages = item.gambar;
+      } else if (typeof item.gambar === "string" && item.gambar.trim() !== "") {
+        existingImages = [item.gambar];
+      }
+
       setFormBerita({
-        judul: item.judul,
-        kategori: item.kategori,
-        isi_berita: item.isi_berita,
-        tanggal: item.tanggal
+        judul: item.judul || "",
+        kategori: item.kategori || "Umum",
+        isi: item.isi || "",
+        tanggal_posting: toDateTimeLocal(item.tanggal_posting || new Date().toISOString()),
+        gambar: existingImages
       });
-      setFotoBeritaLama(item.gambar || "");
     } else {
       setEditIdBerita(null);
       setFormBerita({
         judul: "",
         kategori: "",
-        isi_berita: "",
-        tanggal: new Date().toISOString().split('T')[0]
+        isi: "",
+        tanggal_posting: toDateTimeLocal(new Date().toISOString()),
+        gambar: []
       });
-      setFotoBeritaLama("");
     }
-    setFotoBerita(null);
     setIsModalBeritaOpen(true);
+  };
+
+  // Penanganan Multiple Upload Gambar Langsung (Live)
+  const handleUploadDaftarFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    setIsUploadingFoto(true);
+    try {
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = await uploadFotoKeCloudinary(files[i]);
+        if (url) {
+          uploadedUrls.push(url);
+        }
+      }
+      
+      // Tambahkan url baru ke state array gambar yang sudah ada
+      setFormBerita(prev => ({
+        ...prev,
+        gambar: [...prev.gambar, ...uploadedUrls]
+      }));
+    } catch (error) {
+      console.error("Gagal mengunggah beberapa foto", error);
+      alert("Terjadi kesalahan saat mengunggah foto.");
+    } finally {
+      setIsUploadingFoto(false);
+      // Reset input agar bisa upload file yang sama lagi jika perlu
+      e.target.value = ""; 
+    }
+  };
+
+  // Penanganan Hapus Gambar Spesifik (Klik Silang)
+  const handleHapusSatuFoto = async (urlHapus: string, indexToRemove: number) => {
+    if (!confirm("Yakin ingin menghapus foto ini?")) return;
+    
+    // Hapus dari state UI
+    const updatedImages = formBerita.gambar.filter((_, idx) => idx !== indexToRemove);
+    setFormBerita(prev => ({ ...prev, gambar: updatedImages }));
+
+    // Eksekusi penghapusan di Cloudinary background
+    await hapusFotoDiCloudinary(urlHapus);
   };
 
   const simpanBerita = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setStatusProses("Menyimpan Berita...");
+    
     try {
-      let imageUrl = fotoBeritaLama;
-      if (fotoBerita && fotoBerita.length > 0) {
-        const newImg = await uploadFotoKeCloudinary(fotoBerita[0]);
-        if (newImg) {
-          if (fotoBeritaLama) await hapusFotoDiCloudinary(fotoBeritaLama);
-          imageUrl = newImg;
-        }
-      }
+      // Pastikan format tanggal posting menjadi ISO kembali untuk database
+      const isoDate = new Date(formBerita.tanggal_posting).toISOString();
 
       const payload = { 
-        ...formBerita, 
-        gambar: imageUrl,
-        penulis: userEmail 
+        judul: formBerita.judul,
+        kategori: formBerita.kategori,
+        isi: formBerita.isi,
+        tanggal_posting: isoDate,
+        gambar: formBerita.gambar,
+        penulis: userEmail,
+        is_featured: false
       };
 
       if (editIdBerita) {
-        await updateDoc(doc(db, "kabar_berita", editIdBerita), payload);
+        await updateDoc(doc(db, "kabar_desa", editIdBerita), payload);
       } else {
-        await addDoc(collection(db, "kabar_berita"), {
+        await addDoc(collection(db, "kabar_desa"), {
           ...payload,
-          pin_beranda: false
+          is_pinned: false
         });
       }
 
@@ -261,40 +340,45 @@ export default function KabarAgenda({
       setTimeout(() => setStatusProses(""), 3000);
     } catch (error) {
       setStatusProses("❌ Gagal menyimpan berita.");
+      console.error(error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const hapusBerita = async (id: string, urlFoto: string) => {
+  const hapusBerita = async (id: string, arrayFoto: string[] | string) => {
     if (confirm("Hapus berita ini permanen?")) {
-      if (urlFoto) await hapusFotoDiCloudinary(urlFoto);
-      await deleteDoc(doc(db, "kabar_berita", id));
+      // Hapus seluruh foto yang terkait
+      if (Array.isArray(arrayFoto)) {
+        for (const url of arrayFoto) {
+          await hapusFotoDiCloudinary(url);
+        }
+      } else if (typeof arrayFoto === "string" && arrayFoto !== "") {
+        await hapusFotoDiCloudinary(arrayFoto);
+      }
+
+      await deleteDoc(doc(db, "kabar_desa", id));
       ambilData();
     }
   };
 
   // ==========================================
-  // HANDLER AGENDA
+  // HANDLER AGENDA (AGENDA DESA)
   // ==========================================
   const bukaModalAgenda = (item: any = null) => {
     if (item) {
       setEditIdAgenda(item.id);
       setFormAgenda({
-        nama_kegiatan: item.nama_kegiatan,
-        tanggal: item.tanggal,
-        waktu: item.waktu,
-        lokasi: item.lokasi,
-        deskripsi: item.deskripsi
+        nama: item.nama,
+        tanggal: toDateTimeLocal(item.tanggal || new Date().toISOString()),
+        lokasi: item.lokasi || ""
       });
     } else {
       setEditIdAgenda(null);
       setFormAgenda({
-        nama_kegiatan: "",
-        tanggal: new Date().toISOString().split('T')[0],
-        waktu: "",
-        lokasi: "",
-        deskripsi: ""
+        nama: "",
+        tanggal: toDateTimeLocal(new Date().toISOString()),
+        lokasi: ""
       });
     }
     setIsModalAgendaOpen(true);
@@ -305,12 +389,20 @@ export default function KabarAgenda({
     setIsLoading(true);
     setStatusProses("Menyimpan Agenda...");
     try {
-      const payload = { ...formAgenda, pembuat: userEmail };
+      const isoDate = new Date(formAgenda.tanggal).toISOString();
+      const payload = { 
+        nama: formAgenda.nama,
+        tanggal: isoDate,
+        lokasi: formAgenda.lokasi,
+        is_featured: true
+      };
+      
       if (editIdAgenda) {
-        await updateDoc(doc(db, "kabar_agenda", editIdAgenda), payload);
+        await updateDoc(doc(db, "agenda_desa", editIdAgenda), payload);
       } else {
-        await addDoc(collection(db, "kabar_agenda"), payload);
+        await addDoc(collection(db, "agenda_desa"), payload);
       }
+      
       setIsModalAgendaOpen(false);
       ambilData();
       setStatusProses("✅ Agenda berhasil disimpan!");
@@ -324,13 +416,13 @@ export default function KabarAgenda({
 
   const hapusAgenda = async (id: string) => {
     if (confirm("Hapus agenda ini permanen?")) {
-      await deleteDoc(doc(db, "kabar_agenda", id));
+      await deleteDoc(doc(db, "agenda_desa", id));
       ambilData();
     }
   };
 
   // ==========================================
-  // FILTER & PAGINASI BERITA
+  // FILTER & PAGINASI
   // ==========================================
   const filteredBerita = dataBerita.filter((b) => 
     b.judul?.toLowerCase().includes(searchBerita.toLowerCase()) ||
@@ -339,11 +431,8 @@ export default function KabarAgenda({
   const totalPageBerita = Math.ceil(filteredBerita.length / perPageBerita);
   const paginatedBerita = filteredBerita.slice((pageBerita - 1) * perPageBerita, pageBerita * perPageBerita);
 
-  // ==========================================
-  // FILTER & PAGINASI AGENDA
-  // ==========================================
   const filteredAgenda = dataAgenda.filter((a) => 
-    a.nama_kegiatan?.toLowerCase().includes(searchAgenda.toLowerCase())
+    a.nama?.toLowerCase().includes(searchAgenda.toLowerCase())
   );
   const totalPageAgenda = Math.ceil(filteredAgenda.length / perPageAgenda);
   const paginatedAgenda = filteredAgenda.slice((pageAgenda - 1) * perPageAgenda, pageAgenda * perPageAgenda);
@@ -457,7 +546,7 @@ export default function KabarAgenda({
                     className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200"
                   >
                     <img 
-                      src={heroBgLama.startsWith("http") ? heroBgLama : `https://wsrv.nl/?url=${heroBgLama}`} 
+                      src={getSafeImageUrl(heroBgLama)} 
                       className="w-full h-full object-cover" 
                     />
                   </div>
@@ -496,7 +585,7 @@ export default function KabarAgenda({
       )}
 
       {/* ==========================================
-          TAB 2: MANAJEMEN BERITA
+          TAB 2: MANAJEMEN BERITA (KABAR DESA)
       ========================================== */}
       {tabAktif === "berita" && (
         <div 
@@ -549,81 +638,91 @@ export default function KabarAgenda({
                 </p>
               </div>
             ) : (
-              paginatedBerita.map((item) => (
-                <div 
-                  key={item.id} 
-                  className="bg-gray-50 border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col"
-                >
-                  {/* Judul Memanjang Bebas di Atas */}
-                  <h4 
-                    className="text-xl font-black text-gray-900 mb-3 leading-tight"
-                  >
-                    {item.judul}
-                  </h4>
-                  
+              paginatedBerita.map((item) => {
+                
+                // Ambil thumbnail pertama jika array
+                let imgThumb = "";
+                if (Array.isArray(item.gambar) && item.gambar.length > 0) {
+                  imgThumb = item.gambar[0];
+                } else if (typeof item.gambar === "string") {
+                  imgThumb = item.gambar;
+                }
+
+                return (
                   <div 
-                    className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between"
+                    key={item.id} 
+                    className="bg-gray-50 border border-gray-200 rounded-2xl p-5 hover:shadow-md transition-all flex flex-col"
                   >
-                    {/* Meta Info (Kiri) */}
-                    <div 
-                      className="flex items-center gap-4 text-xs font-bold text-gray-500"
+                    {/* Judul Memanjang Bebas di Atas */}
+                    <h4 
+                      className="text-xl font-black text-gray-900 mb-3 leading-tight"
                     >
-                      {item.gambar && (
-                        <div 
-                          className="w-16 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0"
-                        >
-                          <img 
-                            src={item.gambar.startsWith("http") ? item.gambar : `https://wsrv.nl/?url=${item.gambar}`} 
-                            className="w-full h-full object-cover" 
-                          />
-                        </div>
-                      )}
+                      {item.judul}
+                    </h4>
+                    
+                    <div 
+                      className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between"
+                    >
+                      {/* Meta Info (Kiri) */}
                       <div 
-                        className="flex flex-col gap-1"
+                        className="flex items-center gap-4 text-xs font-bold text-gray-500"
                       >
-                        <span 
-                          className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded w-max"
+                        {imgThumb && (
+                          <div 
+                            className="w-16 h-12 rounded-lg overflow-hidden border border-gray-300 flex-shrink-0"
+                          >
+                            <img 
+                              src={getSafeImageUrl(imgThumb)} 
+                              className="w-full h-full object-cover" 
+                            />
+                          </div>
+                        )}
+                        <div 
+                          className="flex flex-col gap-1"
                         >
-                          {item.kategori}
-                        </span>
-                        <span>
-                          {new Date(item.tanggal).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })} • Oleh: {item.penulis}
-                        </span>
+                          <span 
+                            className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded w-max"
+                          >
+                            {item.kategori || "Umum"}
+                          </span>
+                          <span>
+                            {item.tanggal_posting ? new Date(item.tanggal_posting).toLocaleString("id-ID") : "-"} • Oleh: {item.penulis || "-"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Tombol Aksi (Kanan) */}
+                      <div 
+                        className="flex items-center gap-2 mt-2 md:mt-0"
+                      >
+                        <button 
+                          onClick={() => togglePinBeranda(item.id, item.is_pinned)}
+                          className={`text-xs font-bold px-4 py-2 rounded-lg border flex items-center gap-2 transition-colors ${
+                            item.is_pinned ? "bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100"
+                          }`}
+                        >
+                          {item.is_pinned ? "⭐ Lepas Pin" : "📌 Pin Beranda"}
+                        </button>
+                        <button 
+                          onClick={() => bukaModalBerita(item)} 
+                          className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-4 py-2 rounded-lg font-bold transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => hapusBerita(item.id, item.gambar)} 
+                          className="text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg font-bold transition-colors"
+                        >
+                          Hapus
+                        </button>
                       </div>
                     </div>
-
-                    {/* Tombol Aksi (Kanan) */}
-                    <div 
-                      className="flex items-center gap-2 mt-2 md:mt-0"
-                    >
-                      <button 
-                        onClick={() => togglePinBeranda(item.id, item.pin_beranda)}
-                        className={`text-xs font-bold px-4 py-2 rounded-lg border flex items-center gap-2 transition-colors ${
-                          item.pin_beranda ? "bg-yellow-100 text-yellow-800 border-yellow-300 hover:bg-yellow-200" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100"
-                        }`}
-                      >
-                        {item.pin_beranda ? "⭐ Lepas Pin" : "📌 Pin Beranda"}
-                      </button>
-                      <button 
-                        onClick={() => bukaModalBerita(item)} 
-                        className="text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-4 py-2 rounded-lg font-bold transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => hapusBerita(item.id, item.gambar)} 
-                        className="text-xs bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-lg font-bold transition-colors"
-                      >
-                        Hapus
-                      </button>
-                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
 
-          {/* Kontrol Paginasi Berita */}
           {totalPageBerita > 1 && (
             <div 
               className="flex justify-between items-center mt-6 bg-gray-50 p-4 rounded-xl border border-gray-200"
@@ -653,7 +752,7 @@ export default function KabarAgenda({
       )}
 
       {/* ==========================================
-          TAB 3: MANAJEMEN AGENDA
+          TAB 3: MANAJEMEN AGENDA (AGENDA DESA)
       ========================================== */}
       {tabAktif === "agenda" && (
         <div 
@@ -715,16 +814,26 @@ export default function KabarAgenda({
                     <h4 
                       className="text-xl font-black text-gray-900 mb-2"
                     >
-                      {item.nama_kegiatan}
+                      {item.nama}
                     </h4>
                     <div 
                       className="text-sm font-bold text-gray-500 flex flex-col gap-1"
                     >
                       <span>
-                        <span className="text-blue-600">📅</span> {new Date(item.tanggal).toLocaleDateString("id-ID", { day: 'numeric', month: 'long', year: 'numeric' })} • {item.waktu} WIB
+                        <span 
+                          className="text-blue-600"
+                        >
+                          📅
+                        </span> 
+                        {item.tanggal ? new Date(item.tanggal).toLocaleString("id-ID") : "-"} WIB
                       </span>
                       <span>
-                        <span className="text-red-500">📍</span> {item.lokasi}
+                        <span 
+                          className="text-red-500"
+                        >
+                          📍
+                        </span> 
+                        {item.lokasi}
                       </span>
                     </div>
                   </div>
@@ -750,7 +859,6 @@ export default function KabarAgenda({
             )}
           </div>
 
-          {/* Kontrol Paginasi Agenda */}
           {totalPageAgenda > 1 && (
             <div 
               className="flex justify-between items-center mt-6 bg-gray-50 p-4 rounded-xl border border-gray-200"
@@ -780,23 +888,35 @@ export default function KabarAgenda({
       )}
 
       {/* ==========================================
-          MODAL BERITA
+          MODAL BERITA (LEBIH LEBAR DAN SCROLLABLE)
       ========================================== */}
       {isModalBeritaOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+          className="fixed inset-0 z-50 flex justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
         >
+          {/* PERBAIKAN: max-w-5xl dan my-12 agar sangat luas dan tidak tertutup pinggiran layar */}
           <div 
-            className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl p-6 md:p-8 my-8 border-t-8 border-green-600"
+            className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl p-6 sm:p-10 my-12 border-t-8 border-green-600 h-fit"
           >
-            <h3 
-              className="text-2xl font-black mb-6 text-gray-900"
+            <div 
+              className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4"
             >
-              {editIdBerita ? "Edit Berita" : "Tulis Berita Baru"}
-            </h3>
+              <h3 
+                className="text-3xl font-black text-gray-900"
+              >
+                {editIdBerita ? "Edit Berita Desa" : "Tulis Berita Baru"}
+              </h3>
+              <button 
+                onClick={() => setIsModalBeritaOpen(false)}
+                className="text-gray-400 hover:text-red-500 font-black text-2xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+            
             <form 
               onSubmit={simpanBerita} 
-              className="space-y-5"
+              className="space-y-6"
             >
               <div>
                 <label 
@@ -810,41 +930,45 @@ export default function KabarAgenda({
                   value={formBerita.judul} 
                   onChange={(e) => setFormBerita({...formBerita, judul: e.target.value})} 
                   className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500 font-bold text-lg" 
+                  placeholder="Masukkan judul kabar..."
                 />
               </div>
+
               <div 
-                className="grid grid-cols-1 md:grid-cols-2 gap-5"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Kategori
+                    Kategori Berita
                   </label>
                   <input 
                     type="text" 
                     required 
                     value={formBerita.kategori} 
                     onChange={(e) => setFormBerita({...formBerita, kategori: e.target.value})} 
-                    placeholder="Contoh: Pembangunan, Sosial..."
-                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500 uppercase" 
+                    placeholder="Contoh: Pembangunan, Sosial, Pertanian..."
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500" 
                   />
                 </div>
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Tanggal Publikasi
+                    Tanggal & Waktu Publikasi
                   </label>
+                  {/* PERBAIKAN: Tipe datetime-local untuk memfasilitasi Jam */}
                   <input 
-                    type="date" 
+                    type="datetime-local" 
                     required 
-                    value={formBerita.tanggal} 
-                    onChange={(e) => setFormBerita({...formBerita, tanggal: e.target.value})} 
+                    value={formBerita.tanggal_posting} 
+                    onChange={(e) => setFormBerita({...formBerita, tanggal_posting: e.target.value})} 
                     className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500 font-bold" 
                   />
                 </div>
               </div>
+
               <div>
                 <label 
                   className="block text-sm font-bold mb-2 text-gray-700"
@@ -853,46 +977,94 @@ export default function KabarAgenda({
                 </label>
                 <textarea 
                   required 
-                  rows={8} 
-                  value={formBerita.isi_berita} 
-                  onChange={(e) => setFormBerita({...formBerita, isi_berita: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500 leading-relaxed whitespace-pre-wrap"
+                  rows={10} 
+                  value={formBerita.isi} 
+                  onChange={(e) => setFormBerita({...formBerita, isi: e.target.value})} 
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-green-500 leading-relaxed whitespace-pre-wrap text-base"
+                  placeholder="Ketikkan teks berita secara lengkap di sini..."
                 ></textarea>
               </div>
-              <div>
-                <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
-                >
-                  Foto Dokumentasi Berita
-                </label>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => setFotoBerita(e.target.files)} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50" 
-                />
-                {fotoBeritaLama && (
-                  <p 
-                    className="text-xs text-green-600 mt-2 font-bold"
-                  >
-                    ✅ Gambar sudah terpasang. Biarkan kosong jika tidak ingin mengubahnya.
-                  </p>
-                )}
-              </div>
+
               <div 
-                className="flex gap-4 pt-4 border-t border-gray-100"
+                className="bg-gray-50 p-6 rounded-2xl border border-gray-200"
+              >
+                <label 
+                  className="block text-sm font-bold mb-4 text-gray-700 border-b border-gray-200 pb-2"
+                >
+                  Daftar Foto Dokumentasi (Galeri Mini)
+                </label>
+                
+                {/* Tampilan Daftar Gambar */}
+                {formBerita.gambar.length > 0 && (
+                  <div 
+                    className="flex flex-wrap gap-4 mb-6"
+                  >
+                    {formBerita.gambar.map((url, idx) => (
+                      <div 
+                        key={idx} 
+                        className="relative w-28 h-28 rounded-xl overflow-hidden border-2 border-gray-300 shadow-sm group"
+                      >
+                        <img 
+                          src={getSafeImageUrl(url)} 
+                          className="w-full h-full object-cover" 
+                        />
+                        {/* Tombol X Hapus yang muncul saat hover */}
+                        <button 
+                          type="button"
+                          onClick={() => handleHapusSatuFoto(url, idx)}
+                          className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <span 
+                            className="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs"
+                          >
+                            X Hapus
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Input Tambah Foto */}
+                <div 
+                  className="flex items-center gap-4"
+                >
+                  <label 
+                    className={`cursor-pointer bg-white border border-gray-300 hover:bg-green-50 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 transition-colors shadow-sm flex items-center gap-2 ${
+                      isUploadingFoto ? "opacity-50 pointer-events-none" : ""
+                    }`}
+                  >
+                    <span>{isUploadingFoto ? "⏳ Mengunggah..." : "📸 Tambah Foto Baru"}</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      multiple 
+                      onChange={handleUploadDaftarFoto} 
+                      className="hidden" 
+                    />
+                  </label>
+                  <p 
+                    className="text-[11px] text-gray-500 font-bold"
+                  >
+                    *Anda bisa mengunggah lebih dari satu gambar (Multiple Upload). Format HEIC didukung.
+                  </p>
+                </div>
+              </div>
+
+              <div 
+                className="flex gap-4 pt-6 border-t border-gray-100 mt-8"
               >
                 <button 
                   type="button" 
                   onClick={() => setIsModalBeritaOpen(false)} 
-                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-lg"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isLoading} 
-                  className="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                  disabled={isLoading || isUploadingFoto} 
+                  className="flex-1 py-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-colors text-lg"
                 >
                   {isLoading ? "Menyimpan..." : "Publikasikan Berita"}
                 </button>
@@ -903,23 +1075,35 @@ export default function KabarAgenda({
       )}
 
       {/* ==========================================
-          MODAL AGENDA
+          MODAL AGENDA (DIPERPANJANG KE ATAS BAWAH)
       ========================================== */}
       {isModalAgendaOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+          className="fixed inset-0 z-50 flex justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
         >
+          {/* PERBAIKAN: max-w-4xl dan my-12 agar leluasa */}
           <div 
-            className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 my-8 border-t-8 border-blue-600"
+            className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl p-6 sm:p-10 my-12 border-t-8 border-blue-600 h-fit"
           >
-            <h3 
-              className="text-2xl font-black mb-6 text-gray-900"
+            <div 
+              className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4"
             >
-              {editIdAgenda ? "Edit Agenda" : "Buat Agenda Baru"}
-            </h3>
+              <h3 
+                className="text-3xl font-black text-gray-900"
+              >
+                {editIdAgenda ? "Edit Agenda" : "Buat Agenda Baru"}
+              </h3>
+              <button 
+                onClick={() => setIsModalAgendaOpen(false)}
+                className="text-gray-400 hover:text-red-500 font-black text-2xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+
             <form 
               onSubmit={simpanAgenda} 
-              className="space-y-5"
+              className="space-y-6"
             >
               <div>
                 <label 
@@ -930,22 +1114,25 @@ export default function KabarAgenda({
                 <input 
                   type="text" 
                   required 
-                  value={formAgenda.nama_kegiatan} 
-                  onChange={(e) => setFormAgenda({...formAgenda, nama_kegiatan: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold" 
+                  value={formAgenda.nama} 
+                  onChange={(e) => setFormAgenda({...formAgenda, nama: e.target.value})} 
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg" 
+                  placeholder="Contoh: Rapat Koordinasi Desa..."
                 />
               </div>
+
               <div 
-                className="grid grid-cols-1 md:grid-cols-2 gap-5"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Tanggal Pelaksanaan
+                    Tanggal & Waktu Pelaksanaan
                   </label>
+                  {/* Menggunakan datetime-local agar seragam */}
                   <input 
-                    type="date" 
+                    type="datetime-local" 
                     required 
                     value={formAgenda.tanggal} 
                     onChange={(e) => setFormAgenda({...formAgenda, tanggal: e.target.value})} 
@@ -956,60 +1143,33 @@ export default function KabarAgenda({
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Waktu (Jam)
+                    Lokasi
                   </label>
                   <input 
-                    type="time" 
+                    type="text" 
                     required 
-                    value={formAgenda.waktu} 
-                    onChange={(e) => setFormAgenda({...formAgenda, waktu: e.target.value})} 
+                    value={formAgenda.lokasi} 
+                    onChange={(e) => setFormAgenda({...formAgenda, lokasi: e.target.value})} 
+                    placeholder="Cth: Balai Desa Kerjo"
                     className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold" 
                   />
                 </div>
               </div>
-              <div>
-                <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
-                >
-                  Lokasi
-                </label>
-                <input 
-                  type="text" 
-                  required 
-                  value={formAgenda.lokasi} 
-                  onChange={(e) => setFormAgenda({...formAgenda, lokasi: e.target.value})} 
-                  placeholder="Cth: Balai Desa Kerjo"
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500" 
-                />
-              </div>
-              <div>
-                <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
-                >
-                  Deskripsi / Info Tambahan
-                </label>
-                <textarea 
-                  required 
-                  rows={4} 
-                  value={formAgenda.deskripsi} 
-                  onChange={(e) => setFormAgenda({...formAgenda, deskripsi: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed whitespace-pre-wrap"
-                ></textarea>
-              </div>
+
               <div 
-                className="flex gap-4 pt-4 border-t border-gray-100"
+                className="flex gap-4 pt-6 border-t border-gray-100 mt-8"
               >
                 <button 
                   type="button" 
                   onClick={() => setIsModalAgendaOpen(false)} 
-                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors text-lg"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
                   disabled={isLoading} 
-                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-colors text-lg"
                 >
                   {isLoading ? "Menyimpan..." : "Simpan Agenda"}
                 </button>
