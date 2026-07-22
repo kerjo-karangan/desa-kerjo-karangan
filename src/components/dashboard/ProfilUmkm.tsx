@@ -31,16 +31,37 @@ interface ProfilUmkmProps {
 }
 
 export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
-  const [sejarahDesa, setSejarahDesa] = useState("");
-  const [visiMisiDesa, setVisiMisiDesa] = useState("");
-  const [statusProfil, setStatusProfil] = useState("");
-  const [isLoadingProfil, setIsLoadingProfil] = useState(false);
+  
+  // LOGIKA DEFAULT TAB: Pengaturan Header Berada Paling Atas
+  const defaultTab = activeSubMenu === "profil-teks" ? "teks"
+                   : activeSubMenu === "profil-sotk" ? "sotk"
+                   : activeSubMenu === "profil-lembaga" ? "lembaga"
+                   : activeSubMenu === "profil-umkm" ? "umkm"
+                   : "hero"; // Default ke Header
+                   
+  const [tabAktif, setTabAktif] = useState(defaultTab);
 
+  useEffect(() => {
+    if (activeSubMenu === "profil-teks") setTabAktif("teks");
+    else if (activeSubMenu === "profil-sotk") setTabAktif("sotk");
+    else if (activeSubMenu === "profil-lembaga") setTabAktif("lembaga");
+    else if (activeSubMenu === "profil-umkm") setTabAktif("umkm");
+    else setTabAktif("hero");
+  }, [activeSubMenu]);
+
+  // STATE HEADER PROFIL
   const [heroProfilBgLama, setHeroProfilBgLama] = useState("");
   const [heroProfilBgList, setHeroProfilBgList] = useState<FileList | null>(null);
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
+
+  // STATE SEJARAH & VISI MISI
+  const [sejarahDesa, setSejarahDesa] = useState("");
+  const [visiMisiDesa, setVisiMisiDesa] = useState("");
+  const [statusProfil, setStatusProfil] = useState("");
+  const [isLoadingProfil, setIsLoadingProfil] = useState(false);
   
+  // STATE SOTK / APARATUR
   const [namaAparatur, setNamaAparatur] = useState("");
   const [jabatanAparatur, setJabatanAparatur] = useState("");
   const [urutanAparatur, setUrutanAparatur] = useState<number>(1);
@@ -53,22 +74,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   const [editAparaturId, setEditAparaturId] = useState<string | null>(null);
   const [fotoLamaAparatur, setFotoLamaAparatur] = useState("");
 
-  const [kategoriPotensi, setKategoriPotensi] = useState("UMKM");
-  const [namaPotensi, setNamaPotensi] = useState("");
-  const [pengelola, setPengelola] = useState("");
-  const [hargaMulai, setHargaMulai] = useState<number | string>("");
-  const [hargaSampai, setHargaSampai] = useState<number | string>("");
-  const [kontak, setKontak] = useState("");
-  const [linkMaps, setLinkMaps] = useState("");
-  const [deskripsiPotensi, setDeskripsiPotensi] = useState("");
-  const [jamOperasional, setJamOperasional] = useState<any>(DEFAULT_JAM);
-  const [fotoPotensiList, setFotoPotensiList] = useState<FileList | null>(null);
-  const [gambarLamaPotensi, setGambarLamaPotensi] = useState<string[]>([]);
-  const [daftarUmkm, setDaftarUmkm] = useState<any[]>([]);
-  const [statusUmkm, setStatusUmkm] = useState("");
-  const [isLoadingUmkm, setIsLoadingUmkm] = useState(false);
-  const [editUmkmId, setEditUmkmId] = useState<string | null>(null);
-
+  // STATE LEMBAGA
   const [namaLembaga, setNamaLembaga] = useState("");
   const [singkatanLembaga, setSingkatanLembaga] = useState("");
   const [deskripsiLembaga, setDeskripsiLembaga] = useState("");
@@ -89,17 +95,34 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   const [editAnggotaLemId, setEditAnggotaLemId] = useState<string | null>(null);
   const [fotoLamaAnggotaLem, setFotoLamaAnggotaLem] = useState("");
 
+  // STATE UMKM
+  const [kategoriPotensi, setKategoriPotensi] = useState("UMKM");
+  const [namaPotensi, setNamaPotensi] = useState("");
+  const [pengelola, setPengelola] = useState("");
+  const [hargaMulai, setHargaMulai] = useState<number | string>("");
+  const [hargaSampai, setHargaSampai] = useState<number | string>("");
+  const [kontak, setKontak] = useState("");
+  const [linkMaps, setLinkMaps] = useState("");
+  const [deskripsiPotensi, setDeskripsiPotensi] = useState("");
+  const [jamOperasional, setJamOperasional] = useState<any>(DEFAULT_JAM);
+  const [fotoPotensiList, setFotoPotensiList] = useState<FileList | null>(null);
+  const [gambarLamaPotensi, setGambarLamaPotensi] = useState<string[]>([]);
+  const [daftarUmkm, setDaftarUmkm] = useState<any[]>([]);
+  const [statusUmkm, setStatusUmkm] = useState("");
+  const [isLoadingUmkm, setIsLoadingUmkm] = useState(false);
+  const [editUmkmId, setEditUmkmId] = useState<string | null>(null);
+
   const ambilData = async () => {
     try {
+      const snapHero = await getDoc(doc(db, "pengaturan_web", "profil_hero"));
+      if (snapHero.exists()) {
+        setHeroProfilBgLama(snapHero.data().bg || "");
+      }
+
       const snapProfil = await getDoc(doc(db, "profil_desa", "utama"));
       if (snapProfil.exists()) {
         setSejarahDesa(snapProfil.data().sejarah || "");
         setVisiMisiDesa(snapProfil.data().visi_misi || "");
-      }
-      
-      const snapHero = await getDoc(doc(db, "pengaturan_web", "profil_hero"));
-      if (snapHero.exists()) {
-        setHeroProfilBgLama(snapHero.data().bg || "");
       }
 
       const qAparatur = query(collection(db, "aparatur_desa"), orderBy("urutan", "asc"));
@@ -111,7 +134,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
 
       if (selectedLembaga) {
         const upToDateLembaga = dataLemb.find(l => l.id === selectedLembaga.id);
-        if (upToDateLembaga) setSelectedLembaga(upToDateLembaga);
+        if (upToDateLembaga) {
+          setSelectedLembaga(upToDateLembaga);
+        }
       }
 
       const qUmkm = query(collection(db, "potensi_desa"), orderBy("tanggal_input", "desc"));
@@ -136,7 +161,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
       });
       
       const data = await res.json();
-      if (data.success) return data.url;
+      if (data.success) {
+        return data.url;
+      }
       throw new Error(data.error);
     } catch (error) {
       console.error("Upload error:", error);
@@ -157,18 +184,24 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     }
   };
 
+  // ==========================================
+  // MANAJEMEN HEADER PROFIL
+  // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setIsLoadingHero(true); 
     setStatusHero("Menyimpan Header...");
+    
     try {
       let imageUrl = heroProfilBgLama;
       
       if (heroProfilBgList && heroProfilBgList.length > 0) {
-        setStatusHero("Mengunggah Background...");
+        setStatusHero("Mengunggah Background ke Cloudinary...");
         const newBg = await uploadFotoKeCloudinary(heroProfilBgList[0]);
         if (newBg) {
-          if (heroProfilBgLama) await hapusFotoDiCloudinary(heroProfilBgLama);
+          if (heroProfilBgLama) {
+            await hapusFotoDiCloudinary(heroProfilBgLama);
+          }
           imageUrl = newBg;
         }
       }
@@ -181,6 +214,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
       setStatusHero("✅ Background Header berhasil diperbarui!"); 
       setHeroProfilBgLama(imageUrl); 
       setHeroProfilBgList(null);
+      
+      const input = document.getElementById("inputHeroProfil") as HTMLInputElement;
+      if (input) input.value = "";
+      
       setTimeout(() => setStatusHero(""), 4000);
     } catch (error) { 
       setStatusHero("❌ Gagal menyimpan header."); 
@@ -192,9 +229,12 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   const handleHapusBackgroundHero = async () => {
     if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
     setIsLoadingHero(true);
-    setStatusHero("Menghapus gambar...");
+    setStatusHero("Menghapus gambar dari server...");
+    
     try {
-      if (heroProfilBgLama) await hapusFotoDiCloudinary(heroProfilBgLama);
+      if (heroProfilBgLama) {
+        await hapusFotoDiCloudinary(heroProfilBgLama);
+      }
       
       await setDoc(doc(db, "pengaturan_web", "profil_hero"), { 
         bg: "", 
@@ -211,6 +251,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     }
   };
 
+  // ==========================================
+  // MANAJEMEN TEKS SEJARAH & VISI MISI
+  // ==========================================
   const handleSimpanProfil = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setIsLoadingProfil(true); 
@@ -230,10 +273,14 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     }
   };
 
+  // ==========================================
+  // MANAJEMEN SOTK APARATUR
+  // ==========================================
   const handleSimpanAparatur = async (e: React.FormEvent) => {
     e.preventDefault(); 
     setIsLoadingAparatur(true); 
     setStatusAparatur("Memproses...");
+    
     try {
       let imageUrl = fotoLamaAparatur;
       
@@ -241,7 +288,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         setStatusAparatur("Upload foto wajah..."); 
         const uploadedUrl = await uploadFotoKeCloudinary(fotoAparatur[0]);
         if (uploadedUrl) {
-          if (fotoLamaAparatur) await hapusFotoDiCloudinary(fotoLamaAparatur);
+          if (fotoLamaAparatur) {
+            await hapusFotoDiCloudinary(fotoLamaAparatur);
+          }
           imageUrl = uploadedUrl;
         }
       }
@@ -297,18 +346,217 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
 
   const hapusAparatur = async (org: any) => { 
     if (confirm("Yakin menghapus anggota aparatur ini? Foto akan dihapus dari server.")) { 
-      if (org.foto) await hapusFotoDiCloudinary(org.foto);
+      if (org.foto) {
+        await hapusFotoDiCloudinary(org.foto);
+      }
       await deleteDoc(doc(db, "aparatur_desa", org.id)); 
       ambilData(); 
     } 
   };
 
-  const daftarAtasan = daftarAparatur.filter(org => org.id !== editAparaturId && org.urutan < urutanAparatur);
+  const daftarAtasan = daftarAparatur.filter((org) => org.id !== editAparaturId && org.urutan < urutanAparatur);
 
+  // ==========================================
+  // MANAJEMEN LEMBAGA & SOTK LEMBAGA
+  // ==========================================
+  const handleSimpanLembagaUtama = async (e: React.FormEvent) => {
+    e.preventDefault(); 
+    setIsLoadingLembaga(true); 
+    setStatusLembaga("Memproses...");
+    
+    try {
+      let imageUrl = fotoLamaLembaga;
+      
+      if (fotoLembaga && fotoLembaga.length > 0) { 
+        setStatusLembaga("Upload logo lembaga..."); 
+        const uploadedUrl = await uploadFotoKeCloudinary(fotoLembaga[0]);
+        if (uploadedUrl) {
+          if (fotoLamaLembaga) {
+            await hapusFotoDiCloudinary(fotoLamaLembaga);
+          }
+          imageUrl = uploadedUrl;
+        }
+      }
+      
+      const dataLembaga = { 
+        nama: namaLembaga, 
+        singkatan: singkatanLembaga, 
+        deskripsi: deskripsiLembaga, 
+        foto: imageUrl 
+      };
+      
+      if (editLembagaId) { 
+        await updateDoc(doc(db, "lembaga_desa", editLembagaId), dataLembaga); 
+        setStatusLembaga("✅ Lembaga diperbarui!");
+      } else { 
+        await addDoc(collection(db, "lembaga_desa"), { 
+          ...dataLembaga, 
+          anggota_sotk: [] 
+        }); 
+        setStatusLembaga("✅ Lembaga ditambahkan!"); 
+      }
+      
+      batalEditLembagaUtama(); 
+      ambilData(); 
+      setTimeout(() => setStatusLembaga(""), 4000);
+    } catch (error) { 
+      setStatusLembaga("❌ Gagal menyimpan Lembaga."); 
+    } finally { 
+      setIsLoadingLembaga(false); 
+    }
+  };
+
+  const mulaiEditLembagaUtama = (item: any) => { 
+    setEditLembagaId(item.id); 
+    setNamaLembaga(item.nama); 
+    setSingkatanLembaga(item.singkatan); 
+    setDeskripsiLembaga(item.deskripsi); 
+    setFotoLamaLembaga(item.foto || ""); 
+    setFotoLembaga(null); 
+  };
+
+  const batalEditLembagaUtama = () => { 
+    setEditLembagaId(null); 
+    setNamaLembaga(""); 
+    setSingkatanLembaga(""); 
+    setDeskripsiLembaga(""); 
+    setFotoLamaLembaga(""); 
+    setFotoLembaga(null); 
+  };
+
+  const hapusLembagaUtama = async (lem: any) => { 
+    if (confirm("Yakin menghapus lembaga ini? Semua pengurus dan foto akan dihapus permanen.")) { 
+      if (lem.foto) {
+        await hapusFotoDiCloudinary(lem.foto);
+      }
+      if (lem.anggota_sotk && lem.anggota_sotk.length > 0) {
+        for (const anggota of lem.anggota_sotk) {
+          if (anggota.foto) {
+            await hapusFotoDiCloudinary(anggota.foto);
+          }
+        }
+      }
+      await deleteDoc(doc(db, "lembaga_desa", lem.id)); 
+      ambilData(); 
+    } 
+  };
+
+  const masukModeKeanggotaan = (lembaga: any) => { 
+    setSelectedLembaga(lembaga); 
+    batalEditAnggotaLem(); 
+  };
+  
+  const keluarModeKeanggotaan = () => { 
+    setSelectedLembaga(null); 
+    batalEditAnggotaLem(); 
+  };
+  
+  const handleSimpanAnggotaLem = async (e: React.FormEvent) => {
+    e.preventDefault(); 
+    setIsLoadingLembaga(true); 
+    setStatusLembaga("Menyimpan Anggota...");
+    
+    try {
+      let imageUrl = fotoLamaAnggotaLem;
+      
+      if (fotoAnggotaLem && fotoAnggotaLem.length > 0) { 
+        const uploadedUrl = await uploadFotoKeCloudinary(fotoAnggotaLem[0]);
+        if (uploadedUrl) {
+          if (fotoLamaAnggotaLem) {
+            await hapusFotoDiCloudinary(fotoLamaAnggotaLem);
+          }
+          imageUrl = uploadedUrl;
+        }
+      }
+      
+      let anggotaSOTKSekarang = selectedLembaga.anggota_sotk || [];
+      
+      const newAnggota = {
+        id: editAnggotaLemId || Date.now().toString(),
+        nama: namaAnggotaLem, 
+        jabatan: jabatanAnggotaLem, 
+        urutan: Number(urutanAnggotaLem), 
+        jalurAtas: jalurAtasAnggotaLem, 
+        jenisGaris: jenisGarisAnggotaLem, 
+        foto: imageUrl
+      };
+
+      if (editAnggotaLemId) {
+        anggotaSOTKSekarang = anggotaSOTKSekarang.map((a:any) => 
+          a.id === editAnggotaLemId ? newAnggota : a
+        );
+      } else {
+        anggotaSOTKSekarang.push(newAnggota);
+      }
+      
+      await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
+        anggota_sotk: anggotaSOTKSekarang 
+      });
+      
+      setStatusLembaga("✅ SOTK Lembaga diperbarui!");
+      batalEditAnggotaLem(); 
+      ambilData(); 
+      setTimeout(() => setStatusLembaga(""), 4000);
+    } catch (error) { 
+      setStatusLembaga("❌ Gagal menyimpan anggota."); 
+    } finally { 
+      setIsLoadingLembaga(false); 
+    }
+  };
+  
+  const mulaiEditAnggotaLem = (anggota: any) => {
+    setEditAnggotaLemId(anggota.id); 
+    setNamaAnggotaLem(anggota.nama); 
+    setJabatanAnggotaLem(anggota.jabatan); 
+    setUrutanAnggotaLem(anggota.urutan); 
+    setJalurAtasAnggotaLem(anggota.jalurAtas || ""); 
+    setJenisGarisAnggotaLem(anggota.jenisGaris || "Instruksi"); 
+    setFotoLamaAnggotaLem(anggota.foto || ""); 
+    setFotoAnggotaLem(null);
+  };
+
+  const batalEditAnggotaLem = () => {
+    setEditAnggotaLemId(null); 
+    setNamaAnggotaLem(""); 
+    setJabatanAnggotaLem(""); 
+    setUrutanAnggotaLem(selectedLembaga?.anggota_sotk?.length ? selectedLembaga.anggota_sotk.length + 1 : 1); 
+    setJalurAtasAnggotaLem(""); 
+    setJenisGarisAnggotaLem("Instruksi"); 
+    setFotoLamaAnggotaLem(""); 
+    setFotoAnggotaLem(null);
+  };
+
+  const hapusAnggotaLem = async (id: string) => {
+    if (!confirm("Yakin hapus anggota ini? Foto akan dihapus permanen.")) return;
+    
+    const anggotaTarget = selectedLembaga.anggota_sotk.find((a:any) => a.id === id);
+    if (anggotaTarget && anggotaTarget.foto) {
+      await hapusFotoDiCloudinary(anggotaTarget.foto);
+    }
+
+    const anggotaSOTKSekarang = selectedLembaga.anggota_sotk.filter((a:any) => a.id !== id);
+    
+    await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
+      anggota_sotk: anggotaSOTKSekarang 
+    });
+    
+    ambilData();
+  };
+
+  const daftarAtasanLem = (selectedLembaga?.anggota_sotk || []).filter((org:any) => 
+    org.id !== editAnggotaLemId && org.urutan < urutanAnggotaLem
+  );
+
+  // ==========================================
+  // MANAJEMEN UMKM & WISATA
+  // ==========================================
   const handleJamChange = (hari: string, field: string, value: any) => { 
     setJamOperasional((prev: any) => ({ 
       ...prev, 
-      [hari]: { ...prev[hari], [field]: value } 
+      [hari]: { 
+        ...prev[hari], 
+        [field]: value 
+      } 
     })); 
   };
   
@@ -316,14 +564,15 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     e.preventDefault(); 
     setIsLoadingUmkm(true); 
     setStatusUmkm("Memproses...");
+    
     try {
       let tautanGambarBaru: string[] = [];
       
       if (fotoPotensiList && fotoPotensiList.length > 0) {
         setStatusUmkm(`Mengunggah foto...`);
-        const uploadPromises = Array.from(fotoPotensiList).map(file => uploadFotoKeCloudinary(file));
+        const uploadPromises = Array.from(fotoPotensiList).map((file) => uploadFotoKeCloudinary(file));
         const hasilUpload = await Promise.all(uploadPromises);
-        tautanGambarBaru = hasilUpload.filter(url => url !== null) as string[];
+        tautanGambarBaru = hasilUpload.filter((url) => url !== null) as string[];
       }
       
       const gambarFinal = [...gambarLamaPotensi, ...tautanGambarBaru];
@@ -404,8 +653,11 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setJamOperasional(DEFAULT_JAM); 
     setGambarLamaPotensi([]); 
     setFotoPotensiList(null); 
+    
     const input = document.getElementById('inputFotoPotensi') as HTMLInputElement; 
-    if(input) input.value = ''; 
+    if(input) {
+      input.value = ''; 
+    }
   };
   
   const hapusUmkm = async (umkm: any) => { 
@@ -417,195 +669,77 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
       } else if (umkm.foto) {
         await hapusFotoDiCloudinary(umkm.foto);
       }
+      
       await deleteDoc(doc(db, "potensi_desa", umkm.id)); 
       ambilData(); 
     } 
   };
 
-  const handleSimpanLembagaUtama = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingLembaga(true); 
-    setStatusLembaga("Memproses...");
-    try {
-      let imageUrl = fotoLamaLembaga;
-      
-      if (fotoLembaga && fotoLembaga.length > 0) { 
-        setStatusLembaga("Upload logo lembaga..."); 
-        const uploadedUrl = await uploadFotoKeCloudinary(fotoLembaga[0]);
-        if (uploadedUrl) {
-          if (fotoLamaLembaga) await hapusFotoDiCloudinary(fotoLamaLembaga);
-          imageUrl = uploadedUrl;
-        }
-      }
-      
-      const dataLembaga = { 
-        nama: namaLembaga, 
-        singkatan: singkatanLembaga, 
-        deskripsi: deskripsiLembaga, 
-        foto: imageUrl 
-      };
-      
-      if (editLembagaId) { 
-        await updateDoc(doc(db, "lembaga_desa", editLembagaId), dataLembaga); 
-        setStatusLembaga("✅ Lembaga diperbarui!");
-      } else { 
-        await addDoc(collection(db, "lembaga_desa"), { 
-          ...dataLembaga, 
-          anggota_sotk: [] 
-        }); 
-        setStatusLembaga("✅ Lembaga ditambahkan!"); 
-      }
-      
-      batalEditLembagaUtama(); 
-      ambilData(); 
-      setTimeout(() => setStatusLembaga(""), 4000);
-    } catch (error) { 
-      setStatusLembaga("❌ Gagal menyimpan Lembaga."); 
-    } finally { 
-      setIsLoadingLembaga(false); 
-    }
-  };
-
-  const mulaiEditLembagaUtama = (item: any) => { 
-    setEditLembagaId(item.id); 
-    setNamaLembaga(item.nama); 
-    setSingkatanLembaga(item.singkatan); 
-    setDeskripsiLembaga(item.deskripsi); 
-    setFotoLamaLembaga(item.foto || ""); 
-    setFotoLembaga(null); 
-  };
-
-  const batalEditLembagaUtama = () => { 
-    setEditLembagaId(null); 
-    setNamaLembaga(""); 
-    setSingkatanLembaga(""); 
-    setDeskripsiLembaga(""); 
-    setFotoLamaLembaga(""); 
-    setFotoLembaga(null); 
-  };
-
-  const hapusLembagaUtama = async (lem: any) => { 
-    if (confirm("Yakin menghapus lembaga ini? Semua pengurus dan foto akan dihapus permanen.")) { 
-      if (lem.foto) await hapusFotoDiCloudinary(lem.foto);
-      if (lem.anggota_sotk && lem.anggota_sotk.length > 0) {
-        for (const anggota of lem.anggota_sotk) {
-          if (anggota.foto) await hapusFotoDiCloudinary(anggota.foto);
-        }
-      }
-      await deleteDoc(doc(db, "lembaga_desa", lem.id)); 
-      ambilData(); 
-    } 
-  };
-
-  const masukModeKeanggotaan = (lembaga: any) => { 
-    setSelectedLembaga(lembaga); 
-    batalEditAnggotaLem(); 
-  };
-  
-  const keluarModeKeanggotaan = () => { 
-    setSelectedLembaga(null); 
-    batalEditAnggotaLem(); 
-  };
-  
-  const handleSimpanAnggotaLem = async (e: React.FormEvent) => {
-    e.preventDefault(); 
-    setIsLoadingLembaga(true); 
-    setStatusLembaga("Menyimpan Anggota...");
-    try {
-      let imageUrl = fotoLamaAnggotaLem;
-      
-      if (fotoAnggotaLem && fotoAnggotaLem.length > 0) { 
-        const uploadedUrl = await uploadFotoKeCloudinary(fotoAnggotaLem[0]);
-        if (uploadedUrl) {
-          if (fotoLamaAnggotaLem) await hapusFotoDiCloudinary(fotoLamaAnggotaLem);
-          imageUrl = uploadedUrl;
-        }
-      }
-      
-      let anggotaSOTKSekarang = selectedLembaga.anggota_sotk || [];
-      const newAnggota = {
-        id: editAnggotaLemId || Date.now().toString(),
-        nama: namaAnggotaLem, 
-        jabatan: jabatanAnggotaLem, 
-        urutan: Number(urutanAnggotaLem), 
-        jalurAtas: jalurAtasAnggotaLem, 
-        jenisGaris: jenisGarisAnggotaLem, 
-        foto: imageUrl
-      };
-
-      if (editAnggotaLemId) {
-        anggotaSOTKSekarang = anggotaSOTKSekarang.map((a:any) => a.id === editAnggotaLemId ? newAnggota : a);
-      } else {
-        anggotaSOTKSekarang.push(newAnggota);
-      }
-      
-      await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
-        anggota_sotk: anggotaSOTKSekarang 
-      });
-      
-      setStatusLembaga("✅ SOTK Lembaga diperbarui!");
-      batalEditAnggotaLem(); 
-      ambilData(); 
-      setTimeout(() => setStatusLembaga(""), 4000);
-    } catch (error) { 
-      setStatusLembaga("❌ Gagal menyimpan anggota."); 
-    } finally { 
-      setIsLoadingLembaga(false); 
-    }
-  };
-  
-  const mulaiEditAnggotaLem = (anggota: any) => {
-    setEditAnggotaLemId(anggota.id); 
-    setNamaAnggotaLem(anggota.nama); 
-    setJabatanAnggotaLem(anggota.jabatan); 
-    setUrutanAnggotaLem(anggota.urutan); 
-    setJalurAtasAnggotaLem(anggota.jalurAtas || ""); 
-    setJenisGarisAnggotaLem(anggota.jenisGaris || "Instruksi"); 
-    setFotoLamaAnggotaLem(anggota.foto || ""); 
-    setFotoAnggotaLem(null);
-  };
-
-  const batalEditAnggotaLem = () => {
-    setEditAnggotaLemId(null); 
-    setNamaAnggotaLem(""); 
-    setJabatanAnggotaLem(""); 
-    setUrutanAnggotaLem(selectedLembaga?.anggota_sotk?.length ? selectedLembaga.anggota_sotk.length + 1 : 1); 
-    setJalurAtasAnggotaLem(""); 
-    setJenisGarisAnggotaLem("Instruksi"); 
-    setFotoLamaAnggotaLem(""); 
-    setFotoAnggotaLem(null);
-  };
-
-  const hapusAnggotaLem = async (id: string) => {
-    if (!confirm("Yakin hapus anggota ini? Foto akan dihapus permanen.")) return;
-    
-    const anggotaTarget = selectedLembaga.anggota_sotk.find((a:any) => a.id === id);
-    if (anggotaTarget && anggotaTarget.foto) {
-      await hapusFotoDiCloudinary(anggotaTarget.foto);
-    }
-
-    const anggotaSOTKSekarang = selectedLembaga.anggota_sotk.filter((a:any) => a.id !== id);
-    await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
-      anggota_sotk: anggotaSOTKSekarang 
-    });
-    
-    ambilData();
-  };
-
-  const daftarAtasanLem = (selectedLembaga?.anggota_sotk || []).filter((org:any) => org.id !== editAnggotaLemId && org.urutan < urutanAnggotaLem);
-
   return (
-    <div className="animate-fade-in pb-20 font-sans">
+    <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {(!activeSubMenu || activeSubMenu === "profil-hero") && (
+      {/* MENU NAVIGASI INTERNAL UNTUK MOBILE */}
+      {!activeSubMenu && (
+        <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+          <button 
+            onClick={() => setTabAktif("hero")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "hero" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">🖼️</span> Header Profil
+          </button>
+          <button 
+            onClick={() => setTabAktif("teks")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "teks" ? "bg-green-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">📖</span> Sejarah & Visi
+          </button>
+          <button 
+            onClick={() => setTabAktif("sotk")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "sotk" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">👔</span> Aparatur (SOTK)
+          </button>
+          <button 
+            onClick={() => setTabAktif("lembaga")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "lembaga" ? "bg-indigo-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">🤝</span> Lembaga Desa
+          </button>
+          <button 
+            onClick={() => setTabAktif("umkm")} 
+            className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              tabAktif === "umkm" ? "bg-yellow-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            <span className="text-xl">🛍️</span> Katalog UMKM
+          </button>
+        </div>
+      )}
+
+      {/* 1. PENGATURAN HEADER PROFIL (DIPINDAH KE PALING ATAS SESUAI SIDEBAR) */}
+      {tabAktif === "hero" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 mb-8">
-          <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Profil Desa (Cloudinary)</h3>
-          <p className="text-gray-500 text-sm mb-6">Ubah gambar background (Hero) yang akan menjadi wajah utama di halaman Publik Profil.</p>
+          <h3 className="text-2xl font-bold mb-2">
+            <span className="mr-2">🖼️</span> 
+            Pengaturan Header Profil Desa (Cloudinary)
+          </h3>
+          <p className="text-gray-500 text-sm mb-6">
+            Ubah gambar background (Hero) yang akan menjadi wajah utama di halaman Publik Profil.
+          </p>
           <form onSubmit={handleSimpanHero} className="space-y-6">
             <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200">
               <label className="block text-sm font-bold text-yellow-900 border-b border-yellow-200 pb-2 mb-4">
                 Gambar Background
               </label>
+              
               {heroProfilBgLama && (
                 <div className="relative w-full h-40 md:h-64 rounded-xl overflow-hidden shadow-inner border border-gray-200 group mb-4">
                   <img 
@@ -624,16 +758,21 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   </div>
                 </div>
               )}
+              
               <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                 <span className="text-3xl mb-2">📸</span>
-                <span className="font-bold text-yellow-800 text-sm">Ganti Gambar Baru</span>
+                <span className="font-bold text-yellow-800 text-sm">
+                  Ganti Gambar Baru
+                </span>
                 <input 
+                  id="inputHeroProfil"
                   type="file" 
                   accept="image/*" 
                   onChange={(e) => setHeroProfilBgList(e.target.files)} 
                   className="hidden" 
                 />
               </label>
+              
               {heroProfilBgList && (
                 <div className="text-xs font-bold text-green-700 mt-2">
                   ✅ 1 Gambar siap diunggah.
@@ -646,6 +785,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 {statusHero}
               </div>
             )}
+            
             <button 
               type="submit" 
               disabled={isLoadingHero} 
@@ -657,13 +797,21 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         </div>
       )}
 
-      {(!activeSubMenu || activeSubMenu === "profil" || activeSubMenu === "profil-teks") && (
+      {/* 2. TEKS SEJARAH & VISI MISI */}
+      {tabAktif === "teks" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-600 mb-8">
-          <h3 className="text-2xl font-bold mb-2">📖 Sejarah & Visi Misi</h3>
-          <p className="text-gray-500 text-sm mb-6">Sesuaikan teks Sejarah dan Visi Misi Desa Kerjo secara lengkap.</p>
+          <h3 className="text-2xl font-bold mb-2">
+            <span className="mr-2">📖</span>
+            Sejarah & Visi Misi
+          </h3>
+          <p className="text-gray-500 text-sm mb-6">
+            Sesuaikan teks Sejarah dan Visi Misi Desa Kerjo secara lengkap.
+          </p>
           <form onSubmit={handleSimpanProfil} className="space-y-6">
             <div>
-              <label className="block text-sm font-bold mb-2 text-gray-800">Sejarah Desa</label>
+              <label className="block text-sm font-bold mb-2 text-gray-800">
+                Sejarah Desa
+              </label>
               <textarea 
                 required 
                 rows={8} 
@@ -673,7 +821,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
               ></textarea>
             </div>
             <div>
-              <label className="block text-sm font-bold mb-2 text-gray-800">Visi & Misi</label>
+              <label className="block text-sm font-bold mb-2 text-gray-800">
+                Visi & Misi
+              </label>
               <textarea 
                 required 
                 rows={6} 
@@ -688,6 +838,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 {statusProfil}
               </div>
             )}
+            
             <button 
               type="submit" 
               disabled={isLoadingProfil} 
@@ -699,10 +850,17 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         </div>
       )}
 
-      {(!activeSubMenu || activeSubMenu === "profil-sotk") && (
+      {/* 3. SOTK PEMERINTAH DESA */}
+      {tabAktif === "sotk" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-blue-600 mb-8">
-          <h3 className="text-2xl font-bold mb-2">👔 Susunan Pemerintah Desa (SOTK)</h3>
-          <p className="text-gray-500 text-sm mb-6">Kelola hierarki aparatur desa beserta garis komando.</p>
+          <h3 className="text-2xl font-bold mb-2">
+            <span className="mr-2">👔</span>
+            Susunan Pemerintah Desa (SOTK)
+          </h3>
+          <p className="text-gray-500 text-sm mb-6">
+            Kelola hierarki aparatur desa beserta garis komando.
+          </p>
+          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1 bg-blue-50 p-6 rounded-2xl border border-blue-100 shadow-inner h-fit">
               <div className="flex justify-between items-center mb-6 border-b border-blue-200 pb-3">
@@ -721,7 +879,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
               </div>
               <form onSubmit={handleSimpanAparatur} className="space-y-5">
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama Lengkap & Gelar</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Nama Lengkap & Gelar
+                  </label>
                   <input 
                     type="text" 
                     required 
@@ -731,7 +891,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama Jabatan</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Nama Jabatan
+                  </label>
                   <input 
                     type="text" 
                     required 
@@ -742,7 +904,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">No. Urut Hierarki</label>
+                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                      No. Urut Hierarki
+                    </label>
                     <input 
                       type="number" 
                       required 
@@ -752,10 +916,13 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">Foto Wajah</label>
+                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                      Foto Wajah
+                    </label>
                     <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-blue-300 rounded-xl hover:bg-blue-100 transition-all overflow-hidden shadow-sm">
                       <span className="font-bold text-blue-800 text-xs flex items-center gap-2">
-                        <span className="text-xl">📸</span> {fotoAparatur ? "Siap" : "Pilih File"}
+                        <span className="text-xl">📸</span> 
+                        {fotoAparatur ? "Siap" : "Pilih File"}
                       </span>
                       <input 
                         type="file" 
@@ -766,52 +933,73 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     </label>
                   </div>
                 </div>
+                
                 <div className="bg-white p-4 rounded-xl border border-blue-200 shadow-sm space-y-4">
                   <div className="flex gap-2 items-center mb-1">
                     <span className="text-xl">🔗</span>
-                    <h5 className="font-bold text-gray-800 text-sm">Garis Komando</h5>
+                    <h5 className="font-bold text-gray-800 text-sm">
+                      Garis Komando
+                    </h5>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1 text-gray-600">Jalur Atas (Atasan)</label>
+                    <label className="block text-xs font-bold mb-1 text-gray-600">
+                      Jalur Atas (Atasan)
+                    </label>
                     <select 
                       value={jalurAtas} 
                       onChange={(e) => setJalurAtas(e.target.value)} 
                       className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-gray-50 text-sm"
                     >
-                      <option value="">-- Puncak (Tanpa Atasan) --</option>
+                      <option value="">
+                        -- Puncak (Tanpa Atasan) --
+                      </option>
                       {daftarAtasan.map(atasan => (
-                        <option key={atasan.id} value={atasan.id}>{atasan.jabatan} - {atasan.nama}</option>
+                        <option key={atasan.id} value={atasan.id}>
+                          {atasan.jabatan} - {atasan.nama}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1 text-gray-600">Sifat Hubungan</label>
+                    <label className="block text-xs font-bold mb-1 text-gray-600">
+                      Sifat Hubungan
+                    </label>
                     <select 
                       value={jenisGaris} 
                       onChange={(e) => setJenisGaris(e.target.value)} 
                       className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-gray-50 text-sm"
                     >
-                      <option value="Instruksi">Garis Instruksi (Tegak)</option>
-                      <option value="Koordinasi">Garis Koordinasi (Putus-putus)</option>
+                      <option value="Instruksi">
+                        Garis Instruksi (Tegak)
+                      </option>
+                      <option value="Koordinasi">
+                        Garis Koordinasi (Putus-putus)
+                      </option>
                     </select>
                   </div>
                 </div>
+                
                 {editAparaturId && fotoLamaAparatur && (
                   <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-blue-200 shadow-sm">
                     <img 
-                      src={`https://wsrv.nl/?url=${fotoLamaAparatur}`} 
+                      src={fotoLamaAparatur.startsWith("http") ? fotoLamaAparatur : `https://wsrv.nl/?url=${fotoLamaAparatur}`} 
                       className="w-12 h-12 rounded-full object-cover border-2 border-blue-100" 
+                      alt="Lama"
                     />
                     <div>
-                      <span className="text-xs font-bold text-blue-800 block">Foto Tersimpan</span>
+                      <span className="text-xs font-bold text-blue-800 block">
+                        Foto Tersimpan
+                      </span>
                     </div>
                   </div>
                 )}
+                
                 {statusAparatur && (
                   <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
                     {statusAparatur}
                   </div>
                 )}
+                
                 <button 
                   type="submit" 
                   disabled={isLoadingAparatur} 
@@ -845,13 +1033,19 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                         <td className="py-4 px-4 flex items-center gap-4">
                           <div className="w-14 h-14 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md">
                             {org.foto ? (
-                              <img src={`https://wsrv.nl/?url=${org.foto}`} alt="profil" className="w-full h-full object-cover"/>
+                              <img 
+                                src={org.foto.startsWith("http") ? org.foto : `https://wsrv.nl/?url=${org.foto}`} 
+                                alt="profil" 
+                                className="w-full h-full object-cover"
+                              />
                             ) : (
                               <span className="flex items-center justify-center w-full h-full text-2xl text-gray-400">👤</span>
                             )}
                           </div>
                           <div>
-                            <div className="font-bold text-gray-900 text-base">{org.nama}</div>
+                            <div className="font-bold text-gray-900 text-base">
+                              {org.nama}
+                            </div>
                             <div className="text-xs text-blue-700 uppercase font-black tracking-widest mt-1 bg-blue-50 inline-block px-2 py-1 rounded border border-blue-100">
                               {org.jabatan}
                             </div>
@@ -867,7 +1061,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                               </div>
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-400 italic">Puncak Hierarki</span>
+                            <span className="text-xs text-gray-400 italic">
+                              Puncak Hierarki
+                            </span>
                           )}
                         </td>
                         <td className="py-4 px-4">
@@ -896,13 +1092,20 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         </div>
       )}
 
-      {(!activeSubMenu || activeSubMenu === "profil-lembaga") && (
+      {/* 4. LEMBAGA MASYARAKAT */}
+      {tabAktif === "lembaga" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-indigo-500 mb-8 transition-all">
           
           {!selectedLembaga ? (
             <>
-              <h3 className="text-2xl font-bold mb-2">🤝 Lembaga Kemasyarakatan Desa</h3>
-              <p className="text-gray-500 text-sm mb-6">Kelola data Lembaga (PKK, Karang Taruna) dan struktur hierarki anggota.</p>
+              <h3 className="text-2xl font-bold mb-2">
+                <span className="mr-2">🤝</span> 
+                Lembaga Kemasyarakatan Desa
+              </h3>
+              <p className="text-gray-500 text-sm mb-6">
+                Kelola data Lembaga (PKK, Karang Taruna) dan struktur hierarki anggota.
+              </p>
+              
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 bg-indigo-50 p-6 rounded-2xl border border-indigo-100 shadow-inner h-fit">
                   <div className="flex justify-between items-center mb-6 border-b border-indigo-200 pb-3">
@@ -921,7 +1124,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   </div>
                   <form onSubmit={handleSimpanLembagaUtama} className="space-y-5">
                     <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama Organisasi</label>
+                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                        Nama Organisasi
+                      </label>
                       <input 
                         type="text" 
                         required 
@@ -932,7 +1137,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">Singkatan</label>
+                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                          Singkatan
+                        </label>
                         <input 
                           type="text" 
                           required 
@@ -942,10 +1149,13 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">Logo</label>
+                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                          Logo
+                        </label>
                         <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-indigo-300 rounded-xl hover:bg-indigo-100 transition-all overflow-hidden shadow-sm">
                           <span className="font-bold text-indigo-800 text-xs flex items-center gap-2">
-                            <span className="text-xl">📸</span> {fotoLembaga ? "Siap" : "Upload"}
+                            <span className="text-xl">📸</span> 
+                            {fotoLembaga ? "Siap" : "Upload"}
                           </span>
                           <input 
                             type="file" 
@@ -957,7 +1167,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">Deskripsi / Tupoksi</label>
+                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                        Deskripsi / Tupoksi
+                      </label>
                       <textarea 
                         required 
                         rows={3} 
@@ -970,10 +1182,15 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     {editLembagaId && fotoLamaLembaga && (
                       <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-indigo-200 shadow-sm">
                         <img 
-                          src={`https://wsrv.nl/?url=${fotoLamaLembaga}`} 
+                          src={fotoLamaLembaga.startsWith("http") ? fotoLamaLembaga : `https://wsrv.nl/?url=${fotoLamaLembaga}`} 
                           className="w-10 h-10 rounded-md object-contain" 
+                          alt="Logo Lama"
                         />
-                        <div><span className="text-xs font-bold text-indigo-800 block">Logo Tersimpan</span></div>
+                        <div>
+                          <span className="text-xs font-bold text-indigo-800 block">
+                            Logo Tersimpan
+                          </span>
+                        </div>
                       </div>
                     )}
                     
@@ -1008,14 +1225,22 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                           <td className="py-4 px-4 flex items-center gap-4">
                             <div className="w-16 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 border-2 border-white shadow-md p-1">
                               {lem.foto ? (
-                                <img src={`https://wsrv.nl/?url=${lem.foto}`} className="w-full h-full object-contain" />
+                                <img 
+                                  src={lem.foto.startsWith("http") ? lem.foto : `https://wsrv.nl/?url=${lem.foto}`} 
+                                  className="w-full h-full object-contain" 
+                                  alt="Logo"
+                                />
                               ) : (
                                 <span className="flex items-center justify-center h-full text-3xl">🤝</span>
                               )}
                             </div>
                             <div>
-                              <div className="font-black text-indigo-900 text-lg tracking-wide">{lem.singkatan}</div>
-                              <div className="text-xs font-bold text-gray-500 uppercase mt-1 leading-snug w-40">{lem.nama}</div>
+                              <div className="font-black text-indigo-900 text-lg tracking-wide">
+                                {lem.singkatan}
+                              </div>
+                              <div className="text-xs font-bold text-gray-500 uppercase mt-1 leading-snug w-40">
+                                {lem.nama}
+                              </div>
                             </div>
                           </td>
                           <td className="py-4 px-4">
@@ -1065,9 +1290,12 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     ← Kembali ke Daftar Lembaga
                   </button>
                   <h3 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-                    <span className="text-3xl">👥</span> SOTK: {selectedLembaga.singkatan}
+                    <span className="text-3xl">👥</span> 
+                    SOTK: {selectedLembaga.singkatan}
                   </h3>
-                  <p className="text-gray-500 text-sm mt-1">Bangun struktur hierarki pengurus khusus lembaga ini.</p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Bangun struktur hierarki pengurus khusus lembaga ini.
+                  </p>
                 </div>
               </div>
 
@@ -1089,7 +1317,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   </div>
                   <form onSubmit={handleSimpanAnggotaLem} className="space-y-5">
                     <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">Nama Lengkap</label>
+                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                        Nama Lengkap
+                      </label>
                       <input 
                         type="text" 
                         required 
@@ -1099,7 +1329,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold mb-1.5 text-gray-700">Jabatan</label>
+                      <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                        Jabatan
+                      </label>
                       <input 
                         type="text" 
                         required 
@@ -1110,7 +1342,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">No. Urut Hierarki</label>
+                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                          No. Urut Hierarki
+                        </label>
                         <input 
                           type="number" 
                           required 
@@ -1120,10 +1354,13 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold mb-1.5 text-gray-700">Foto</label>
+                        <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                          Foto
+                        </label>
                         <label className="cursor-pointer flex flex-col items-center justify-center h-[52px] bg-white border border-indigo-300 rounded-xl hover:bg-indigo-100 transition-all overflow-hidden shadow-sm">
                           <span className="font-bold text-indigo-800 text-xs flex items-center gap-2">
-                            <span className="text-xl">📸</span> {fotoAnggotaLem ? "Siap" : "Pilih File"}
+                            <span className="text-xl">📸</span> 
+                            {fotoAnggotaLem ? "Siap" : "Pilih File"}
                           </span>
                           <input 
                             type="file" 
@@ -1134,50 +1371,73 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                         </label>
                       </div>
                     </div>
+                    
                     <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-inner space-y-4">
                       <div className="flex gap-2 items-center mb-1">
                         <span className="text-xl">🔗</span>
-                        <h5 className="font-bold text-indigo-900 text-sm">Garis Koordinasi</h5>
+                        <h5 className="font-bold text-indigo-900 text-sm">
+                          Garis Koordinasi
+                        </h5>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold mb-1 text-gray-600">Jalur Atas (Lapor ke siapa?)</label>
+                        <label className="block text-xs font-bold mb-1 text-gray-600">
+                          Jalur Atas (Lapor ke siapa?)
+                        </label>
                         <select 
                           value={jalurAtasAnggotaLem} 
                           onChange={(e) => setJalurAtasAnggotaLem(e.target.value)} 
                           className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-white text-sm"
                         >
-                          <option value="">-- Puncak Lembaga --</option>
+                          <option value="">
+                            -- Puncak Lembaga --
+                          </option>
                           {daftarAtasanLem.map((atasan:any) => (
-                            <option key={atasan.id} value={atasan.id}>{atasan.jabatan} - {atasan.nama}</option>
+                            <option key={atasan.id} value={atasan.id}>
+                              {atasan.jabatan} - {atasan.nama}
+                            </option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold mb-1 text-gray-600">Sifat Garis Hubungan</label>
+                        <label className="block text-xs font-bold mb-1 text-gray-600">
+                          Sifat Garis Hubungan
+                        </label>
                         <select 
                           value={jenisGarisAnggotaLem} 
                           onChange={(e) => setJenisGarisAnggotaLem(e.target.value)} 
                           className="w-full p-2.5 rounded-lg border border-gray-300 outline-none bg-white text-sm"
                         >
-                          <option value="Instruksi">Garis Instruksi (Tegak)</option>
-                          <option value="Koordinasi">Garis Koordinasi (Putus-putus)</option>
+                          <option value="Instruksi">
+                            Garis Instruksi (Tegak)
+                          </option>
+                          <option value="Koordinasi">
+                            Garis Koordinasi (Putus-putus)
+                          </option>
                         </select>
                       </div>
                     </div>
+                    
                     {editAnggotaLemId && fotoLamaAnggotaLem && (
                       <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-indigo-200 shadow-sm">
                         <img 
-                          src={`https://wsrv.nl/?url=${fotoLamaAnggotaLem}`} 
+                          src={fotoLamaAnggotaLem.startsWith("http") ? fotoLamaAnggotaLem : `https://wsrv.nl/?url=${fotoLamaAnggotaLem}`} 
                           className="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" 
+                          alt="Foto Lama"
                         />
-                        <div><span className="text-xs font-bold text-indigo-800 block">Foto Tersimpan</span></div>
+                        <div>
+                          <span className="text-xs font-bold text-indigo-800 block">
+                            Foto Tersimpan
+                          </span>
+                        </div>
                       </div>
                     )}
+                    
                     {statusLembaga && (
                       <div className="text-xs font-bold text-green-800 bg-green-100 border border-green-300 p-3 rounded-lg text-center">
                         {statusLembaga}
                       </div>
                     )}
+                    
                     <button 
                       type="submit" 
                       disabled={isLoadingLembaga} 
@@ -1187,6 +1447,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     </button>
                   </form>
                 </div>
+                
                 <div className="lg:col-span-2 overflow-x-auto bg-gray-50 rounded-3xl border border-gray-200 shadow-inner p-4">
                   <table className="min-w-full text-sm text-left bg-white rounded-2xl overflow-hidden shadow-sm">
                     <thead className="bg-indigo-100 border-b border-indigo-200">
@@ -1211,7 +1472,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                               <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-300 shadow-sm">
                                 {org.foto ? (
                                   <img 
-                                    src={`https://wsrv.nl/?url=${org.foto}`} 
+                                    src={org.foto.startsWith("http") ? org.foto : `https://wsrv.nl/?url=${org.foto}`} 
                                     alt="profil" 
                                     className="w-full h-full object-cover"
                                   />
@@ -1220,7 +1481,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                                 )}
                               </div>
                               <div>
-                                <div className="font-bold text-gray-900 text-sm">{org.nama}</div>
+                                <div className="font-bold text-gray-900 text-sm">
+                                  {org.nama}
+                                </div>
                                 <div className="text-[10px] text-indigo-700 uppercase font-black tracking-widest mt-1 bg-indigo-50 inline-block px-2 py-0.5 rounded border border-indigo-100">
                                   {org.jabatan}
                                 </div>
@@ -1236,7 +1499,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                                   </div>
                                 </div>
                               ) : (
-                                <span className="text-xs text-gray-400 italic">Puncak Hierarki</span>
+                                <span className="text-xs text-gray-400 italic">
+                                  Puncak Hierarki
+                               </span>
                               )}
                             </td>
                             <td className="py-4 px-4">
@@ -1267,11 +1532,16 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         </div>
       )}
 
-      {/* 4. MODUL KATALOG UMKM & WISATA */}
-      {(!activeSubMenu || activeSubMenu === "profil-umkm") && (
+      {/* 5. MODUL KATALOG UMKM & WISATA */}
+      {tabAktif === "umkm" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-yellow-600">
-          <h3 className="text-2xl font-bold mb-2">🛍️ Katalog Potensi, Wisata & UMKM</h3>
-          <p className="text-gray-500 text-sm mb-6">Kelola promosi pariwisata, produk UMKM, fasilitas, beserta jam operasional dan lokasi.</p>
+          <h3 className="text-2xl font-bold mb-2">
+            <span className="mr-2">🛍️</span>
+            Katalog Potensi, Wisata & UMKM
+          </h3>
+          <p className="text-gray-500 text-sm mb-6">
+            Kelola promosi pariwisata, produk UMKM, fasilitas, beserta jam operasional dan lokasi.
+          </p>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1 bg-yellow-50 p-6 rounded-2xl border border-yellow-200 shadow-inner">
@@ -1291,7 +1561,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
               </div>
               <form onSubmit={handleSimpanUmkm} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Kategori</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Kategori
+                  </label>
                   <select 
                     value={kategoriPotensi} 
                     onChange={(e) => setKategoriPotensi(e.target.value)} 
@@ -1316,7 +1588,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">Pemilik / Pengelola</label>
+                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                      Pemilik / Pengelola
+                    </label>
                     <input 
                       type="text" 
                       value={pengelola} 
@@ -1325,7 +1599,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1.5 text-gray-700">No. Kontak / WA</label>
+                    <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                      No. Kontak / WA
+                    </label>
                     <input 
                       type="number" 
                       value={kontak} 
@@ -1336,7 +1612,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   </div>
                 </div>
                 <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm">
-                  <label className="block text-xs font-bold mb-2 text-yellow-900 border-b border-yellow-100 pb-1">Estimasi Harga (Rp) - Isi 0 jika Gratis</label>
+                  <label className="block text-xs font-bold mb-2 text-yellow-900 border-b border-yellow-100 pb-1">
+                    Estimasi Harga (Rp) - Isi 0 jika Gratis
+                  </label>
                   <div className="flex items-center gap-2">
                     <input 
                       type="number" 
@@ -1358,7 +1636,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Tautan Google Maps</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Tautan Google Maps
+                  </label>
                   <input 
                     type="url" 
                     value={linkMaps} 
@@ -1368,7 +1648,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 </div>
                 
                 <div className="bg-white p-3 rounded-xl border border-yellow-300 shadow-sm overflow-hidden">
-                  <label className="block text-xs font-bold mb-3 text-yellow-900 border-b border-yellow-100 pb-1">Jadwal Operasional (Per Hari)</label>
+                  <label className="block text-xs font-bold mb-3 text-yellow-900 border-b border-yellow-100 pb-1">
+                    Jadwal Operasional (Per Hari)
+                  </label>
                   <div className="space-y-3">
                     {Object.keys(jamOperasional).map((hari) => (
                       <div key={hari} className="flex flex-col xl:flex-row xl:items-center gap-2 justify-between bg-gray-50 p-2.5 rounded-lg border border-gray-100">
@@ -1381,7 +1663,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                               onChange={(e) => handleJamChange(hari, 'libur', e.target.checked)} 
                               className="w-3.5 h-3.5 text-red-500 rounded border-gray-300 focus:ring-red-500 flex-shrink-0" 
                             />
-                            <span className={jamOperasional[hari].libur ? "text-red-600 font-bold" : "text-gray-500"}>Libur</span>
+                            <span className={jamOperasional[hari].libur ? "text-red-600 font-bold" : "text-gray-500"}>
+                              Libur
+                            </span>
                           </label>
                         </div>
                         {!jamOperasional[hari].libur ? (
@@ -1411,7 +1695,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Deskripsi Daya Tarik</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Deskripsi Daya Tarik
+                  </label>
                   <textarea 
                     required 
                     rows={3} 
@@ -1421,7 +1707,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   ></textarea>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Cloudinary)</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">
+                    Galeri Foto (Cloudinary)
+                  </label>
                   <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                     <span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2">
                       <span className="text-3xl">📸</span> Klik Pilih File
@@ -1439,13 +1727,16 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                 
                 {editUmkmId && gambarLamaPotensi.length > 0 && (
                   <div className="bg-orange-50 p-3 rounded-xl border border-orange-200">
-                    <p className="text-xs font-bold text-orange-900 mb-2">Foto Tersimpan (Klik X untuk hapus permanen):</p>
+                    <p className="text-xs font-bold text-orange-900 mb-2">
+                      Foto Tersimpan (Klik X untuk hapus permanen):
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {gambarLamaPotensi.map((url, idx) => (
                         <div key={idx} className="relative w-16 h-16 border-2 border-white rounded-lg overflow-hidden group shadow-md">
                           <img 
                             src={url.startsWith("http") ? url : `https://wsrv.nl/?url=${url}`} 
                             className="w-full h-full object-cover" 
+                            alt="UMKM"
                           />
                           <button 
                             type="button" 
@@ -1496,6 +1787,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                               <img 
                                 src={fotonya.startsWith("http") ? fotonya : `https://wsrv.nl/?url=${fotonya}`} 
                                 className="w-full h-full object-cover"
+                                alt="Fotonya"
                               />
                             ) : (
                               <span className="flex items-center justify-center h-full text-3xl text-gray-400">🏞️</span>
