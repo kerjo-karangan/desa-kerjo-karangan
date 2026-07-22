@@ -22,6 +22,7 @@ interface KabarAgendaProps {
 }
 
 export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaProps) {
+  
   const getLocalDatetime = (d = new Date()) => {
     const tzOffset = d.getTimezoneOffset() * 60000; 
     return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
@@ -39,6 +40,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     else setTabAktif("berita");
   }, [activeSubMenu]);
 
+  // STATE HEADER/HERO KABAR
   const [heroJudul, setHeroJudul] = useState("");
   const [heroSub, setHeroSub] = useState("");
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
@@ -46,6 +48,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
+  // STATE KABAR BERITA
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
   const [tanggalKabar, setTanggalKabar] = useState(getLocalDatetime()); 
@@ -56,6 +59,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
   const [editKabarId, setEditKabarId] = useState<string | null>(null);
   const [gambarLama, setGambarLama] = useState<string[]>([]);
 
+  // STATE AGENDA DESA
   const [namaAgenda, setNamaAgenda] = useState("");
   const [tanggalAgenda, setTanggalAgenda] = useState("");
   const [lokasiAgenda, setLokasiAgenda] = useState("");
@@ -92,23 +96,19 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     ambilData();
   }, []);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result?.toString() || '');
-      reader.onerror = error => reject(error);
-    });
-  };
-
+  // ==========================================
+  // METODE BARU: CLOUDINARY UPLOAD DENGAN FORMDATA
+  // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/cloudinary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64Data }),
+        body: formData, 
       });
+      
       const data = await res.json();
       if (data.success) return data.url;
       throw new Error(data.error);
@@ -118,6 +118,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     }
   };
 
+  // ==========================================
+  // METODE BARU: HAPUS GAMBAR DARI CLOUDINARY
+  // ==========================================
   const hapusFotoDiCloudinary = async (url: string) => {
     if (!url || !url.includes("cloudinary.com")) return;
     try {
@@ -131,17 +134,25 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     }
   };
 
+  // ==========================================
+  // MANAJEMEN HEADER/HERO KABAR
+  // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingHero(true);
     setStatusHero("Menyimpan pengaturan Header...");
+    
     try {
       let imageUrl = heroBgLama;
+      
       if (heroBgList && heroBgList.length > 0) {
         setStatusHero("Mengunggah gambar ke Cloudinary...");
         const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
+        
         if (newBg) {
-          if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
+          if (heroBgLama) {
+            await hapusFotoDiCloudinary(heroBgLama);
+          }
           imageUrl = newBg;
         } else {
           setStatusHero("❌ Gagal mengunggah gambar.");
@@ -149,12 +160,14 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
           return; 
         }
       }
+      
       await setDoc(doc(db, "pengaturan_web", "kabar_hero"), {
         judul: heroJudul, 
         sub: heroSub, 
         bg: imageUrl, 
         terakhir_diperbarui: new Date().toISOString()
       });
+      
       setStatusHero("✅ Pengaturan Header Kabar berhasil diperbarui!");
       setHeroBgLama(imageUrl); 
       setHeroBgList(null);
@@ -171,15 +184,20 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
   const handleHapusBackgroundHero = async () => {
     if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
     setIsLoadingHero(true);
-    setStatusHero("Menghapus gambar dari server...");
+    setStatusHero("Menghapus gambar dari server Cloudinary...");
+    
     try {
-      if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
+      if (heroBgLama) {
+        await hapusFotoDiCloudinary(heroBgLama);
+      }
+      
       await setDoc(doc(db, "pengaturan_web", "kabar_hero"), {
         judul: heroJudul, 
         sub: heroSub, 
         bg: "", 
         terakhir_diperbarui: new Date().toISOString()
       });
+      
       setHeroBgLama("");
       setStatusHero("✅ Gambar background dihapus.");
       setTimeout(() => setStatusHero(""), 4000);
@@ -215,12 +233,17 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     }
   };
 
+  // ==========================================
+  // MANAJEMEN KABAR BERITA
+  // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKabar(true);
     setStatusKabar("Memproses...");
+    
     try {
       let tautanGambarBaru: string[] = [];
+      
       if (fotoKabarList && fotoKabarList.length > 0) {
         setStatusKabar(`Mengunggah foto ke Cloudinary...`);
         const uploadPromises = Array.from(fotoKabarList).map((file) => uploadFotoKeCloudinary(file));
@@ -282,12 +305,14 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     setGambarLama(sisaGambar);
     
     if (editKabarId) {
-      await updateDoc(doc(db, "kabar_desa", editKabarId), { gambar: sisaGambar });
+      await updateDoc(doc(db, "kabar_desa", editKabarId), { 
+        gambar: sisaGambar 
+      });
     }
   };
 
   const hapusKabar = async (id: string, gambarArray: string[]) => {
-    if (!confirm("Yakin hapus berita permanen? Semua foto yang terkait akan dimusnahkan dari server Cloudinary.")) return;
+    if (!confirm("Yakin hapus berita permanen? Semua foto terkait akan dimusnahkan dari server Cloudinary.")) return;
     
     if (gambarArray && gambarArray.length > 0) {
       for (const url of gambarArray) {
@@ -330,10 +355,14 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
     }
   };
 
+  // ==========================================
+  // MANAJEMEN AGENDA DESA
+  // ==========================================
   const handleSimpanAgenda = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingAgenda(true);
     setStatusAgenda("Menyimpan...");
+    
     try {
       const dataAgenda = { 
         nama: namaAgenda, 
@@ -446,6 +475,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
         </div>
       )}
 
+      {/* ==========================================
+          TAMPILAN HERO
+      ========================================== */}
       {tabAktif === "hero" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-gray-800 animate-fade-in">
           <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Kabar Desa</h3>
@@ -536,6 +568,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
         </div>
       )}
 
+      {/* ==========================================
+          TAMPILAN BERITA
+      ========================================== */}
       {tabAktif === "berita" && (
         <>
           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500 animate-fade-in">
@@ -713,7 +748,7 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
                             onClick={() => hapusKabar(item.id, arrGambarHapus)} 
                             className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
                           >
-                            Hapus
+                            Hapus Permanen
                           </button>
                         </div>
                       </td>
@@ -733,6 +768,9 @@ export default function KabarAgenda({ userEmail, activeSubMenu }: KabarAgendaPro
         </>
       )}
 
+      {/* ==========================================
+          TAMPILAN AGENDA
+      ========================================== */}
       {tabAktif === "agenda" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-gray-100 border-t-4 border-yellow-500 animate-fade-in">
           <div className="flex justify-between items-center mb-6">

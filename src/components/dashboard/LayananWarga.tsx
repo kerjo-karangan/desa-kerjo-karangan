@@ -2,18 +2,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, doc, deleteDoc, updateDoc, query, orderBy, addDoc, getDoc, setDoc } from "firebase/firestore";
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  deleteDoc, 
+  updateDoc, 
+  query, 
+  orderBy, 
+  addDoc, 
+  getDoc, 
+  setDoc 
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-// ==========================================
-// SOLUSI ERROR TYPESCRIPT (INTRINSIC ATTRIBUTES)
-// ==========================================
 interface LayananWargaProps {
   activeSubMenu?: string;
 }
 
 export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
-  // Set default tab berdasarkan activeSubMenu dari sidebar
   const defaultTab = activeSubMenu === "layan-master" ? "master" 
                    : activeSubMenu === "layan-pengaduan" ? "pengaduan" 
                    : activeSubMenu === "layan-hero" ? "hero"
@@ -28,9 +35,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
     else setTabAktif("antrean");
   }, [activeSubMenu]);
 
-  // ==========================================
-  // STATE PENGATURAN HEADER/HERO LAYANAN
-  // ==========================================
   const [heroJudul, setHeroJudul] = useState("");
   const [heroSub, setHeroSub] = useState("");
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
@@ -38,9 +42,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
-  // ==========================================
-  // STATE MASTER SURAT (JENIS SURAT)
-  // ==========================================
   const [masterSuratList, setMasterSuratList] = useState<any[]>([]);
   const [editMasterId, setEditMasterId] = useState<string | null>(null);
   const [namaSurat, setNamaSurat] = useState("");
@@ -48,33 +49,21 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
   const [persyaratan, setPersyaratan] = useState<string[]>([""]); 
   const [isLoadingMaster, setIsLoadingMaster] = useState(false);
 
-  // ==========================================
-  // STATE ANTREAN SURAT
-  // ==========================================
   const [antreanSurat, setAntreanSurat] = useState<any[]>([]);
   const [batasHapusSurat, setBatasHapusSurat] = useState("30");
   const [isCleaningSurat, setIsCleaningSurat] = useState(false);
   
-  // Modal Penolakan Surat
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [suratToReject, setSuratToReject] = useState<string | null>(null);
   const [alasanTolak, setAlasanTolak] = useState("");
 
-  // ==========================================
-  // STATE PENGADUAN
-  // ==========================================
   const [daftarPengaduan, setDaftarPengaduan] = useState<any[]>([]);
   const [pengaduanTerpilih, setPengaduanTerpilih] = useState<any | null>(null);
-
   const [loadingData, setLoadingData] = useState(true);
 
-  // ==========================================
-  // FUNGSI FETCH DATA
-  // ==========================================
   const ambilSemuaData = async () => {
     setLoadingData(true);
     try {
-      // Fetch Header Layanan
       const snapHero = await getDoc(doc(db, "pengaturan_web", "layanan_hero"));
       if (snapHero.exists() && snapHero.data()) {
         setHeroJudul(snapHero.data().judul || "Layanan Surat Mandiri");
@@ -82,17 +71,14 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
         setHeroBgLama(snapHero.data().bg || "");
       }
 
-      // Fetch Master Surat
       const qMaster = query(collection(db, "master_surat"));
       const snapMaster = await getDocs(qMaster);
       setMasterSuratList(snapMaster.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      // Fetch Antrean Surat
       const qSurat = query(collection(db, "layanan_surat"), orderBy("tanggal_pengajuan", "desc"));
       const snapSurat = await getDocs(qSurat);
       setAntreanSurat(snapSurat.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
-      // Fetch Pengaduan
       const qAduan = query(collection(db, "pengaduan_masyarakat"), orderBy("tanggal", "desc"));
       const snapAduan = await getDocs(qAduan);
       setDaftarPengaduan(snapAduan.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -125,57 +111,38 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
     }) + " WIB";
   };
 
-  // ==========================================
-  // FUNGSI UPLOAD GAMBAR API IMGBB
-  // ==========================================
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        let encoded = reader.result?.toString().replace(/^data:(.*,)?/, '') || '';
-        if ((encoded.length % 4) > 0) { 
-          encoded += '='.repeat(4 - (encoded.length % 4)); 
-        }
-        resolve(encoded);
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  const uploadFotoKeImgBB = async (file: File) => {
+  const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
       const formData = new FormData();
-      formData.append("image", base64Data);
-      const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-      
-      const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`, { 
-        method: "POST", 
-        body: formData 
+      formData.append("file", file);
+
+      const res = await fetch("/api/cloudinary", {
+        method: "POST",
+        body: formData,
       });
+      
       const data = await res.json();
-      if (data.success) return data.data.url;
-      throw new Error("Jalur utama gagal");
+      if (data.success) return data.url;
+      throw new Error(data.error);
     } catch (error) {
-      try {
-        const base64Data = await fileToBase64(file);
-        const formData = new FormData();
-        formData.append("image", base64Data);
-        const apiKeyImgBB = "6755e61bb042b746d83c71595313674e";
-        const cdnUrl = `https://corsproxy.io/?https://api.imgbb.com/1/upload?key=${apiKeyImgBB}`;
-        
-        const resCdn = await fetch(cdnUrl, { method: "POST", body: formData });
-        const dataCdn = await resCdn.json();
-        if (dataCdn.success) return dataCdn.data.url;
-        return null;
-      } catch (errCdn) { return null; }
+      console.error("Upload error:", error);
+      return null;
     }
   };
 
-  // ==========================================
-  // MANAJEMEN PENGATURAN HEADER/HERO LAYANAN
-  // ==========================================
+  const hapusFotoDiCloudinary = async (url: string) => {
+    if (!url || !url.includes("cloudinary.com")) return;
+    try {
+      await fetch("/api/cloudinary", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+    } catch (error) {
+      console.error("Delete error:", error);
+    }
+  };
+
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingHero(true);
@@ -185,12 +152,13 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
       let imageUrl = heroBgLama;
       
       if (heroBgList && heroBgList.length > 0) {
-        setStatusHero("Mengunggah gambar background...");
-        const newBg = await uploadFotoKeImgBB(heroBgList[0]);
+        setStatusHero("Mengunggah gambar ke Cloudinary...");
+        const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
         if (newBg) {
+          if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
           imageUrl = newBg;
         } else {
-          setStatusHero("❌ Gagal mengunggah gambar. Pastikan internet stabil.");
+          setStatusHero("❌ Gagal mengunggah gambar.");
           setIsLoadingHero(false); 
           return; 
         }
@@ -216,9 +184,31 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
     }
   };
 
-  // ==========================================
-  // LOGIKA MASTER SURAT (JENIS SURAT)
-  // ==========================================
+  const handleHapusBackgroundHero = async () => {
+    if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
+    setIsLoadingHero(true);
+    setStatusHero("Menghapus gambar...");
+    
+    try {
+      if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
+      
+      await setDoc(doc(db, "pengaturan_web", "layanan_hero"), {
+        judul: heroJudul,
+        sub: heroSub,
+        bg: "",
+        terakhir_diperbarui: new Date().toISOString()
+      });
+      
+      setHeroBgLama("");
+      setStatusHero("✅ Background dihapus.");
+      setTimeout(() => setStatusHero(""), 4000);
+    } catch (error) {
+      setStatusHero("❌ Gagal menghapus background.");
+    } finally {
+      setIsLoadingHero(false);
+    }
+  };
+
   const handlePersyaratanChange = (index: number, value: string) => {
     const newPersyaratan = [...persyaratan];
     newPersyaratan[index] = value;
@@ -283,12 +273,16 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
     }
   };
 
-  // ==========================================
-  // LOGIKA ANTREAN SURAT
-  // ==========================================
-  const hapusSurat = async (id: string) => {
-    if (confirm("Yakin hapus data antrean surat ini permanen?")) {
-      await deleteDoc(doc(db, "layanan_surat", id));
+  const hapusSurat = async (surat: any) => {
+    if (confirm("Yakin hapus data antrean surat ini permanen? File syarat milik warga juga akan dihapus dari Cloudinary.")) {
+      
+      if (surat.berkas && Object.keys(surat.berkas).length > 0) {
+        for (const url of Object.values(surat.berkas)) {
+          await hapusFotoDiCloudinary(url as string);
+        }
+      }
+
+      await deleteDoc(doc(db, "layanan_surat", surat.id));
       ambilSemuaData();
     }
   };
@@ -332,24 +326,30 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
   };
 
   const pembersihanSuratOtomatis = async () => {
-    if (!confirm(`Tindakan ini akan menghapus riwayat surat yang usianya melebihi ${batasHapusSurat} hari. Lanjutkan?`)) return;
+    if (!confirm(`Tindakan ini akan menghapus riwayat surat yang usianya melebihi ${batasHapusSurat} hari beserta berkasnya. Lanjutkan?`)) return;
     setIsCleaningSurat(true);
     try {
       const limitDate = new Date();
       limitDate.setDate(limitDate.getDate() - parseInt(batasHapusSurat));
       
       let countDeleted = 0;
-      const deletePromises = [];
       
       for (const surat of antreanSurat) {
         const tglSurat = new Date(surat.tanggal_pengajuan);
         if (tglSurat < limitDate) {
-          deletePromises.push(deleteDoc(doc(db, "layanan_surat", surat.id)));
+          
+          if (surat.berkas && Object.keys(surat.berkas).length > 0) {
+            for (const url of Object.values(surat.berkas)) {
+              await hapusFotoDiCloudinary(url as string);
+            }
+          }
+
+          await deleteDoc(doc(db, "layanan_surat", surat.id));
           countDeleted++;
         }
       }
-      await Promise.all(deletePromises);
-      alert(`✅ Berhasil menghapus ${countDeleted} data antrean surat usang.`);
+      
+      alert(`✅ Berhasil menghapus ${countDeleted} data antrean surat usang beserta filenya.`);
       ambilSemuaData();
     } catch (error) { 
       alert("❌ Gagal melakukan pembersihan otomatis."); 
@@ -358,9 +358,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
     }
   };
 
-  // ==========================================
-  // LOGIKA KOTAK PENGADUAN
-  // ==========================================
   const hapusPengaduan = async (id: string) => {
     if (confirm("Hapus laporan pengaduan ini?")) {
       await deleteDoc(doc(db, "pengaduan_masyarakat", id));
@@ -371,7 +368,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
   return (
     <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {/* TABS NAVIGASI (Hanya tampil jika tidak ada submenu spesifik yang dipilih) */}
       {!activeSubMenu && (
         <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
           <button 
@@ -409,12 +405,9 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
         </div>
       ) : (
         <>
-          {/* ==========================================
-              TAB 0: PENGATURAN HEADER LAYANAN
-          ========================================== */}
           {tabAktif === "hero" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-500 animate-fade-in">
-              <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Layanan Mandiri</h3>
+              <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Header Layanan (Cloudinary)</h3>
               <p className="text-gray-500 text-sm mb-6">Sesuaikan gambar background dan teks sambutan khusus di halaman Layanan Surat Warga.</p>
               
               <form onSubmit={handleSimpanHero} className="space-y-6">
@@ -456,10 +449,10 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                           <button 
                             type="button" 
-                            onClick={() => setHeroBgLama("")} 
+                            onClick={handleHapusBackgroundHero} 
                             className="bg-red-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-lg hover:bg-red-700 border border-red-500"
                           >
-                            Hapus Background
+                            Hapus Permanen
                           </button>
                         </div>
                       </div>
@@ -502,9 +495,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
             </div>
           )}
 
-          {/* ==========================================
-              TAB 1: ANTREAN SURAT
-          ========================================== */}
           {tabAktif === "antrean" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
               
@@ -624,10 +614,10 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
                             )}
                             
                             <button 
-                              onClick={() => hapusSurat(surat.id)} 
+                              onClick={() => hapusSurat(surat)} 
                               className="mt-2 text-[10px] text-red-500 hover:text-red-700 font-bold underline"
                             >
-                              Hapus Data
+                              Hapus Permanen
                             </button>
                           </div>
                         </td>
@@ -646,9 +636,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
             </div>
           )}
 
-          {/* ==========================================
-              TAB 2: MASTER SURAT
-          ========================================== */}
           {tabAktif === "master" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 border-b border-gray-100 pb-6">
@@ -821,9 +808,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
             </div>
           )}
 
-          {/* ==========================================
-              TAB 3: KOTAK PENGADUAN
-          ========================================== */}
           {tabAktif === "pengaduan" && (
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-red-600 animate-fade-in">
               <h3 className="text-2xl font-bold text-gray-900 mb-6">📥 Kotak Pengaduan Masyarakat</h3>
@@ -891,9 +875,6 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
         </>
       )}
 
-      {/* ==========================================
-          MODAL: BACA PENGADUAN LENGKAP
-      ========================================== */}
       {pengaduanTerpilih && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
@@ -942,15 +923,12 @@ export default function LayananWarga({ activeSubMenu }: LayananWargaProps) {
         </div>
       )}
 
-      {/* ==========================================
-          MODAL: ALASAN PENOLAKAN SURAT
-      ========================================== */}
       {rejectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl border-t-8 border-red-600">
             <div className="p-6 md:p-8">
               <h3 className="text-2xl font-black text-gray-900 mb-2">🔴 Tolak Pengajuan Surat</h3>
-              <p className="text-sm text-gray-500 mb-6">Berikan alasan mengapa permohonan surat ini ditolak (misal: Foto KTP buram, NIK tidak sesuai, dll) agar warga dapat memperbaikinya.</p>
+              <p className="text-sm text-gray-500 mb-6">Berikan alasan mengapa permohonan surat ini ditolak agar warga dapat memperbaikinya.</p>
               
               <textarea 
                 rows={4} 

@@ -17,17 +17,13 @@ import {
 import { db } from "../../lib/firebase";
 
 export default function PengaturanBeranda({ userEmail }: { userEmail: string | null }) {
-  const [tabAktif, setTabAktif] = useState("hero"); // 'hero', 'kontak', 'berita'
+  const [tabAktif, setTabAktif] = useState("hero");
 
-  // Helper Waktu
   const getLocalDatetime = (d = new Date()) => {
     const tzOffset = d.getTimezoneOffset() * 60000; 
     return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
   };
 
-  // ==========================================
-  // STATE PENGATURAN TAMPILAN BERANDA (HERO)
-  // ==========================================
   const [heroJudul, setHeroJudul] = useState("");
   const [heroSub, setHeroSub] = useState("");
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
@@ -35,9 +31,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   const [statusHero, setStatusHero] = useState("");
   const [isLoadingHero, setIsLoadingHero] = useState(false);
 
-  // ==========================================
-  // STATE PENGATURAN KONTAK & SOSMED
-  // ==========================================
   const [alamat, setAlamat] = useState("");
   const [email, setEmail] = useState("");
   const [jamKerja, setJamKerja] = useState("");
@@ -49,9 +42,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   const [statusKontak, setStatusKontak] = useState("");
   const [isLoadingKontak, setIsLoadingKontak] = useState(false);
 
-  // ==========================================
-  // STATE MANAJEMEN BERITA
-  // ==========================================
   const [judulKabar, setJudulKabar] = useState("");
   const [isiKabar, setIsiKabar] = useState("");
   const [tanggalKabar, setTanggalKabar] = useState(getLocalDatetime());
@@ -62,12 +52,8 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   const [editKabarId, setEditKabarId] = useState<string | null>(null);
   const [gambarLamaKabar, setGambarLamaKabar] = useState<string[]>([]);
 
-  // ==========================================
-  // FUNGSI PENGAMBILAN DATA (FETCH)
-  // ==========================================
   const ambilData = async () => {
     try {
-      // 1. Data Hero Beranda
       const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda"));
       if (snapHero.exists()) {
         setHeroJudul(snapHero.data().judul || "Selamat Datang di\nDesa Kerjo");
@@ -75,7 +61,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         setHeroBgLama(snapHero.data().bg || "");
       }
 
-      // 2. Data Kontak
       const snapKontak = await getDoc(doc(db, "pengaturan_web", "kontak"));
       if (snapKontak.exists()) {
         const d = snapKontak.data();
@@ -89,7 +74,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         setLinkTt(d.tiktok || "");
       }
 
-      // 3. Data Berita
       const qKabar = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
       const snapKabar = await getDocs(qKabar);
       setRiwayatKabar(snapKabar.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
@@ -103,31 +87,19 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
   }, []);
 
   // ==========================================
-  // FUNGSI CLOUDINARY (UPLOAD & DELETE API)
+  // METODE BARU: UPLOAD MENGGUNAKAN FORMDATA
   // ==========================================
-  
-  // Konversi Gambar ke Format Base64
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => {
-        let encoded = reader.result?.toString() || '';
-        resolve(encoded); 
-      };
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  // UPLOAD Ke API Route Internal Kita
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
+      // Kita langsung bungkus File ke dalam FormData (Jauh lebih cepat dan anti-limit)
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/cloudinary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64Data }),
+        body: formData, // Browser akan otomatis mengatur header Content-Type multipart
       });
+      
       const data = await res.json();
       if (data.success) return data.url;
       throw new Error(data.error);
@@ -137,24 +109,19 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // DELETE Ke API Route Internal Kita
   const hapusFotoDiCloudinary = async (url: string) => {
-    if (!url || !url.includes("cloudinary.com")) return; // Hanya jalankan jika itu URL Cloudinary
+    if (!url || !url.includes("cloudinary.com")) return;
     try {
       await fetch("/api/cloudinary", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url }),
       });
-      console.log("Gambar dihapus dari Cloudinary:", url);
     } catch (error) {
       console.error("Gagal Hapus di Cloudinary:", error);
     }
   };
 
-  // ==========================================
-  // FUNGSI SIMPAN PENGATURAN BERANDA (HERO)
-  // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingHero(true);
@@ -166,9 +133,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       if (heroBgList && heroBgList.length > 0) {
         setStatusHero("Mengunggah gambar ke Cloudinary...");
         const newBg = await uploadFotoKeCloudinary(heroBgList[0]);
-        
         if (newBg) {
-          // Jika gambar baru berhasil diunggah, HAPUS gambar lama dari server (agar tidak numpuk)
           if (heroBgLama) {
             await hapusFotoDiCloudinary(heroBgLama);
           }
@@ -200,7 +165,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // Hapus Permanen Background Hero
   const handleHapusBackgroundHero = async () => {
     if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
     setIsLoadingHero(true);
@@ -226,9 +190,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // ==========================================
-  // FUNGSI SIMPAN KONTAK & SOSIAL MEDIA
-  // ==========================================
   const handleSimpanKontak = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKontak(true);
@@ -256,9 +217,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // ==========================================
-  // LOGIKA OTOMATIS: MATIKAN BERITA LAMA (MAX 10)
-  // ==========================================
   const pastikanSepuluhTerbaru = async () => {
     try {
       const q = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
@@ -284,9 +242,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // ==========================================
-  // MANAJEMEN KABAR BERITA
-  // ==========================================
   const handleSimpanKabar = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKabar(true);
@@ -297,7 +252,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
       
       if (fotoKabarList && fotoKabarList.length > 0) {
         setStatusKabar(`Mengunggah foto ke Cloudinary...`);
-        // Upload Multi Gambar
         const uploadPromises = Array.from(fotoKabarList).map((file) => uploadFotoKeCloudinary(file));
         const hasilUpload = await Promise.all(uploadPromises);
         tautanGambarBaru = hasilUpload.filter((url) => url !== null) as string[];
@@ -313,7 +267,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           gambar: gambarFinal,
           tanggal_posting: finalTanggalPosting
         });
-        setStatusKabar("✅ Berita Diperbarui!");
+        setStatusKabar("✅ Diperbarui!");
       } else {
         await addDoc(collection(db, "kabar_desa"), {
           judul: judulKabar, 
@@ -324,7 +278,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
           is_featured: true, 
           is_pinned: false
         });
-        setStatusKabar("✅ Berita Dipublikasikan!");
+        setStatusKabar("✅ Dipublikasikan!");
       }
       
       await pastikanSepuluhTerbaru();
@@ -347,20 +301,15 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // MENGHAPUS SATU FOTO SPESIFIK SAAT EDIT BERITA
   const hapusGambarDariDaftarLamaKabar = async (indexGambar: number) => {
     if (!confirm("Yakin menghapus foto ini? Foto akan dihapus secara permanen dari server Cloudinary.")) return;
     
     const urlYangDihapus = gambarLamaKabar[indexGambar];
-    
-    // 1. Hapus dari Cloudinary
     await hapusFotoDiCloudinary(urlYangDihapus);
 
-    // 2. Update UI & State
     const sisaGambar = gambarLamaKabar.filter((_, i) => i !== indexGambar);
     setGambarLamaKabar(sisaGambar);
     
-    // 3. Update Database Firebase langsung agar sinkron
     if (editKabarId) {
       await updateDoc(doc(db, "kabar_desa", editKabarId), {
         gambar: sisaGambar
@@ -368,18 +317,15 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // MENGHAPUS SELURUH BERITA & MEMUSNAHKAN SEMUA FOTONYA DARI CLOUDINARY
   const hapusKabar = async (id: string, gambarArray: string[]) => {
     if (!confirm("Yakin hapus berita permanen? Semua foto yang terkait dengan berita ini akan dimusnahkan juga dari server Cloudinary.")) return;
     
-    // 1. Loop dan hapus setiap gambar dari Cloudinary
     if (gambarArray && gambarArray.length > 0) {
       for (const url of gambarArray) {
         await hapusFotoDiCloudinary(url);
       }
     }
     
-    // 2. Hapus data dari Firebase
     await deleteDoc(doc(db, "kabar_desa", id));
     ambilData();
   };
@@ -418,13 +364,9 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
     }
   };
 
-  // ==========================================
-  // TAMPILAN RENDER UI
-  // ==========================================
   return (
     <div className="space-y-8 animate-fade-in pb-20 font-sans">
       
-      {/* TABS NAVIGASI SISTEM UTAMA */}
       <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
         <button 
           onClick={() => setTabAktif("hero")} 
@@ -452,7 +394,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </button>
       </div>
 
-      {/* 1. PENGATURAN TAMPILAN BERANDA (HERO) */}
       {tabAktif === "hero" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
           <h3 className="text-2xl font-bold mb-2">🖼️ Pengaturan Visual Beranda (Cloudinary)</h3>
@@ -541,7 +482,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </div>
       )}
 
-      {/* 2. PENGATURAN KONTAK & MEDIA SOSIAL */}
       {tabAktif === "kontak" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in">
           <h3 className="text-2xl font-bold mb-2">📞 Identitas Kontak & Media Sosial</h3>
@@ -587,7 +527,7 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
               <div className="space-y-5 bg-green-50 p-5 rounded-2xl border border-green-100">
                 <h4 className="font-bold text-green-900 border-b border-green-200 pb-2 flex items-center gap-2"><span className="text-lg">🌐</span> Kanal Digital & WA</h4>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">No. WhatsApp Admin (Gunakan 62)</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">No. WhatsApp Admin (Gunakan awalan 62)</label>
                   <input 
                     type="number" 
                     required
@@ -658,7 +598,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </div>
       )}
 
-      {/* 3. MANAJEMEN BERITA */}
       {tabAktif === "berita" && (
         <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-green-500 animate-fade-in">
           <div className="flex justify-between mb-2 border-b pb-4">
@@ -774,7 +713,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
         </div>
       )}
 
-      {/* 3. TABEL MANAJEMEN BERITA */}
       {tabAktif === "berita" && (
         <div className="bg-white p-6 rounded-3xl shadow-sm overflow-x-auto border border-gray-100 animate-fade-in">
           <div className="flex justify-between items-center mb-6">
@@ -797,7 +735,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                 const isTampil = item.is_featured !== false; 
                 const isPinned = item.is_pinned === true;
                 
-                // Pastikan gambar berbentuk array untuk dilempar ke fungsi hapusKabar
                 const arrGambarHapus = Array.isArray(item.gambar) ? item.gambar : item.gambar ? [item.gambar] : [];
                 
                 return (
@@ -836,7 +773,6 @@ export default function PengaturanBeranda({ userEmail }: { userEmail: string | n
                         >
                           Edit
                         </button>
-                        {/* UPDATE SAKTI CLOUDINARY: Lempar array gambar untuk dibasmi */}
                         <button 
                           onClick={() => hapusKabar(item.id, arrGambarHapus)} 
                           className="w-full max-w-[100px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-lg"

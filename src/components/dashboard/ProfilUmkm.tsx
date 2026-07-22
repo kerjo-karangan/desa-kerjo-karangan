@@ -31,7 +31,6 @@ interface ProfilUmkmProps {
 }
 
 export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
-  
   const [sejarahDesa, setSejarahDesa] = useState("");
   const [visiMisiDesa, setVisiMisiDesa] = useState("");
   const [statusProfil, setStatusProfil] = useState("");
@@ -126,23 +125,16 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     ambilData(); 
   }, []);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result?.toString() || '');
-      reader.onerror = error => reject(error);
-    });
-  };
-
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/cloudinary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64Data }),
+        body: formData,
       });
+      
       const data = await res.json();
       if (data.success) return data.url;
       throw new Error(data.error);
@@ -171,6 +163,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusHero("Menyimpan Header...");
     try {
       let imageUrl = heroProfilBgLama;
+      
       if (heroProfilBgList && heroProfilBgList.length > 0) {
         setStatusHero("Mengunggah Background...");
         const newBg = await uploadFotoKeCloudinary(heroProfilBgList[0]);
@@ -179,6 +172,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
           imageUrl = newBg;
         }
       }
+      
       await setDoc(doc(db, "pengaturan_web", "profil_hero"), { 
         bg: imageUrl, 
         terakhir_diperbarui: new Date().toISOString() 
@@ -201,10 +195,12 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusHero("Menghapus gambar...");
     try {
       if (heroProfilBgLama) await hapusFotoDiCloudinary(heroProfilBgLama);
+      
       await setDoc(doc(db, "pengaturan_web", "profil_hero"), { 
         bg: "", 
         terakhir_diperbarui: new Date().toISOString() 
       });
+      
       setHeroProfilBgLama("");
       setStatusHero("✅ Background dihapus.");
       setTimeout(() => setStatusHero(""), 4000);
@@ -240,6 +236,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusAparatur("Memproses...");
     try {
       let imageUrl = fotoLamaAparatur;
+      
       if (fotoAparatur && fotoAparatur.length > 0) { 
         setStatusAparatur("Upload foto wajah..."); 
         const uploadedUrl = await uploadFotoKeCloudinary(fotoAparatur[0]);
@@ -309,7 +306,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   const daftarAtasan = daftarAparatur.filter(org => org.id !== editAparaturId && org.urutan < urutanAparatur);
 
   const handleJamChange = (hari: string, field: string, value: any) => { 
-    setJamOperasional((prev: any) => ({ ...prev, [hari]: { ...prev[hari], [field]: value } })); 
+    setJamOperasional((prev: any) => ({ 
+      ...prev, 
+      [hari]: { ...prev[hari], [field]: value } 
+    })); 
   };
   
   const handleSimpanUmkm = async (e: React.FormEvent) => {
@@ -318,6 +318,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusUmkm("Memproses...");
     try {
       let tautanGambarBaru: string[] = [];
+      
       if (fotoPotensiList && fotoPotensiList.length > 0) {
         setStatusUmkm(`Mengunggah foto...`);
         const uploadPromises = Array.from(fotoPotensiList).map(file => uploadFotoKeCloudinary(file));
@@ -326,6 +327,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
       }
       
       const gambarFinal = [...gambarLamaPotensi, ...tautanGambarBaru];
+      
       const dataUmkm = { 
         kategori: kategoriPotensi, 
         nama_produk: namaPotensi, 
@@ -375,6 +377,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
   
   const hapusGambarLamaPotensi = async (index: number) => { 
     if (!confirm("Yakin hapus foto ini dari Cloudinary?")) return;
+    
     const urlTarget = gambarLamaPotensi[index];
     await hapusFotoDiCloudinary(urlTarget);
 
@@ -382,7 +385,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setGambarLamaPotensi(sisaGambar);
 
     if (editUmkmId) {
-      await updateDoc(doc(db, "potensi_desa", editUmkmId), { gambar: sisaGambar });
+      await updateDoc(doc(db, "potensi_desa", editUmkmId), { 
+        gambar: sisaGambar 
+      });
     }
   };
   
@@ -423,6 +428,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusLembaga("Memproses...");
     try {
       let imageUrl = fotoLamaLembaga;
+      
       if (fotoLembaga && fotoLembaga.length > 0) { 
         setStatusLembaga("Upload logo lembaga..."); 
         const uploadedUrl = await uploadFotoKeCloudinary(fotoLembaga[0]);
@@ -443,7 +449,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         await updateDoc(doc(db, "lembaga_desa", editLembagaId), dataLembaga); 
         setStatusLembaga("✅ Lembaga diperbarui!");
       } else { 
-        await addDoc(collection(db, "lembaga_desa"), { ...dataLembaga, anggota_sotk: [] }); 
+        await addDoc(collection(db, "lembaga_desa"), { 
+          ...dataLembaga, 
+          anggota_sotk: [] 
+        }); 
         setStatusLembaga("✅ Lembaga ditambahkan!"); 
       }
       
@@ -504,6 +513,7 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     setStatusLembaga("Menyimpan Anggota...");
     try {
       let imageUrl = fotoLamaAnggotaLem;
+      
       if (fotoAnggotaLem && fotoAnggotaLem.length > 0) { 
         const uploadedUrl = await uploadFotoKeCloudinary(fotoAnggotaLem[0]);
         if (uploadedUrl) {
@@ -529,7 +539,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
         anggotaSOTKSekarang.push(newAnggota);
       }
       
-      await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { anggota_sotk: anggotaSOTKSekarang });
+      await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
+        anggota_sotk: anggotaSOTKSekarang 
+      });
+      
       setStatusLembaga("✅ SOTK Lembaga diperbarui!");
       batalEditAnggotaLem(); 
       ambilData(); 
@@ -572,7 +585,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
     }
 
     const anggotaSOTKSekarang = selectedLembaga.anggota_sotk.filter((a:any) => a.id !== id);
-    await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { anggota_sotk: anggotaSOTKSekarang });
+    await updateDoc(doc(db, "lembaga_desa", selectedLembaga.id), { 
+      anggota_sotk: anggotaSOTKSekarang 
+    });
+    
     ambilData();
   };
 
@@ -587,7 +603,9 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
           <p className="text-gray-500 text-sm mb-6">Ubah gambar background (Hero) yang akan menjadi wajah utama di halaman Publik Profil.</p>
           <form onSubmit={handleSimpanHero} className="space-y-6">
             <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200">
-              <label className="block text-sm font-bold text-yellow-900 border-b border-yellow-200 pb-2 mb-4">Gambar Background</label>
+              <label className="block text-sm font-bold text-yellow-900 border-b border-yellow-200 pb-2 mb-4">
+                Gambar Background
+              </label>
               {heroProfilBgLama && (
                 <div className="relative w-full h-40 md:h-64 rounded-xl overflow-hidden shadow-inner border border-gray-200 group mb-4">
                   <img 
@@ -1148,7 +1166,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                     </div>
                     {editAnggotaLemId && fotoLamaAnggotaLem && (
                       <div className="flex items-center gap-4 p-3 bg-white rounded-xl border border-indigo-200 shadow-sm">
-                        <img src={`https://wsrv.nl/?url=${fotoLamaAnggotaLem}`} className="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" />
+                        <img 
+                          src={`https://wsrv.nl/?url=${fotoLamaAnggotaLem}`} 
+                          className="w-12 h-12 rounded-full object-cover border-2 border-indigo-100" 
+                        />
                         <div><span className="text-xs font-bold text-indigo-800 block">Foto Tersimpan</span></div>
                       </div>
                     )}
@@ -1189,7 +1210,11 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                             <td className="py-4 px-4 flex items-center gap-4">
                               <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden flex-shrink-0 border border-gray-300 shadow-sm">
                                 {org.foto ? (
-                                  <img src={`https://wsrv.nl/?url=${org.foto}`} alt="profil" className="w-full h-full object-cover"/>
+                                  <img 
+                                    src={`https://wsrv.nl/?url=${org.foto}`} 
+                                    alt="profil" 
+                                    className="w-full h-full object-cover"
+                                  />
                                 ) : (
                                   <span className="flex items-center justify-center w-full h-full text-xl text-gray-400">👤</span>
                                 )}
@@ -1396,10 +1421,10 @@ export default function ProfilUmkm({ activeSubMenu }: ProfilUmkmProps) {
                   ></textarea>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Bisa lebih dari 1)</label>
+                  <label className="block text-xs font-bold mb-1.5 text-gray-700">Galeri Foto (Cloudinary)</label>
                   <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-white border-2 border-dashed border-yellow-400 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
                     <span className="font-bold text-yellow-800 text-xs flex flex-col items-center gap-2">
-                      <span className="text-3xl">📸</span> Klik Pilih File Cloudinary
+                      <span className="text-3xl">📸</span> Klik Pilih File
                     </span>
                     <input 
                       id="inputFotoPotensi" 

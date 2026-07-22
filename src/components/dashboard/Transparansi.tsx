@@ -22,7 +22,6 @@ interface TransparansiProps {
 }
 
 export default function Transparansi({ activeSubMenu, userEmail }: TransparansiProps) {
-  
   const getLocalDatetime = (d = new Date()) => {
     const tzOffset = d.getTimezoneOffset() * 60000; 
     return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
@@ -61,7 +60,10 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
 
   const ambilData = async () => {
     try {
-      const qDokumen = query(collection(db, "transparansi_desa"), orderBy("tanggal_posting", "desc"));
+      const qDokumen = query(
+        collection(db, "transparansi_desa"), 
+        orderBy("tanggal_posting", "desc")
+      );
       const snapDokumen = await getDocs(qDokumen);
       setDaftarDokumen(snapDokumen.docs.map(doc => ({ id: doc.id, ...doc.data() } as any)));
 
@@ -80,23 +82,16 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     ambilData();
   }, []);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result?.toString() || '');
-      reader.onerror = error => reject(error);
-    });
-  };
-
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/cloudinary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64Data }),
+        body: formData,
       });
+      
       const data = await res.json();
       if (data.success) return data.url;
       throw new Error(data.error);
@@ -150,8 +145,10 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
       setStatusHero("✅ Pengaturan Header Transparansi berhasil diperbarui!");
       setHeroBgLama(imageUrl); 
       setHeroBgList(null);
+      
       const input = document.getElementById("inputBgTransparansi") as HTMLInputElement;
       if (input) input.value = "";
+      
       setTimeout(() => setStatusHero(""), 4000);
     } catch (error) {
       setStatusHero("❌ Gagal menyimpan pengaturan.");
@@ -164,14 +161,17 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
     if (!confirm("Yakin ingin menghapus gambar background secara permanen?")) return;
     setIsLoadingHero(true);
     setStatusHero("Menghapus gambar...");
+    
     try {
       if (heroBgLama) await hapusFotoDiCloudinary(heroBgLama);
+      
       await setDoc(doc(db, "pengaturan_web", "transparansi_hero"), {
         judul: heroJudul,
         sub: heroSub,
         bg: "",
         terakhir_diperbarui: new Date().toISOString()
       });
+      
       setHeroBgLama("");
       setStatusHero("✅ Background dihapus.");
       setTimeout(() => setStatusHero(""), 4000);
@@ -246,7 +246,9 @@ export default function Transparansi({ activeSubMenu, userEmail }: TransparansiP
 
   const handleHapusSampulLama = async () => {
     if (!confirm("Yakin hapus foto sampul ini dari Cloudinary?")) return;
+    
     if (gambarLama) await hapusFotoDiCloudinary(gambarLama);
+    
     setGambarLama("");
     if (editDokumenId) {
       await updateDoc(doc(db, "transparansi_desa", editDokumenId), { gambar: "" });

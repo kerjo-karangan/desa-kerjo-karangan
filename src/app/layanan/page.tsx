@@ -90,23 +90,16 @@ function LayananContent() {
     }
   };
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result?.toString() || '');
-      reader.onerror = error => reject(error);
-    });
-  };
-
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
-      const base64Data = await fileToBase64(file);
+      const formData = new FormData();
+      formData.append("file", file);
+
       const res = await fetch("/api/cloudinary", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file: base64Data }),
+        body: formData,
       });
+      
       const data = await res.json();
       if (data.success) return data.url;
       throw new Error(data.error);
@@ -140,7 +133,7 @@ function LayananContent() {
       const berkasTerunggah: { [key: string]: string } = {};
 
       if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
-        setStatusSubmit("Mengunggah berkas ke server Cloudinary...");
+        setStatusSubmit("Mengunggah berkas persyaratan ke server aman...");
         const syaratWajib = selectedSurat.persyaratan as string[];
         
         for (const syarat of syaratWajib) {
@@ -420,7 +413,7 @@ function LayananContent() {
                               <label className="cursor-pointer flex flex-col items-center justify-center py-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-blue-100 hover:border-blue-400 transition-all text-center">
                                 <span className="text-2xl mb-1">{fileBerkas[syarat] ? "✅" : "📷"}</span>
                                 <span className={`text-xs font-bold ${fileBerkas[syarat] ? "text-green-600" : "text-gray-500"}`}>
-                                  {fileBerkas[syarat] ? fileBerkas[syarat].name.substring(0,20)+"..." : "Ambil Foto"}
+                                  {fileBerkas[syarat] ? fileBerkas[syarat].name.substring(0,20)+"..." : "Pilih File"}
                                 </span>
                                 <input 
                                   type="file" 
