@@ -1,57 +1,48 @@
 // src/app/dashboard/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../../lib/firebase";
+import { useEffect, useState, Suspense } from "react";
+import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
+import { useRouter, useSearchParams } from "next/navigation";
 
-// Import Komponen Dashboard
+// Import semua komponen dashboard
+import Sidebar from "../../components/Sidebar";
 import Welcome from "../../components/dashboard/Welcome";
 import PengaturanBeranda from "../../components/dashboard/PengaturanBeranda";
-import DataPenduduk from "../../components/dashboard/DataPenduduk";
-import ManajemenAkun from "../../components/dashboard/ManajemenAkun";
 import ProfilUmkm from "../../components/dashboard/ProfilUmkm";
 import KabarAgenda from "../../components/dashboard/KabarAgenda";
 import Transparansi from "../../components/dashboard/Transparansi";
 import LayananWarga from "../../components/dashboard/LayananWarga";
+import DataPenduduk from "../../components/dashboard/DataPenduduk";
+import ManajemenAkun from "../../components/dashboard/ManajemenAkun";
 
-export default function DashboardAdmin() {
+function DashboardContent() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const searchParams = useSearchParams();
   
-  // State Navigasi Menu
-  const [activeMenu, setActiveMenu] = useState("welcome");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const activeMenu = searchParams.get("menu") || "beranda";
+  const activeSubMenu = searchParams.get("submenu") || "";
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUserEmail(user.email);
-        try {
-          const docRef = doc(db, "users", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            setUserRole(docSnap.data().role);
-          } else {
-            setUserRole("Admin");
-          }
-        } catch (error) {
-          console.error("Gagal mengambil role:", error);
-          setUserRole("Admin");
-        }
-        setLoadingAuth(false);
+    // Memanggil getAuth tanpa parameter app untuk menghindari error import
+    const auth = getAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      if (currentUser) {
+        setUser(currentUser);
       } else {
         router.push("/login");
       }
+      setLoading(false);
     });
+
     return () => unsubscribe();
   }, [router]);
 
   const handleLogout = async () => {
+    const auth = getAuth();
     try {
       await signOut(auth);
       router.push("/login");
@@ -60,165 +51,97 @@ export default function DashboardAdmin() {
     }
   };
 
-  // Struktur Menu Sidebar dengan Sub-Menu Baru (Termasuk Pengaturan Header/Hero)
-  const menuItems = [
-    { id: "welcome", label: "Dashboard", icon: "🏠" },
-    { id: "beranda", label: "Beranda Utama", icon: "🖼️" },
-    { id: "datadesa", label: "Data Penduduk", icon: "👥" },
-    { 
-      id: "profil", label: "Profil & UMKM", icon: "🏛️", 
-      subMenu: [
-        { id: "profil-teks", label: "Sejarah & Visi Misi" },
-        { id: "profil-sotk", label: "Aparatur (SOTK)" },
-        { id: "profil-lembaga", label: "Lembaga Masyarakat" },
-        { id: "profil-umkm", label: "Potensi & UMKM" },
-        { id: "profil-hero", label: "Pengaturan Header" }
-      ] 
-    },
-    { 
-      id: "kabar", label: "Kabar & Agenda", icon: "📰", 
-      subMenu: [
-        { id: "kabar-berita", label: "Berita Desa" },
-        { id: "kabar-agenda", label: "Agenda Kegiatan" },
-        { id: "kabar-hero", label: "Pengaturan Header" }
-      ] 
-    },
-    { 
-      id: "trans", label: "Transparansi", icon: "📊", 
-      subMenu: [
-        { id: "trans-apbdes", label: "Data APBDes" },
-        { id: "trans-regulasi", label: "Regulasi & Perdes" },
-        { id: "trans-hero", label: "Pengaturan Header" }
-      ] 
-    },
-    { 
-      id: "layan", label: "Layanan Warga", icon: "📄", 
-      subMenu: [
-        { id: "layan-antrean", label: "Antrean Surat" },
-        { id: "layan-master", label: "Daftar Jenis Surat" },
-        { id: "layan-pengaduan", label: "Kotak Pengaduan" },
-        { id: "layan-hero", label: "Pengaturan Header" }
-      ] 
-    },
-  ];
-
-  if (userRole === "Super Admin") {
-    menuItems.push({ id: "akun", label: "Manajemen Akun", icon: "🔑" });
-  }
-
-  if (loadingAuth) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">
-        <div className="flex flex-col items-center">
-          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold tracking-widest animate-pulse">MEMUAT SISTEM...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-green-700 font-bold tracking-widest animate-pulse">
+            Memuat Dashboard...
+          </p>
         </div>
       </div>
     );
   }
 
+  if (!user) {
+    return null;
+  }
+
+  // Fungsi untuk merender komponen berdasarkan parameter URL ?menu=...
+  const renderContent = () => {
+    switch (activeMenu) {
+      case "beranda":
+        return <PengaturanBeranda userEmail={user.email} activeSubMenu={activeSubMenu} />;
+      case "profil":
+        return <ProfilUmkm activeSubMenu={activeSubMenu} />;
+      case "datadesa":
+        return <DataPenduduk activeSubMenu={activeSubMenu} />;
+      case "kabar":
+        return <KabarAgenda userEmail={user.email} activeSubMenu={activeSubMenu} />;
+      case "transparansi":
+        return <Transparansi userEmail={user.email} activeSubMenu={activeSubMenu} />;
+      case "layanan":
+        return <LayananWarga activeSubMenu={activeSubMenu} />;
+      case "akun":
+        return <ManajemenAkun userEmail={user.email} />;
+      default:
+        // Menghapus parameter userEmail dari Welcome.tsx untuk memperbaiki Error TypeScript
+        return <Welcome />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col md:flex-row overflow-hidden font-sans">
+    <div className="flex min-h-screen bg-gray-50 font-sans">
       
-      {/* NAVBAR MOBILE */}
-      <div className="md:hidden bg-gray-900 text-white flex items-center justify-between p-4 shadow-md z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-white rounded-full p-1"><img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo" className="w-full h-full object-contain" /></div>
-          <span className="font-black tracking-widest text-sm">ADMIN DESA</span>
-        </div>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-2xl focus:outline-none">
-          {isSidebarOpen ? "✖" : "☰"}
-        </button>
-      </div>
+      {/* Komponen Sidebar Admin Kiri */}
+      <Sidebar />
 
-      {/* SIDEBAR */}
-      <aside className={`${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 fixed md:relative w-64 h-full bg-gray-900 text-gray-300 flex flex-col transition-transform duration-300 ease-in-out z-40 shadow-2xl`}>
-        <div className="p-6 border-b border-gray-800 hidden md:flex items-center gap-4">
-          <div className="w-12 h-12 bg-white rounded-full p-1"><img src="https://i.ibb.co.com/4ny8JgGm/1.png" alt="Logo" className="w-full h-full object-contain" /></div>
-          <div>
-            <h2 className="font-black text-white text-lg leading-none tracking-wide">Admin Panel</h2>
-            <p className="text-[10px] text-green-400 font-bold uppercase tracking-widest mt-1">Desa Kerjo</p>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto py-4 custom-scrollbar">
-          <nav className="space-y-1 px-3">
-            {menuItems.map((item) => {
-              const isMainActive = activeMenu === item.id || activeMenu.startsWith(item.id + "-");
-              return (
-                <div key={item.id}>
-                  <button
-                    onClick={() => {
-                      if (item.subMenu) {
-                        // Jika punya submenu, default buka submenu pertama
-                        setActiveMenu(item.subMenu[0].id);
-                      } else {
-                        setActiveMenu(item.id);
-                      }
-                      if (window.innerWidth < 768 && !item.subMenu) setIsSidebarOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${
-                      isMainActive ? "bg-green-600 text-white shadow-lg shadow-green-900/50" : "hover:bg-gray-800 hover:text-white"
-                    }`}
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    {item.label}
-                  </button>
-
-                  {/* Render SubMenu jika Main Menu sedang aktif */}
-                  {item.subMenu && isMainActive && (
-                    <div className="ml-11 mt-2 space-y-1 border-l-2 border-gray-700 pl-3">
-                      {item.subMenu.map((sub) => (
-                        <button
-                          key={sub.id}
-                          onClick={() => {
-                            setActiveMenu(sub.id);
-                            if (window.innerWidth < 768) setIsSidebarOpen(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                            activeMenu === sub.id ? "bg-gray-800 text-green-400" : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
-                          }`}
-                        >
-                          {sub.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
-        </div>
-
-        <div className="p-4 border-t border-gray-800 bg-gray-900">
-          <div className="bg-gray-800 rounded-xl p-4 mb-4 border border-gray-700">
-            <div className="text-[10px] text-gray-500 font-bold uppercase mb-1">Login Aktif</div>
-            <div className="text-xs font-bold text-white truncate">{userEmail}</div>
-            <div className="text-[10px] text-green-400 font-bold mt-1 bg-green-900/30 inline-block px-2 py-0.5 rounded">{userRole}</div>
-          </div>
-          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors shadow-lg">
-            <span>🚪</span> Keluar Sistem
-          </button>
-        </div>
-      </aside>
-
-      {/* OVERLAY MOBILE */}
-      {isSidebarOpen && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>}
-
-      {/* AREA KONTEN UTAMA */}
-      <main className="flex-1 p-4 md:p-10 overflow-y-auto relative w-full h-[calc(100vh-64px)] md:h-screen bg-gray-50">
-        {activeMenu === "welcome" && <Welcome />}
-        {activeMenu === "beranda" && <PengaturanBeranda userEmail={userEmail} />}
-        {activeMenu === "datadesa" && <DataPenduduk />}
-        {activeMenu === "akun" && <ManajemenAkun userEmail={userEmail} />}
+      {/* Area Konten Utama Kanan */}
+      <div className="flex-1 lg:ml-64 flex flex-col transition-all duration-300">
         
-        {/* Parsing activeMenu menjadi prop activeSubMenu ke komponen bersangkutan */}
-        {activeMenu.startsWith("profil") && <ProfilUmkm activeSubMenu={activeMenu} />}
-        {activeMenu.startsWith("kabar") && <KabarAgenda userEmail={userEmail} activeSubMenu={activeMenu} />}
-        {activeMenu.startsWith("trans") && <Transparansi activeSubMenu={activeMenu} userEmail={userEmail} />}
-        {activeMenu.startsWith("layan") && <LayananWarga activeSubMenu={activeMenu} />}
-      </main>
+        {/* Header Atas Dashboard */}
+        <header className="bg-white shadow-sm border-b border-gray-100 py-4 px-6 md:px-8 flex justify-between items-center sticky top-0 z-40">
+          <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">
+            Dashboard Panel
+          </h1>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex flex-col text-right">
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Login Aktif
+              </span>
+              <span className="text-sm font-bold text-green-700">
+                {user.email}
+              </span>
+            </div>
+            <button 
+              onClick={handleLogout} 
+              className="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 font-bold py-2 px-5 rounded-xl transition-all shadow-sm text-sm flex items-center gap-2"
+            >
+              <span>🚪</span> Keluar
+            </button>
+          </div>
+        </header>
 
+        {/* Render Komponen Sesuai Menu yang Dipilih */}
+        <main className="p-6 md:p-8 flex-grow">
+          {renderContent()}
+        </main>
+        
+      </div>
     </div>
+  );
+}
+
+// Membungkus DashboardContent dengan Suspense karena menggunakan useSearchParams
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   );
 }
