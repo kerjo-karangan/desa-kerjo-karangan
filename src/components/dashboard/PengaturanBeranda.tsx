@@ -1,7 +1,10 @@
 // src/components/dashboard/PengaturanBeranda.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { 
+  useEffect, 
+  useState 
+} from "react";
 import { 
   doc, 
   getDoc, 
@@ -185,10 +188,14 @@ export default function PengaturanBeranda({
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 font-sans">
+    <div 
+      className="space-y-8 animate-fade-in pb-20 font-sans"
+    >
       
       {!activeSubMenu && (
-        <div className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8">
+        <div 
+          className="flex flex-wrap gap-3 bg-white p-3 rounded-2xl shadow-sm border border-gray-100 mb-8"
+        >
           <button 
             onClick={() => setTabAktif("hero")} 
             className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
@@ -197,7 +204,9 @@ export default function PengaturanBeranda({
               : "bg-gray-50 text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <span className="text-xl">
+            <span 
+              className="text-xl"
+            >
               🖼️
             </span> 
             Header Beranda
@@ -211,7 +220,9 @@ export default function PengaturanBeranda({
               : "bg-gray-50 text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <span className="text-xl">
+            <span 
+              className="text-xl"
+            >
               📞
             </span> 
             Kontak & Sosmed
@@ -225,7 +236,9 @@ export default function PengaturanBeranda({
               : "bg-gray-50 text-gray-600 hover:bg-gray-100"
             }`}
           >
-            <span className="text-xl">
+            <span 
+              className="text-xl"
+            >
               📰
             </span> 
             Berita Slide
@@ -234,14 +247,22 @@ export default function PengaturanBeranda({
       )}
 
       {tabAktif === "hero" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in">
-          <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
-            <span className="text-3xl">
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-yellow-500 animate-fade-in"
+        >
+          <h3 
+            className="text-2xl font-bold mb-2 flex items-center gap-2"
+          >
+            <span 
+              className="text-3xl"
+            >
               🖼️
             </span> 
             Pengaturan Visual Beranda (Cloudinary)
           </h3>
-          <p className="text-gray-500 text-sm mb-8">
+          <p 
+            className="text-gray-500 text-sm mb-8"
+          >
             Ubah gambar latar belakang (background) dan teks sambutan utama di halaman depan web.
           </p>
           
@@ -249,11 +270,17 @@ export default function PengaturanBeranda({
             onSubmit={handleSimpanHero} 
             className="space-y-6"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
               
-              <div className="space-y-6">
+              <div 
+                className="space-y-6"
+              >
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-800">
+                  <label 
+                    className="block text-sm font-bold mb-2 text-gray-800"
+                  >
                     Judul Utama
                   </label>
                   <input 
@@ -266,7 +293,9 @@ export default function PengaturanBeranda({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-2 text-gray-800">
+                  <label 
+                    className="block text-sm font-bold mb-2 text-gray-800"
+                  >
                     Teks Sub-Judul (Deskripsi Singkat)
                   </label>
                   <textarea 
@@ -280,13 +309,19 @@ export default function PengaturanBeranda({
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <label className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2">
+              <div 
+                className="space-y-4"
+              >
+                <label 
+                  className="block text-sm font-bold text-gray-800 border-b border-gray-100 pb-2"
+                >
                   Gambar Background Beranda
                 </label>
                 
                 {bgHeroLama && (
-                  <div className="relative w-full h-40 md:h-48 rounded-xl overflow-hidden shadow-inner border border-gray-200 group">
+                  <div 
+                    className="relative w-full h-40 md:h-48 rounded-xl overflow-hidden shadow-inner border border-gray-200 group"
+                  >
                     <img 
                       src={bgHeroLama.startsWith("http") ? bgHeroLama : `https://wsrv.nl/?url=${bgHeroLama}`} 
                       alt="Hero Beranda"
@@ -295,11 +330,17 @@ export default function PengaturanBeranda({
                   </div>
                 )}
                 
-                <label className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm">
-                  <span className="text-3xl mb-2">
+                <label 
+                  className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"
+                >
+                  <span 
+                    className="text-3xl mb-2"
+                  >
                     📸
                   </span>
-                  <span className="font-bold text-yellow-800 text-sm">
+                  <span 
+                    className="font-bold text-yellow-800 text-sm"
+                  >
                     {bgHeroLama ? "Ganti Gambar Baru" : "Upload Background ke Cloudinary"}
                   </span>
                   <input 
@@ -312,7 +353,9 @@ export default function PengaturanBeranda({
                 </label>
                 
                 {bgHeroList && (
-                  <div className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div 
+                    className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200"
+                  >
                     ✅ Gambar siap diunggah.
                   </div>
                 )}
@@ -343,14 +386,22 @@ export default function PengaturanBeranda({
       )}
 
       {tabAktif === "kontak" && (
-        <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-600 animate-fade-in">
-          <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
-            <span className="text-3xl">
+        <div 
+          className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-purple-600 animate-fade-in"
+        >
+          <h3 
+            className="text-2xl font-bold mb-2 flex items-center gap-2"
+          >
+            <span 
+              className="text-3xl"
+            >
               📞
             </span> 
             Identitas Kontak & Media Sosial
           </h3>
-          <p className="text-gray-500 text-sm mb-8">
+          <p 
+            className="text-gray-500 text-sm mb-8"
+          >
             Informasi yang diisi di sini akan otomatis tampil di Footer publik dan mengaktifkan tombol WhatsApp melayang warga.
           </p>
           
@@ -358,10 +409,16 @@ export default function PengaturanBeranda({
             onSubmit={handleSimpanKontak} 
             className="space-y-8"
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div 
+              className="grid grid-cols-1 md:grid-cols-2 gap-8"
+            >
               
-              <div className="bg-purple-50 p-6 rounded-2xl border border-purple-100 space-y-5">
-                <h4 className="font-black text-purple-900 flex items-center gap-2 mb-2 border-b border-purple-200 pb-3">
+              <div 
+                className="bg-purple-50 p-6 rounded-2xl border border-purple-100 space-y-5"
+              >
+                <h4 
+                  className="font-black text-purple-900 flex items-center gap-2 mb-2 border-b border-purple-200 pb-3"
+                >
                   <span>
                     📍
                   </span> 
@@ -369,7 +426,9 @@ export default function PengaturanBeranda({
                 </h4>
                 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-purple-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-purple-800"
+                  >
                     Alamat Lengkap Balai Desa
                   </label>
                   <textarea 
@@ -382,7 +441,9 @@ export default function PengaturanBeranda({
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-purple-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-purple-800"
+                  >
                     Email Resmi Desa
                   </label>
                   <input 
@@ -394,7 +455,9 @@ export default function PengaturanBeranda({
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-purple-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-purple-800"
+                  >
                     Jam Kerja / Operasional
                   </label>
                   <input 
@@ -407,8 +470,12 @@ export default function PengaturanBeranda({
                 </div>
               </div>
 
-              <div className="bg-green-50 p-6 rounded-2xl border border-green-100 space-y-5">
-                <h4 className="font-black text-green-900 flex items-center gap-2 mb-2 border-b border-green-200 pb-3">
+              <div 
+                className="bg-green-50 p-6 rounded-2xl border border-green-100 space-y-5"
+              >
+                <h4 
+                  className="font-black text-green-900 flex items-center gap-2 mb-2 border-b border-green-200 pb-3"
+                >
                   <span>
                     🌐
                   </span> 
@@ -416,7 +483,9 @@ export default function PengaturanBeranda({
                 </h4>
                 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-green-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-green-800"
+                  >
                     No. WhatsApp Admin (Gunakan awalan 62)
                   </label>
                   <input 
@@ -427,13 +496,17 @@ export default function PengaturanBeranda({
                     placeholder="628123456789"
                     className="w-full p-3 border border-green-300 rounded-xl outline-none focus:ring-2 focus:ring-green-500 bg-white font-mono text-sm font-bold text-green-900"
                   />
-                  <p className="text-[9px] mt-1 text-green-600 font-bold">
+                  <p 
+                    className="text-[9px] mt-1 text-green-600 font-bold"
+                  >
                     Nomor ini digunakan untuk Tombol Bantuan WA yang melayang di sudut layar publik.
                   </p>
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-green-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-green-800"
+                  >
                     Link Instagram
                   </label>
                   <input 
@@ -446,7 +519,9 @@ export default function PengaturanBeranda({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-green-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-green-800"
+                  >
                     Link Facebook
                   </label>
                   <input 
@@ -459,7 +534,9 @@ export default function PengaturanBeranda({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-green-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-green-800"
+                  >
                     Link YouTube
                   </label>
                   <input 
@@ -472,7 +549,9 @@ export default function PengaturanBeranda({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold mb-2 text-green-800">
+                  <label 
+                    className="block text-xs font-bold mb-2 text-green-800"
+                  >
                     Link TikTok
                   </label>
                   <input 
@@ -511,14 +590,22 @@ export default function PengaturanBeranda({
       )}
 
       {tabAktif === "slide" && (
-        <div className="bg-white p-6 md:p-12 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in text-center">
-          <span className="text-6xl mb-4 block opacity-50">
+        <div 
+          className="bg-white p-6 md:p-12 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in text-center"
+        >
+          <span 
+            className="text-6xl mb-4 block opacity-50"
+          >
             📰
           </span>
-          <h3 className="text-2xl font-black text-gray-900 mb-2">
+          <h3 
+            className="text-2xl font-black text-gray-900 mb-2"
+          >
             Pengaturan Berita Slide
           </h3>
-          <p className="text-gray-500 font-medium max-w-lg mx-auto">
+          <p 
+            className="text-gray-500 font-medium max-w-lg mx-auto"
+          >
             Fitur ini secara otomatis menarik berita terbaru dari menu "Kabar & Agenda" yang ditandai sebagai <b>Pin/Info Penting</b>. Anda tidak perlu mengatur slide secara manual di sini.
           </p>
         </div>

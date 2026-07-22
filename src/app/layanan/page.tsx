@@ -1,545 +1,798 @@
 // src/app/layanan/page.tsx
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { 
+  useEffect, 
+  useState, 
+  Suspense 
+} from "react";
+import { 
+  useSearchParams, 
+  useRouter 
+} from "next/navigation";
 import { 
   collection, 
-  addDoc, 
   getDocs, 
-  query, 
-  where, 
   doc, 
-  getDoc 
+  getDoc,
+  addDoc,
+  query,
+  where,
+  orderBy
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
-export default function LayananMandiri() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    }>
-      <LayananContent />
-    </Suspense>
-  );
-}
-
 function LayananContent() {
-  const [tabAktif, setTabAktif] = useState("buat");
-
-  const [heroData, setHeroData] = useState({
-    judul: "Layanan Surat Mandiri",
-    sub: "Ajukan surat administrasi (SKTM, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.",
-    bg: "" 
-  });
-
-  const [masterSuratList, setMasterSuratList] = useState<any[]>([]);
-  const [loadingMaster, setLoadingMaster] = useState(true);
-
-  const [nik, setNik] = useState("");
-  const [nama, setNama] = useState("");
-  const [wa, setWa] = useState("");
-  const [jenisSuratId, setJenisSuratId] = useState("");
-  const [keperluan, setKeperluan] = useState("");
-  const [fileBerkas, setFileBerkas] = useState<{ [key: string]: File }>({});
+  const searchParams = useSearchParams();
+  const router = useRouter();
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusSubmit, setStatusSubmit] = useState("");
-
-  const [searchNik, setSearchNik] = useState("");
-  const [hasilLacak, setHasilLacak] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const tabParam = searchParams.get("tab") || "buat";
+  
+  const [activeTab, setActiveTab] = useState(tabParam);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAwalData = async () => {
+    if (tabParam === "buat" || tabParam === "cek" || tabParam === "pengaduan") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.push(`/layanan?tab=${tab}`);
+  };
+
+  const [heroData, setHeroData] = useState({
+    judul: "Layanan Warga Mandiri",
+    sub: "Pusat pelayanan administrasi persuratan dan kotak pengaduan masyarakat secara daring.",
+    bg: ""
+  });
+  
+  const [masterSurat, setMasterSurat] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setLoading(true);
       try {
         const snapHero = await getDoc(doc(db, "pengaturan_web", "layanan_hero"));
         if (snapHero.exists() && snapHero.data()) {
           setHeroData({
-            judul: snapHero.data().judul || "Layanan Surat Mandiri",
-            sub: snapHero.data().sub || "Ajukan surat administrasi (SKTM, Pengantar, dll) langsung dari HP Anda tanpa perlu antre di balai desa.",
+            judul: snapHero.data().judul || "Layanan Warga Mandiri",
+            sub: snapHero.data().sub || "Pusat pelayanan administrasi persuratan secara daring.",
             bg: snapHero.data().bg || ""
           });
         }
 
-        const qMaster = query(collection(db, "master_surat"));
-        const snap = await getDocs(qMaster);
-        const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setMasterSuratList(data);
+        const snapMaster = await getDocs(collection(db, "master_surat"));
+        setMasterSurat(snapMaster.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        })));
 
       } catch (error) {
-        console.error("Gagal memuat data awal:", error);
+        console.error("Gagal memuat data:", error);
       } finally {
-        setLoadingMaster(false);
+        setLoading(false);
       }
     };
-    fetchAwalData();
+
+    fetchInitialData();
   }, []);
 
-  const selectedSurat = masterSuratList.find(s => s.id === jenisSuratId);
-
-  const handleFileChange = (namaSyarat: string, file: File | null) => {
-    if (file) {
-      setFileBerkas(prev => ({ ...prev, [namaSyarat]: file }));
-    } else {
-      const temp = { ...fileBerkas };
-      delete temp[namaSyarat];
-      setFileBerkas(temp);
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
     }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
   };
 
-  const uploadFotoKeCloudinary = async (file: File) => {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
+  // ==========================================
+  // STATE & FUNGSI: BUAT SURAT
+  // ==========================================
+  const [formSurat, setFormSurat] = useState({
+    jenis_surat: "",
+    nik: "",
+    nama: "",
+    no_wa: "",
+    keperluan: ""
+  });
+  const [statusSurat, setStatusSurat] = useState("");
+  const [isSubmittingSurat, setIsSubmittingSurat] = useState(false);
 
-      const res = await fetch("/api/cloudinary", {
-        method: "POST",
-        body: formData,
-      });
-      
-      const data = await res.json();
-      if (data.success) return data.url;
-      throw new Error(data.error);
-    } catch (error) {
-      console.error("Upload error:", error);
-      return null;
-    }
-  };
-
-  const handleSubmitPengajuan = async (e: React.FormEvent) => {
+  const handleSubmitSurat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSurat) {
-      setStatusSubmit("❌ Silakan pilih jenis surat terlebih dahulu.");
-      return;
-    }
-
-    if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
-      const syaratWajib = selectedSurat.persyaratan as string[];
-      for (const syarat of syaratWajib) {
-        if (!fileBerkas[syarat]) {
-          setStatusSubmit(`❌ Anda belum mengunggah berkas untuk: ${syarat}`);
-          return;
-        }
-      }
-    }
-
-    setIsSubmitting(true);
-    setStatusSubmit("Memproses pengajuan Anda...");
+    setIsSubmittingSurat(true);
+    setStatusSurat("Mengirim permohonan surat...");
 
     try {
-      const berkasTerunggah: { [key: string]: string } = {};
-
-      if (!selectedSurat.harus_datang && selectedSurat.persyaratan) {
-        setStatusSubmit("Mengunggah berkas persyaratan ke server aman...");
-        const syaratWajib = selectedSurat.persyaratan as string[];
-        
-        for (const syarat of syaratWajib) {
-          const file = fileBerkas[syarat];
-          if (file) {
-            const linkGambar = await uploadFotoKeCloudinary(file);
-            if (linkGambar) {
-              berkasTerunggah[syarat] = linkGambar;
-            } else {
-              throw new Error(`Gagal mengunggah ${syarat}. Pastikan koneksi stabil.`);
-            }
-          }
-        }
-      }
-
-      let formattedWA = wa.replace(/\D/g, "");
-      if (formattedWA.startsWith("0")) formattedWA = "62" + formattedWA.substring(1);
-
-      setStatusSubmit("Menyimpan pengajuan ke server desa...");
-      
-      await addDoc(collection(db, "layanan_surat"), {
-        nik: nik,
-        nama: nama,
-        wa: formattedWA,
-        jenis_surat: selectedSurat.nama_surat,
-        keperluan: keperluan,
-        berkas: berkasTerunggah, 
+      await addDoc(collection(db, "antrean_surat"), {
+        ...formSurat,
         status: "Menunggu",
         tanggal_pengajuan: new Date().toISOString(),
-        alasan_penolakan: ""
+        keterangan_admin: ""
       });
-
-      setStatusSubmit("✅ Pengajuan Surat Berhasil! Silakan cek menu Lacak secara berkala.");
       
-      setNik(""); 
-      setNama(""); 
-      setWa(""); 
-      setKeperluan(""); 
-      setFileBerkas({}); 
-      setJenisSuratId("");
+      setStatusSurat("✅ Permohonan berhasil dikirim! Silakan cek status secara berkala.");
+      setFormSurat({ jenis_surat: "", nik: "", nama: "", no_wa: "", keperluan: "" });
       
-      setTimeout(() => setStatusSubmit(""), 6000);
-
-    } catch (error: any) {
-      setStatusSubmit(error.message || "❌ Terjadi kesalahan pada sistem.");
+      setTimeout(() => setStatusSurat(""), 5000);
+    } catch (error) {
+      setStatusSurat("❌ Gagal mengirim permohonan. Coba lagi.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingSurat(false);
     }
   };
 
-  const handleLacakSurat = async (e: React.FormEvent) => {
+  // ==========================================
+  // STATE & FUNGSI: CEK STATUS SURAT
+  // ==========================================
+  const [searchNik, setSearchNik] = useState("");
+  const [searchResult, setSearchResult] = useState<any[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleCekSurat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchNik) return;
     
     setIsSearching(true);
-    setHasSearched(true);
-    
     try {
       const q = query(
-        collection(db, "layanan_surat"), 
+        collection(db, "antrean_surat"), 
         where("nik", "==", searchNik)
       );
       const snap = await getDocs(q);
       
-      const hasil = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const sortedHasil = hasil.sort((a, b) => 
-        new Date(b.tanggal_pengajuan).getTime() - new Date(a.tanggal_pengajuan).getTime()
-      );
-      
-      setHasilLacak(sortedHasil);
+      if (snap.empty) {
+        setSearchResult([]);
+      } else {
+        const results = snap.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        }));
+        
+        results.sort((a, b) => new Date(b.tanggal_pengajuan).getTime() - new Date(a.tanggal_pengajuan).getTime());
+        setSearchResult(results);
+      }
     } catch (error) {
-      console.error("Gagal melacak surat:", error);
+      console.error("Gagal mencari data:", error);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const formatTanggalLacak = (isoString: string) => {
-    if (!isoString) return "-";
-    return new Date(isoString).toLocaleString("id-ID", {
-      day: "numeric", 
-      month: "long", 
-      year: "numeric", 
-      hour: "2-digit", 
-      minute: "2-digit"
-    }) + " WIB";
+  // ==========================================
+  // STATE & FUNGSI: PENGADUAN WARGA
+  // ==========================================
+  const [formPengaduan, setFormPengaduan] = useState({
+    nama: "",
+    no_wa: "",
+    isi_laporan: ""
+  });
+  const [fotoPengaduan, setFotoPengaduan] = useState<FileList | null>(null);
+  const [statusPengaduan, setStatusPengaduan] = useState("");
+  const [isSubmittingPengaduan, setIsSubmittingPengaduan] = useState(false);
+
+  const uploadFotoKeCloudinary = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const res = await fetch("/api/cloudinary", { 
+        method: "POST", 
+        body: formData 
+      });
+      
+      const data = await res.json();
+      if (data.success) {
+        return data.url;
+      }
+      throw new Error(data.error);
+    } catch (error) {
+      return null;
+    }
   };
 
-  let heroBgSafe = "";
-  if (typeof heroData.bg === "string" && heroData.bg.trim() !== "") {
-    heroBgSafe = heroData.bg;
+  const handleSubmitPengaduan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingPengaduan(true);
+    setStatusPengaduan("Mengirim laporan Anda...");
+
+    try {
+      let imageUrl = "";
+      if (fotoPengaduan && fotoPengaduan.length > 0) {
+        setStatusPengaduan("Mengunggah foto bukti...");
+        const newBg = await uploadFotoKeCloudinary(fotoPengaduan[0]);
+        if (newBg) {
+          imageUrl = newBg;
+        }
+      }
+
+      await addDoc(collection(db, "pengaduan_warga"), {
+        ...formPengaduan,
+        foto: imageUrl,
+        status: "Belum Dibaca",
+        tanggal_masuk: new Date().toISOString()
+      });
+      
+      setStatusPengaduan("✅ Laporan berhasil dikirim dan akan segera ditindaklanjuti.");
+      setFormPengaduan({ nama: "", no_wa: "", isi_laporan: "" });
+      setFotoPengaduan(null);
+      
+      const fileInput = document.getElementById("inputFotoPengaduan") as HTMLInputElement;
+      if (fileInput) fileInput.value = "";
+      
+      setTimeout(() => setStatusPengaduan(""), 5000);
+    } catch (error) {
+      setStatusPengaduan("❌ Gagal mengirim laporan. Silakan coba lagi.");
+    } finally {
+      setIsSubmittingPengaduan(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center bg-gray-50"
+      >
+        <div 
+          className="w-16 h-16 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin mb-4"
+        ></div>
+        <p 
+          className="text-green-700 font-bold tracking-widest animate-pulse"
+        >
+          MEMUAT LAYANAN...
+        </p>
+      </div>
+    );
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div 
+      className="min-h-screen bg-gray-50 flex flex-col font-sans pb-24"
+    >
       
-      <div className="bg-yellow-700 text-yellow-50 py-16 md:py-24 relative overflow-hidden shadow-md">
-        <div className="absolute inset-0 z-0">
-          {heroBgSafe && (
+      {/* ==========================================
+          HEADER (HERO SECTION)
+      ========================================== */}
+      <div 
+        className={`relative py-16 md:py-24 text-white overflow-hidden shadow-md transition-colors duration-500 ${
+          heroData.bg ? "bg-gray-900" : "bg-green-700"
+        }`}
+      >
+        <div 
+          className="absolute inset-0 z-0"
+        >
+          {heroData.bg && (
             <img 
-              src={heroBgSafe.startsWith("http") ? heroBgSafe : `https://wsrv.nl/?url=${heroBgSafe}`} 
-              alt="Hero Background" 
+              src={getSafeImageUrl(heroData.bg)} 
+              alt="Layanan Background" 
               className="w-full h-full object-cover opacity-30 mix-blend-overlay"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-gray-900/80 via-transparent to-transparent"></div>
+          <div 
+            className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent"
+          ></div>
         </div>
-        <div className="container mx-auto px-4 relative z-10 text-center animate-fade-in">
-          <span className="text-yellow-100 font-extrabold tracking-widest uppercase text-sm mb-3 inline-block bg-yellow-900/50 px-4 py-1.5 rounded-full border border-yellow-800">
-            Akses Cepat & Mudah
+        
+        <div 
+          className="container mx-auto px-4 relative z-10 text-center animate-fade-in"
+        >
+          <span 
+            className="text-green-200 font-extrabold tracking-widest uppercase text-sm mb-3 inline-block bg-green-900/50 px-4 py-1.5 rounded-full border border-green-800 backdrop-blur-sm shadow-sm"
+          >
+            Portal Layanan Terpadu
           </span>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4 text-white drop-shadow-lg whitespace-pre-wrap leading-tight">
+          <h1 
+            className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4 drop-shadow-2xl whitespace-pre-wrap leading-tight"
+          >
             {heroData.judul}
           </h1>
-          <p className="text-lg md:text-xl text-yellow-100 max-w-2xl mx-auto font-medium drop-shadow-md whitespace-pre-wrap">
+          <p 
+            className="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto font-medium drop-shadow-lg whitespace-pre-wrap"
+          >
             {heroData.sub}
           </p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12 max-w-4xl flex-grow">
+      {/* ==========================================
+          KONTEN UTAMA & MENU TAB
+      ========================================== */}
+      <div 
+        className="container mx-auto px-4 max-w-5xl relative z-20 -mt-8"
+      >
         
-        <div className="flex justify-center gap-2 md:gap-4 mb-10 relative z-20 -mt-20">
+        {/* Navigasi Tab Internal */}
+        <div 
+          className="bg-white p-2 md:p-3 rounded-2xl shadow-lg border border-gray-100 flex flex-col md:flex-row gap-2 md:gap-4 justify-center mx-auto mb-10"
+        >
           <button 
-            onClick={() => setTabAktif("buat")}
-            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 flex items-center gap-2 ${
-              tabAktif === "buat" 
-              ? "bg-yellow-500 text-white shadow-xl transform -translate-y-2 border-2 border-yellow-400" 
-              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 shadow-sm"
+            onClick={() => handleTabChange("buat")} 
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "buat" 
+              ? "bg-green-600 text-white shadow-md transform scale-[1.02]" 
+              : "bg-gray-50 text-gray-600 hover:bg-green-50 hover:text-green-700"
             }`}
           >
-            <span className="text-2xl">📝</span> Buat Surat
+            <span 
+              className="text-xl"
+            >
+              📝
+            </span> 
+            Buat Surat
           </button>
           
           <button 
-            onClick={() => setTabAktif("lacak")}
-            className={`px-8 py-4 rounded-2xl font-bold text-sm md:text-base transition-all duration-300 flex items-center gap-2 ${
-              tabAktif === "lacak" 
-              ? "bg-yellow-500 text-white shadow-xl transform -translate-y-2 border-2 border-yellow-400" 
-              : "bg-white text-gray-600 hover:bg-yellow-50 border border-gray-200 shadow-sm"
+            onClick={() => handleTabChange("cek")} 
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "cek" 
+              ? "bg-blue-600 text-white shadow-md transform scale-[1.02]" 
+              : "bg-gray-50 text-gray-600 hover:bg-blue-50 hover:text-blue-700"
             }`}
           >
-            <span className="text-2xl">🔍</span> Cek Status
+            <span 
+              className="text-xl"
+            >
+              🔍
+            </span> 
+            Cek Status
+          </button>
+
+          <button 
+            onClick={() => handleTabChange("pengaduan")} 
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "pengaduan" 
+              ? "bg-red-600 text-white shadow-md transform scale-[1.02]" 
+              : "bg-gray-50 text-gray-600 hover:bg-red-50 hover:text-red-700"
+            }`}
+          >
+            <span 
+              className="text-xl"
+            >
+              📢
+            </span> 
+            Pengaduan
           </button>
         </div>
 
-        {tabAktif === "buat" && (
-          <div className="bg-white p-6 md:p-12 rounded-[40px] shadow-sm border border-gray-100 animate-fade-in border-t-8 border-t-yellow-400">
-            <div className="text-center mb-10">
-              <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">Formulir Pengajuan Surat</h2>
-              <p className="text-gray-500 text-sm">Isi data diri Anda dengan benar sesuai KTP.</p>
-            </div>
+        {/* ==========================================
+            TAB 1: BUAT SURAT MANDIRI
+        ========================================== */}
+        {activeTab === "buat" && (
+          <div 
+            className="animate-fade-in max-w-3xl mx-auto"
+          >
+            <div 
+              className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border-t-4 border-green-600"
+            >
+              <h2 
+                className="text-2xl font-black text-gray-900 mb-2 text-center"
+              >
+                Form Pengajuan Surat
+              </h2>
+              <p 
+                className="text-gray-500 text-center text-sm mb-8"
+              >
+                Silakan lengkapi data diri Anda. Surat akan diproses oleh perangkat desa pada jam kerja.
+              </p>
 
-            {loadingMaster ? (
-              <div className="flex justify-center py-20">
-                <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            ) : masterSuratList.length === 0 ? (
-              <div className="text-center py-16 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                <span className="text-6xl opacity-50 block mb-4">📭</span>
-                <p className="font-bold text-gray-600">Admin belum mendata jenis surat yang tersedia.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmitPengajuan} className="space-y-6">
-                
-                <div className="bg-yellow-50 p-6 rounded-3xl border border-yellow-200">
-                  <label className="block text-sm font-bold mb-2 text-yellow-900">
-                    Pilih Jenis Surat yang Ingin Dibuat
+              <form 
+                onSubmit={handleSubmitSurat} 
+                className="space-y-6"
+              >
+                <div>
+                  <label 
+                    className="block text-sm font-bold text-gray-700 mb-2"
+                  >
+                    Pilih Jenis Surat
                   </label>
                   <select 
                     required 
-                    value={jenisSuratId} 
-                    onChange={(e) => setJenisSuratId(e.target.value)}
-                    className="w-full p-4 border border-yellow-300 rounded-xl outline-none focus:ring-2 focus:ring-yellow-600 bg-white font-bold text-gray-800"
+                    value={formSurat.jenis_surat} 
+                    onChange={(e) => setFormSurat({...formSurat, jenis_surat: e.target.value})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all font-bold text-gray-800"
                   >
-                    <option value="" disabled>-- Pilih Dokumen --</option>
-                    {masterSuratList.map((surat) => (
-                      <option key={surat.id} value={surat.id}>{surat.nama_surat}</option>
+                    <option 
+                      value="" 
+                      disabled
+                    >
+                      -- Pilih Jenis Dokumen --
+                    </option>
+                    {masterSurat.map((surat) => (
+                      <option 
+                        key={surat.id} 
+                        value={surat.nama_surat}
+                      >
+                        {surat.nama_surat}
+                      </option>
                     ))}
                   </select>
                 </div>
 
-                {selectedSurat && (
-                  <div className="space-y-6 animate-fade-in">
-                    
-                    {selectedSurat.harus_datang && (
-                      <div className="bg-red-50 border border-red-200 p-6 rounded-3xl flex gap-4">
-                        <span className="text-4xl">🏢</span>
-                        <div>
-                          <h4 className="font-black text-red-800 text-lg mb-1">WAJIB DATANG KE BALAI DESA</h4>
-                          <p className="text-sm text-red-600 font-medium">Surat ini membutuhkan verifikasi tatap muka atau cap basah. Silakan isi form antrean di bawah, lalu bawa persyaratan fisik secara langsung ke Kantor Desa.</p>
-                          {selectedSurat.persyaratan && selectedSurat.persyaratan.length > 0 && (
-                            <div className="mt-3">
-                              <p className="text-xs font-bold text-red-900 mb-1">Persyaratan Fisik yang Dibawa:</p>
-                              <ul className="list-disc pl-5 text-xs text-red-700 font-medium">
-                                {selectedSurat.persyaratan.map((syarat: string, idx: number) => (
-                                  <li key={idx}>{syarat}</li>
-                                ))}
-                              </ul>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 p-6 rounded-3xl border border-gray-100">
-                      <div className="md:col-span-2 border-b border-gray-200 pb-2 mb-2">
-                        <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                          <span className="text-xl">👤</span> Identitas Diri
-                        </h4>
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-bold mb-2 text-gray-800">Nomor Induk Kependudukan (NIK)</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={nik} 
-                          onChange={(e) => setNik(e.target.value)} 
-                          placeholder="16 Digit NIK Anda..."
-                          className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-white font-mono tracking-widest text-lg" 
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-bold mb-2 text-gray-800">Nama Lengkap Sesuai KTP</label>
-                        <input 
-                          type="text" 
-                          required 
-                          value={nama} 
-                          onChange={(e) => setNama(e.target.value)} 
-                          placeholder="Nama Lengkap..."
-                          className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-white uppercase" 
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-bold mb-2 text-gray-800">No. WhatsApp Aktif</label>
-                        <input 
-                          type="number" 
-                          required 
-                          value={wa} 
-                          onChange={(e) => setWa(e.target.value)} 
-                          placeholder="0812..."
-                          className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-white font-mono" 
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-bold mb-2 text-gray-800">Alasan / Keperluan Surat</label>
-                        <textarea 
-                          required 
-                          rows={3}
-                          value={keperluan} 
-                          onChange={(e) => setKeperluan(e.target.value)} 
-                          placeholder="Misal: Untuk syarat daftar sekolah anak..."
-                          className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-white" 
-                        ></textarea>
-                      </div>
-                    </div>
-
-                    {!selectedSurat.harus_datang && selectedSurat.persyaratan && selectedSurat.persyaratan.length > 0 && (
-                      <div className="bg-blue-50 p-6 rounded-3xl border border-blue-200">
-                        <div className="border-b border-blue-200 pb-2 mb-6">
-                          <h4 className="font-bold text-blue-900 flex items-center gap-2">
-                            <span className="text-xl">📸</span> Foto Persyaratan
-                          </h4>
-                          <p className="text-xs text-blue-700 mt-1 font-medium">Unggah foto dokumen dengan jelas agar admin dapat memverifikasinya.</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          {selectedSurat.persyaratan.map((syarat: string, idx: number) => (
-                            <div key={idx} className="bg-white p-4 rounded-xl border border-blue-100 shadow-sm flex flex-col justify-center">
-                              <label className="block text-xs font-black mb-3 text-gray-800 uppercase tracking-wide">
-                                📋 {syarat}
-                              </label>
-                              <label className="cursor-pointer flex flex-col items-center justify-center py-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:bg-blue-100 hover:border-blue-400 transition-all text-center">
-                                <span className="text-2xl mb-1">{fileBerkas[syarat] ? "✅" : "📷"}</span>
-                                <span className={`text-xs font-bold ${fileBerkas[syarat] ? "text-green-600" : "text-gray-500"}`}>
-                                  {fileBerkas[syarat] ? fileBerkas[syarat].name.substring(0,20)+"..." : "Pilih File"}
-                                </span>
-                                <input 
-                                  type="file" 
-                                  accept="image/*" 
-                                  onChange={(e) => handleFileChange(syarat, e.target.files ? e.target.files[0] : null)} 
-                                  className="hidden" 
-                                />
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {statusSubmit && (
-                      <div className={`p-4 rounded-2xl text-sm font-bold text-center border shadow-sm ${statusSubmit.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"}`}>
-                        {statusSubmit}
-                      </div>
-                    )}
-
-                    <button 
-                      type="submit" 
-                      disabled={isSubmitting} 
-                      className={`w-full text-white font-black py-5 rounded-2xl shadow-lg transition-transform transform text-lg flex items-center justify-center gap-2 ${isSubmitting ? "bg-gray-400 cursor-not-allowed" : "bg-yellow-500 hover:bg-yellow-600 hover:-translate-y-1"}`}
+                <div 
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <div>
+                    <label 
+                      className="block text-sm font-bold text-gray-700 mb-2"
                     >
-                      {isSubmitting ? "Sedang Mengirim..." : "🚀 Kirim Pengajuan Surat"}
-                    </button>
+                      Nomor Induk Kependudukan (NIK)
+                    </label>
+                    <input 
+                      type="number" 
+                      required 
+                      value={formSurat.nik} 
+                      onChange={(e) => setFormSurat({...formSurat, nik: e.target.value})} 
+                      className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all font-mono"
+                      placeholder="16 Digit NIK Anda"
+                    />
+                  </div>
+                  <div>
+                    <label 
+                      className="block text-sm font-bold text-gray-700 mb-2"
+                    >
+                      Nama Lengkap Sesuai KTP
+                    </label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={formSurat.nama} 
+                      onChange={(e) => setFormSurat({...formSurat, nama: e.target.value})} 
+                      className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all uppercase"
+                      placeholder="Nama Lengkap"
+                    />
+                  </div>
+                </div>
 
+                <div>
+                  <label 
+                    className="block text-sm font-bold text-gray-700 mb-2"
+                  >
+                    Nomor WhatsApp Aktif
+                  </label>
+                  <input 
+                    type="number" 
+                    required 
+                    value={formSurat.no_wa} 
+                    onChange={(e) => setFormSurat({...formSurat, no_wa: e.target.value})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all font-mono"
+                    placeholder="Contoh: 08123456789"
+                  />
+                  <p 
+                    className="text-[10px] text-gray-500 mt-1"
+                  >
+                    Digunakan jika petugas desa perlu menghubungi Anda.
+                  </p>
+                </div>
+
+                <div>
+                  <label 
+                    className="block text-sm font-bold text-gray-700 mb-2"
+                  >
+                    Tujuan / Keperluan Pembuatan Surat
+                  </label>
+                  <textarea 
+                    required 
+                    rows={3} 
+                    value={formSurat.keperluan} 
+                    onChange={(e) => setFormSurat({...formSurat, keperluan: e.target.value})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                    placeholder="Jelaskan secara singkat kegunaan surat ini..."
+                  ></textarea>
+                </div>
+
+                {statusSurat && (
+                  <div 
+                    className={`p-4 rounded-xl text-sm font-bold text-center border ${
+                      statusSurat.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"
+                    }`}
+                  >
+                    {statusSurat}
                   </div>
                 )}
+
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingSurat} 
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-lg"
+                >
+                  {isSubmittingSurat ? "MENGIRIM..." : "KIRIM PERMOHONAN SURAT"}
+                </button>
               </form>
-            )}
+            </div>
           </div>
         )}
 
-        {tabAktif === "lacak" && (
-          <div className="bg-white p-6 md:p-12 rounded-[40px] shadow-sm border border-gray-100 animate-fade-in border-t-8 border-t-gray-800">
-            <div className="text-center mb-10">
-              <h2 className="text-2xl md:text-3xl font-black text-gray-900 mb-2">Lacak Status Surat</h2>
-              <p className="text-gray-500 text-sm">Masukkan NIK Anda untuk melihat progres dokumen yang telah diajukan.</p>
-            </div>
-
-            <form onSubmit={handleLacakSurat} className="max-w-xl mx-auto flex flex-col sm:flex-row gap-4 mb-12">
-              <input 
-                type="number" 
-                required 
-                value={searchNik}
-                onChange={(e) => setSearchNik(e.target.value)}
-                placeholder="Ketik 16 Digit NIK..."
-                className="flex-grow p-4 border-2 border-gray-300 rounded-2xl outline-none focus:border-gray-800 focus:ring-4 focus:ring-gray-100 font-mono text-lg tracking-widest text-center sm:text-left"
-              />
-              <button 
-                type="submit" 
-                disabled={isSearching}
-                className="bg-gray-900 hover:bg-black text-white font-bold px-8 py-4 rounded-2xl shadow-md transition-all sm:w-auto"
+        {/* ==========================================
+            TAB 2: CEK STATUS SURAT
+        ========================================== */}
+        {activeTab === "cek" && (
+          <div 
+            className="animate-fade-in max-w-3xl mx-auto"
+          >
+            <div 
+              className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border-t-4 border-blue-600"
+            >
+              <h2 
+                className="text-2xl font-black text-gray-900 mb-2 text-center"
               >
-                {isSearching ? "Mencari..." : "Lacak"}
-              </button>
-            </form>
+                Lacak Status Surat
+              </h2>
+              <p 
+                className="text-gray-500 text-center text-sm mb-8"
+              >
+                Masukkan NIK Anda untuk melihat proses pengerjaan surat yang telah Anda ajukan.
+              </p>
 
-            {hasSearched && (
-              <div className="space-y-6">
-                <h3 className="font-bold text-gray-800 border-b border-gray-200 pb-3">
-                  Hasil Pelacakan untuk NIK: <span className="font-mono text-gray-500">{searchNik}</span>
-                </h3>
-                
-                {hasilLacak.length === 0 ? (
-                  <div className="text-center py-10 bg-red-50 rounded-3xl border border-red-100">
-                    <span className="text-4xl mb-3 block opacity-50">📂</span>
-                    <p className="text-red-700 font-bold">Tidak ada riwayat pengajuan surat dengan NIK tersebut.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-6">
-                    {hasilLacak.map((surat) => (
-                      <div key={surat.id} className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
-                        
-                        <div className={`absolute top-0 right-0 px-6 py-2 rounded-bl-3xl font-black text-[10px] uppercase tracking-widest text-white shadow-sm
-                          ${surat.status === "Selesai" ? "bg-green-500" :
-                            surat.status === "Diproses" ? "bg-blue-500" :
-                            surat.status === "Ditolak" ? "bg-red-500" :
-                            "bg-yellow-500"}`}
+              <form 
+                onSubmit={handleCekSurat} 
+                className="flex flex-col md:flex-row gap-4 mb-10"
+              >
+                <input 
+                  type="number" 
+                  required 
+                  value={searchNik} 
+                  onChange={(e) => setSearchNik(e.target.value)} 
+                  className="flex-1 p-4 rounded-xl border border-blue-200 bg-blue-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono text-center md:text-left text-lg font-bold"
+                  placeholder="Masukkan 16 Digit NIK"
+                />
+                <button 
+                  type="submit" 
+                  disabled={isSearching} 
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-4 rounded-xl shadow-md transition-colors"
+                >
+                  {isSearching ? "Mencari..." : "Cari Data"}
+                </button>
+              </form>
+
+              {searchResult !== null && (
+                <div 
+                  className="space-y-4"
+                >
+                  <h3 
+                    className="font-bold text-gray-800 border-b border-gray-100 pb-2"
+                  >
+                    Hasil Pencarian ({searchResult.length} Dokumen)
+                  </h3>
+                  
+                  {searchResult.length === 0 ? (
+                    <div 
+                      className="text-center p-8 bg-gray-50 rounded-2xl border border-gray-100 text-gray-500"
+                    >
+                      Tidak ditemukan riwayat pengajuan surat dengan NIK tersebut.
+                    </div>
+                  ) : (
+                    searchResult.map((res) => (
+                      <div 
+                        key={res.id} 
+                        className="p-5 rounded-2xl border border-gray-200 bg-white hover:shadow-md transition-shadow relative overflow-hidden"
+                      >
+                        <div 
+                          className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4"
                         >
-                          {surat.status || "Menunggu"}
-                        </div>
-
-                        <div className="text-xs font-bold text-gray-400 mb-2">
-                          {formatTanggalLacak(surat.tanggal_pengajuan)}
-                        </div>
-                        <h4 className="text-xl font-black text-gray-900 leading-tight w-3/4 mb-1">
-                          {surat.jenis_surat}
-                        </h4>
-                        <p className="text-sm font-bold text-gray-500 mb-4 uppercase">
-                          {surat.nama}
-                        </p>
-                        
-                        <p className="text-sm text-gray-700 leading-relaxed border-t border-gray-100 pt-3">
-                          <span className="font-bold text-gray-900 block mb-1">Keperluan:</span> {surat.keperluan}
-                        </p>
-
-                        {surat.status === "Ditolak" && surat.alasan_penolakan && (
-                          <div className="mt-4 bg-red-50 border border-red-200 p-4 rounded-2xl flex items-start gap-3">
-                            <span className="text-xl">⚠️</span>
-                            <div>
-                              <span className="font-black text-red-800 text-sm block mb-1">Ditolak oleh Admin</span>
-                              <p className="text-xs font-medium text-red-700 leading-relaxed italic">Alasan: "{surat.alasan_penolakan}"</p>
-                              <p className="text-[10px] text-red-500 mt-2 font-bold">Silakan buat pengajuan ulang dengan memperbaiki data Anda.</p>
-                            </div>
+                          <div>
+                            <span 
+                              className="text-[10px] text-gray-500 font-bold tracking-widest uppercase block mb-1"
+                            >
+                              {new Date(res.tanggal_pengajuan).toLocaleDateString("id-ID", {
+                                day: 'numeric', month: 'long', year: 'numeric'
+                              })}
+                            </span>
+                            <h4 
+                              className="font-black text-gray-900 text-lg"
+                            >
+                              {res.jenis_surat}
+                            </h4>
                           </div>
-                        )}
+                          <span 
+                            className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-lg border text-center ${
+                              res.status === "Selesai" ? "bg-green-100 text-green-800 border-green-300" :
+                              res.status === "Ditolak" ? "bg-red-100 text-red-800 border-red-300" :
+                              res.status === "Diproses" ? "bg-blue-100 text-blue-800 border-blue-300" :
+                              "bg-yellow-100 text-yellow-800 border-yellow-300"
+                            }`}
+                          >
+                            {res.status}
+                          </span>
+                        </div>
                         
-                        {surat.status === "Selesai" && (
-                          <div className="mt-4 bg-green-50 border border-green-200 p-4 rounded-2xl">
-                            <p className="text-xs font-bold text-green-800 text-center">✅ Surat Anda telah selesai dicetak. Silakan ambil di Kantor Balai Desa pada jam kerja.</p>
+                        <div 
+                          className="bg-gray-50 p-4 rounded-xl text-sm text-gray-600 border border-gray-100"
+                        >
+                          <span 
+                            className="font-bold block mb-1 text-gray-800"
+                          >
+                            Keperluan:
+                          </span>
+                          {res.keperluan}
+                        </div>
+
+                        {res.keterangan_admin && (
+                          <div 
+                            className="mt-3 bg-blue-50 p-4 rounded-xl text-sm text-blue-800 border border-blue-200"
+                          >
+                            <span 
+                              className="font-bold block mb-1 text-blue-900"
+                            >
+                              Pesan dari Admin Desa:
+                            </span>
+                            {res.keterangan_admin}
                           </div>
                         )}
                       </div>
-                    ))}
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+            TAB 3: KOTAK PENGADUAN
+        ========================================== */}
+        {activeTab === "pengaduan" && (
+          <div 
+            className="animate-fade-in max-w-3xl mx-auto"
+          >
+            <div 
+              className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border-t-4 border-red-600"
+            >
+              <h2 
+                className="text-2xl font-black text-gray-900 mb-2 text-center"
+              >
+                Kotak Pengaduan Warga
+              </h2>
+              <p 
+                className="text-gray-500 text-center text-sm mb-8"
+              >
+                Sampaikan laporan, kritik, atau saran Anda demi kemajuan Desa. Identitas Anda akan kami rahasiakan.
+              </p>
+
+              <form 
+                onSubmit={handleSubmitPengaduan} 
+                className="space-y-6"
+              >
+                <div 
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <div>
+                    <label 
+                      className="block text-sm font-bold text-gray-700 mb-2"
+                    >
+                      Nama / Inisial (Opsional)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={formPengaduan.nama} 
+                      onChange={(e) => setFormPengaduan({...formPengaduan, nama: e.target.value})} 
+                      className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all uppercase"
+                      placeholder="Anonim"
+                    />
+                  </div>
+                  <div>
+                    <label 
+                      className="block text-sm font-bold text-gray-700 mb-2"
+                    >
+                      No. WhatsApp (Opsional)
+                    </label>
+                    <input 
+                      type="number" 
+                      value={formPengaduan.no_wa} 
+                      onChange={(e) => setFormPengaduan({...formPengaduan, no_wa: e.target.value})} 
+                      className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all font-mono"
+                      placeholder="Untuk konfirmasi balasan"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label 
+                    className="block text-sm font-bold text-gray-700 mb-2"
+                  >
+                    Isi Laporan / Pengaduan
+                  </label>
+                  <textarea 
+                    required 
+                    rows={5} 
+                    value={formPengaduan.isi_laporan} 
+                    onChange={(e) => setFormPengaduan({...formPengaduan, isi_laporan: e.target.value})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-red-500 outline-none transition-all leading-relaxed"
+                    placeholder="Tuliskan secara detail apa yang ingin Anda laporkan..."
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label 
+                    className="block text-sm font-bold text-gray-700 mb-2"
+                  >
+                    Lampirkan Bukti Foto (Opsional)
+                  </label>
+                  <label 
+                    className="cursor-pointer flex flex-col items-center justify-center py-8 bg-red-50 border-2 border-dashed border-red-300 rounded-xl hover:bg-red-100 transition-all shadow-sm"
+                  >
+                    <span 
+                      className="text-3xl mb-2"
+                    >
+                      📸
+                    </span>
+                    <span 
+                      className="font-bold text-red-800 text-sm"
+                    >
+                      Pilih Foto dari Galeri
+                    </span>
+                    <input 
+                      id="inputFotoPengaduan"
+                      type="file" 
+                      accept="image/*" 
+                      onChange={(e) => setFotoPengaduan(e.target.files)} 
+                      className="hidden" 
+                    />
+                  </label>
+                  {fotoPengaduan && (
+                    <div 
+                      className="text-xs font-bold text-green-700 p-3 mt-2 bg-green-50 rounded-lg border border-green-200 text-center"
+                    >
+                      ✅ Foto "{fotoPengaduan[0].name}" siap dikirim.
+                    </div>
+                  )}
+                </div>
+
+                {statusPengaduan && (
+                  <div 
+                    className={`p-4 rounded-xl text-sm font-bold text-center border ${
+                      statusPengaduan.includes("❌") ? "bg-red-50 text-red-700 border-red-200" : "bg-green-100 text-green-800 border-green-300"
+                    }`}
+                  >
+                    {statusPengaduan}
                   </div>
                 )}
-              </div>
-            )}
 
+                <button 
+                  type="submit" 
+                  disabled={isSubmittingPengaduan} 
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-lg flex items-center justify-center gap-2"
+                >
+                  <span>🚀</span> 
+                  {isSubmittingPengaduan ? "MENGIRIM LAPORAN..." : "KIRIM PENGADUAN"}
+                </button>
+              </form>
+            </div>
           </div>
         )}
 
       </div>
-    </main>
+    </div>
+  );
+}
+
+export default function LayananPublik() {
+  return (
+    <Suspense 
+      fallback={
+        <div 
+          className="min-h-screen flex flex-col items-center justify-center bg-gray-50"
+        >
+          <div 
+            className="w-16 h-16 border-4 border-gray-200 border-t-green-600 rounded-full animate-spin mb-4"
+          ></div>
+          <p 
+            className="text-green-700 font-bold tracking-widest animate-pulse"
+          >
+            MENYIAPKAN LAYANAN...
+          </p>
+        </div>
+      }
+    >
+      <LayananContent />
+    </Suspense>
   );
 }

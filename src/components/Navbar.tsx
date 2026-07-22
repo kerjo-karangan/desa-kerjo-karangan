@@ -10,6 +10,7 @@ import {
 
 export default function Navbar() {
   const pathname = usePathname();
+  
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mobileDropdown, setMobileDropdown] = useState<string | null>(null);
@@ -203,7 +204,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Menu Transparansi */}
+          {/* Menu Transparansi (Diperbaiki: 2 Tab Saja) */}
           <div 
             className="relative group"
           >
@@ -236,7 +237,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Menu Layanan (Diubah menjadi Dropdown) */}
+          {/* Menu Layanan (Diperbaiki: Animasi Dropdown dengan 3 Tab) */}
           <div 
             className="relative group"
           >
@@ -255,22 +256,22 @@ export default function Navbar() {
               className="absolute top-full right-0 mt-0 w-56 bg-white border border-gray-100 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 flex flex-col overflow-hidden transform origin-top scale-95 group-hover:scale-100"
             >
               <Link 
-                href="/layanan?tab=antrean" 
+                href="/layanan?tab=buat" 
                 className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/layanan")}`}
               >
-                Antrean Surat Anda
+                Layanan Surat Mandiri
               </Link>
               <Link 
-                href="/layanan?tab=master" 
+                href="/layanan?tab=cek" 
                 className={`px-5 py-3.5 text-sm font-bold text-gray-600 border-b transition-colors ${getDropdownHoverStyle("/layanan")}`}
               >
-                Daftar Jenis Surat
+                Cek Status Surat
               </Link>
               <Link 
                 href="/layanan?tab=pengaduan" 
                 className={`px-5 py-3.5 text-sm font-bold text-gray-600 transition-colors ${getDropdownHoverStyle("/layanan")}`}
               >
-                Kotak Pengaduan Warga
+                Kotak Pengaduan
               </Link>
             </div>
           </div>
@@ -485,7 +486,7 @@ export default function Navbar() {
                 <div 
                   className="flex items-center gap-2"
                 >
-                  <span>💌</span> Layanan Mandiri
+                  <span>💌</span> Layanan Surat
                 </div>
                 <span 
                   className={`text-[10px] transform transition-transform duration-300 ${
@@ -500,18 +501,18 @@ export default function Navbar() {
                   className="flex flex-col pl-10 pr-4 py-2 space-y-1 border-l-2 border-green-100 ml-6 mt-1"
                 >
                   <Link 
-                    href="/layanan?tab=antrean" 
+                    href="/layanan?tab=buat" 
                     onClick={() => setIsMobileMenuOpen(false)} 
                     className="py-2.5 text-sm font-bold text-gray-600 hover:text-green-600"
                   >
-                    Antrean Surat
+                    Layanan Surat Mandiri
                   </Link>
                   <Link 
-                    href="/layanan?tab=master" 
+                    href="/layanan?tab=cek" 
                     onClick={() => setIsMobileMenuOpen(false)} 
                     className="py-2.5 text-sm font-bold text-gray-600 hover:text-green-600"
                   >
-                    Daftar Jenis Surat
+                    Cek Status Surat
                   </Link>
                   <Link 
                     href="/layanan?tab=pengaduan" 

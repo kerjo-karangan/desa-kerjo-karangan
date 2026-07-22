@@ -1,250 +1,484 @@
 // src/app/transparansi/page.tsx
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { 
+  useEffect, 
+  useState, 
+  Suspense 
+} from "react";
+import { 
+  useSearchParams,
+  useRouter
+} from "next/navigation";
+import { 
+  collection, 
+  getDocs, 
+  doc, 
+  getDoc,
+  query,
+  orderBy
+} from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-
-// Komponen Pembungkus Suspense agar bebas Error Vercel
-export default function TransparansiPublik() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    }>
-      <TransparansiContent />
-    </Suspense>
-  );
-}
 
 function TransparansiContent() {
   const searchParams = useSearchParams();
-  const tabQuery = searchParams.get("tab");
-
-  const [daftarDokumen, setDaftarDokumen] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   
-  // STATE PENCARIAN & PAGINATION DINAMIS
-  const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); 
+  // Mengambil parameter tab dari URL (default ke apbdes)
+  const tabParam = searchParams.get("tab") || "apbdes";
+  
+  const [activeTab, setActiveTab] = useState(tabParam);
+  const [loading, setLoading] = useState(true);
 
+  // Sinkronisasi state internal dengan URL jika terjadi perubahan dari Navbar
   useEffect(() => {
-    const ambilData = async () => {
+    if (tabParam === "apbdes" || tabParam === "regulasi") {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  // Fungsi untuk mengganti URL saat user klik Tab di dalam halaman
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    router.push(`/transparansi?tab=${tab}`);
+  };
+
+  // State Data
+  const [heroData, setHeroData] = useState({
+    judul: "Transparansi Desa",
+    sub: "Keterbukaan informasi publik terkait anggaran dan regulasi hukum Pemerintah Desa.",
+    bg: ""
+  });
+  const [dataApbdes, setDataApbdes] = useState<any[]>([]);
+  const [dataRegulasi, setDataRegulasi] = useState<any[]>([]);
+
+  // Fungsi Fetch Data dari Firebase
+  useEffect(() => {
+    const fetchTransparansiData = async () => {
+      setLoading(true);
       try {
-        const qDokumen = query(collection(db, "transparansi_desa"), orderBy("tanggal_posting", "desc"));
-        const snapDokumen = await getDocs(qDokumen);
-        const dataDokumen: any[] = [];
-        snapDokumen.forEach((doc) => { 
-          dataDokumen.push({ id: doc.id, ...doc.data() }); 
-        });
-        setDaftarDokumen(dataDokumen);
+        // 1. Ambil Data Header Transparansi
+        const snapHero = await getDoc(doc(db, "pengaturan_web", "transparansi_hero"));
+        if (snapHero.exists() && snapHero.data()) {
+          setHeroData({
+            judul: snapHero.data().judul || "Transparansi Desa",
+            sub: snapHero.data().sub || "Keterbukaan informasi publik terkait anggaran dan regulasi.",
+            bg: snapHero.data().bg || ""
+          });
+        }
+
+        // 2. Ambil Data APBDes
+        const qApbdes = query(collection(db, "transparansi_apbdes"), orderBy("tahun", "desc"));
+        const snapApbdes = await getDocs(qApbdes);
+        setDataApbdes(snapApbdes.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        })));
+
+        // 3. Ambil Data Regulasi
+        const qRegulasi = query(collection(db, "transparansi_regulasi"), orderBy("tahun", "desc"));
+        const snapRegulasi = await getDocs(qRegulasi);
+        setDataRegulasi(snapRegulasi.docs.map(doc => ({ 
+          id: doc.id, 
+          ...(doc.data() as any) 
+        })));
+
       } catch (error) {
-        console.error("Gagal mengambil data:", error);
+        console.error("Gagal memuat data transparansi:", error);
       } finally {
         setLoading(false);
       }
     };
-    ambilData();
+
+    fetchTransparansiData();
   }, []);
 
-  // Format Tanggal
-  const formatTanggal = (isoString: string) => {
-    if (!isoString) return "";
-    return new Date(isoString).toLocaleDateString("id-ID", { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
   };
 
-  // LOGIKA FILTER DAN SORTING
-  const dokumenTerfilter = daftarDokumen.filter((d) => 
-    d.judul.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    d.kategori.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (d.deskripsi && d.deskripsi.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-  
-  const indexOfLastDokumen = currentPage * itemsPerPage;
-  const indexOfFirstDokumen = indexOfLastDokumen - itemsPerPage;
-  const currentDokumen = dokumenTerfilter.slice(indexOfFirstDokumen, indexOfLastDokumen);
-  const totalPages = Math.ceil(dokumenTerfilter.length / itemsPerPage);
-
-  // Reset pagination ke halaman 1 jika user melakukan pencarian baru atau ubah jumlah baris
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, itemsPerPage]);
+  if (loading) {
+    return (
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center bg-gray-50"
+      >
+        <div 
+          className="w-16 h-16 border-4 border-gray-200 border-t-yellow-500 rounded-full animate-spin mb-4"
+        ></div>
+        <p 
+          className="text-yellow-700 font-bold tracking-widest animate-pulse"
+        >
+          MEMUAT DOKUMEN PUBLIK...
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-gray-50 flex flex-col font-sans">
+    <div 
+      className="min-h-screen bg-gray-50 flex flex-col font-sans pb-24"
+    >
       
-      {/* HEADER SECTION */}
-      <div className="bg-blue-900 text-white py-16 md:py-24 relative overflow-hidden shadow-md">
-        <div className="absolute inset-0 bg-black opacity-20"></div>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <span className="text-blue-300 font-extrabold tracking-widest uppercase text-sm mb-2 block">
+      {/* ==========================================
+          HEADER (HERO SECTION)
+      ========================================== */}
+      <div 
+        className={`relative py-16 md:py-24 text-white overflow-hidden shadow-md transition-colors duration-500 ${
+          heroData.bg ? "bg-gray-900" : "bg-yellow-600"
+        }`}
+      >
+        <div 
+          className="absolute inset-0 z-0"
+        >
+          {heroData.bg && (
+            <img 
+              src={getSafeImageUrl(heroData.bg)} 
+              alt="Transparansi Background" 
+              className="w-full h-full object-cover opacity-30 mix-blend-overlay"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          )}
+          <div 
+            className="absolute inset-0 bg-gradient-to-t from-gray-900/90 via-gray-900/40 to-transparent"
+          ></div>
+        </div>
+        
+        <div 
+          className="container mx-auto px-4 relative z-10 text-center animate-fade-in"
+        >
+          <span 
+            className="text-yellow-200 font-extrabold tracking-widest uppercase text-sm mb-3 inline-block bg-yellow-900/50 px-4 py-1.5 rounded-full border border-yellow-800 backdrop-blur-sm shadow-sm"
+          >
             Akses Informasi Terbuka
           </span>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-            Transparansi Desa
+          <h1 
+            className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4 drop-shadow-2xl whitespace-pre-wrap leading-tight"
+          >
+            {heroData.judul}
           </h1>
-          <p className="text-lg md:text-xl text-blue-100 max-w-2xl mx-auto font-medium">
-            Dokumen resmi APBDes, Peraturan Desa (Perdes), Laporan, dan Keputusan Kepala Desa yang dapat diakses oleh seluruh warga.
+          <p 
+            className="text-lg md:text-xl text-gray-200 max-w-2xl mx-auto font-medium drop-shadow-lg whitespace-pre-wrap"
+          >
+            {heroData.sub}
           </p>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-12 max-w-5xl flex-grow">
+      {/* ==========================================
+          KONTEN UTAMA & MENU TAB
+      ========================================== */}
+      <div 
+        className="container mx-auto px-4 max-w-6xl relative z-20 -mt-8"
+      >
         
-        {/* KOTAK PENCARIAN PINTAR */}
-        <div className="mb-10 max-w-2xl mx-auto relative z-20">
-          <input 
-            type="text" 
-            placeholder="Cari nama dokumen, tahun, atau kategori..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-14 pr-4 py-4 rounded-2xl border-2 border-blue-200 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all font-bold text-gray-800 shadow-md"
-          />
-          <span className="absolute left-5 top-1/2 transform -translate-y-1/2 text-2xl opacity-60">🔍</span>
-        </div>
-
-        <div className="animate-fade-in">
+        {/* Navigasi Tab Internal */}
+        <div 
+          className="bg-white p-2 md:p-3 rounded-2xl shadow-lg border border-gray-100 flex flex-col md:flex-row gap-2 md:gap-4 justify-center max-w-3xl mx-auto mb-10"
+        >
+          <button 
+            onClick={() => handleTabChange("apbdes")} 
+            className={`flex-1 py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "apbdes" 
+              ? "bg-yellow-500 text-white shadow-md transform scale-[1.02]" 
+              : "bg-gray-50 text-gray-600 hover:bg-yellow-50 hover:text-yellow-700"
+            }`}
+          >
+            <span 
+              className="text-xl"
+            >
+              📊
+            </span> 
+            Info Grafis APBDes
+          </button>
           
-          {/* FITUR DROPDOWN TAMPILKAN BARIS */}
-          {!loading && dokumenTerfilter.length > 0 && (
-            <div className="flex justify-end mb-6">
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-200">
-                <span className="text-sm font-bold text-gray-600">Tampilkan:</span>
-                <select 
-                  value={itemsPerPage} 
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-600 focus:border-blue-600 block p-1.5 font-bold outline-none cursor-pointer"
-                >
-                  <option value={10}>10 Dokumen</option>
-                  <option value={20}>20 Dokumen</option>
-                  <option value={50}>50 Dokumen</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex justify-center my-20">
-              <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div>
-            </div>
-          ) : dokumenTerfilter.length === 0 ? (
-            <div className="bg-white p-12 rounded-3xl shadow-sm border border-gray-100 text-center max-w-3xl mx-auto">
-              <span className="text-6xl mb-4 block opacity-50">📂</span>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                {searchTerm ? "Dokumen Tidak Ditemukan" : "Belum Ada Dokumen Transparansi"}
-              </h3>
-              <p className="text-gray-500 font-medium">
-                {searchTerm ? `Tidak ada dokumen yang cocok dengan pencarian "${searchTerm}".` : "Pemerintah desa belum mengunggah dokumen APBDes atau Peraturan Desa."}
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {currentDokumen.map((dok) => (
-                <article key={dok.id} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-300 transition-all group flex flex-col md:flex-row gap-6">
-                  
-                  {/* GAMBAR DOKUMEN DI KIRI */}
-                  <div className="w-full md:w-48 lg:w-56 h-48 md:h-auto bg-gray-100 rounded-2xl overflow-hidden flex-shrink-0 border border-gray-200 shadow-inner flex items-center justify-center relative">
-                    {dok.gambar ? (
-                      <img 
-                        src={dok.gambar.startsWith("http") ? dok.gambar : `https://wsrv.nl/?url=${dok.gambar}`} 
-                        alt="Sampul Dokumen" 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <span className="text-5xl opacity-50">📄</span>
-                    )}
-                    <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded shadow-md">
-                      {dok.kategori}
-                    </div>
-                  </div>
-                  
-                  {/* DETAIL TEKS DAN TOMBOL DI KANAN */}
-                  <div className="flex flex-col flex-grow py-2">
-                    <div className="flex flex-wrap items-center gap-3 mb-2 text-xs font-bold text-gray-500">
-                      <span className="bg-gray-100 px-2 py-1 rounded border border-gray-200 flex items-center gap-1">
-                        📅 {formatTanggal(dok.tanggal_posting)}
-                      </span>
-                      <span className="flex items-center gap-1">👤 Oleh: {dok.penulis}</span>
-                    </div>
-
-                    <h2 className="text-xl md:text-2xl font-black text-gray-900 mb-2 leading-snug group-hover:text-blue-700 transition-colors">
-                      {dok.judul}
-                    </h2>
-                    
-                    <p className="text-sm text-gray-600 leading-relaxed line-clamp-3 mb-5 flex-grow">
-                      {dok.deskripsi || "Tidak ada deskripsi detail untuk dokumen ini."}
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-3 mt-auto pt-4 border-t border-gray-100">
-                      <a 
-                        href={dok.link_dokumen} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="flex-1 md:flex-none text-center bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-transform hover:-translate-y-0.5 text-sm flex items-center justify-center gap-2"
-                      >
-                        ⬇️ Download File
-                      </a>
-                      <Link 
-                        href={`/transparansi/${dok.id}`} 
-                        className="flex-1 md:flex-none text-center bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 font-bold px-6 py-2.5 rounded-xl transition-colors shadow-sm text-sm"
-                      >
-                        Selengkapnya →
-                      </Link>
-                    </div>
-                  </div>
-
-                </article>
-              ))}
-            </div>
-          )}
-
-          {/* KOMPONEN PAGINATION DOKUMEN */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 mt-12 mb-8 flex-wrap">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
-                disabled={currentPage === 1}
-                className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                &laquo; Prev
-              </button>
-              
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button 
-                  key={i} 
-                  onClick={() => setCurrentPage(i + 1)} 
-                  className={`w-10 h-10 rounded-xl font-bold shadow-sm transition-colors ${
-                    currentPage === i + 1 
-                    ? "bg-blue-600 text-white border-blue-600" 
-                    : "bg-white border border-gray-300 text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 rounded-xl font-bold bg-white border border-gray-300 text-gray-600 disabled:opacity-50 hover:bg-gray-50 transition-colors"
-              >
-                Next &raquo;
-              </button>
-            </div>
-          )}
+          <button 
+            onClick={() => handleTabChange("regulasi")} 
+            className={`flex-1 py-3 px-6 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+              activeTab === "regulasi" 
+              ? "bg-yellow-500 text-white shadow-md transform scale-[1.02]" 
+              : "bg-gray-50 text-gray-600 hover:bg-yellow-50 hover:text-yellow-700"
+            }`}
+          >
+            <span 
+              className="text-xl"
+            >
+              ⚖️
+            </span> 
+            Regulasi & Peraturan
+          </button>
         </div>
+
+        {/* ==========================================
+            TAB 1: INFO GRAFIS APBDES
+        ========================================== */}
+        {activeTab === "apbdes" && (
+          <div 
+            className="animate-fade-in space-y-8"
+          >
+            {dataApbdes.length === 0 ? (
+              <div 
+                className="bg-white p-16 rounded-3xl shadow-sm border border-gray-100 text-center"
+              >
+                <span 
+                  className="text-6xl mb-4 block opacity-30"
+                >
+                  📭
+                </span>
+                <h2 
+                  className="text-2xl font-bold text-gray-800 mb-2"
+                >
+                  Info Grafis Belum Tersedia
+                </h2>
+                <p 
+                  className="text-gray-500"
+                >
+                  Pemerintah Desa belum mengunggah dokumen grafis APBDes.
+                </p>
+              </div>
+            ) : (
+              <div 
+                className="grid grid-cols-1 md:grid-cols-2 gap-8"
+              >
+                {dataApbdes.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-shadow"
+                  >
+                    <div 
+                      className="h-64 sm:h-80 bg-gray-100 relative overflow-hidden"
+                    >
+                      {item.gambar ? (
+                        <img 
+                          src={getSafeImageUrl(item.gambar)} 
+                          alt={item.judul} 
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div 
+                          className="w-full h-full flex items-center justify-center text-4xl text-gray-300"
+                        >
+                          📊
+                        </div>
+                      )}
+                      
+                      <div 
+                        className="absolute top-4 right-4 bg-yellow-500 text-white font-black px-4 py-1.5 rounded-full text-sm shadow-md"
+                      >
+                        Tahun {item.tahun || "Berjalan"}
+                      </div>
+                    </div>
+                    <div 
+                      className="p-6 border-t border-gray-50"
+                    >
+                      <h3 
+                        className="text-xl font-bold text-gray-900 mb-2"
+                      >
+                        {item.judul}
+                      </h3>
+                      <p 
+                        className="text-gray-500 text-sm leading-relaxed"
+                      >
+                        {item.deskripsi || "Dokumen rincian Anggaran Pendapatan dan Belanja Desa."}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==========================================
+            TAB 2: REGULASI & PERATURAN
+        ========================================== */}
+        {activeTab === "regulasi" && (
+          <div 
+            className="animate-fade-in"
+          >
+            {dataRegulasi.length === 0 ? (
+              <div 
+                className="bg-white p-16 rounded-3xl shadow-sm border border-gray-100 text-center"
+              >
+                <span 
+                  className="text-6xl mb-4 block opacity-30"
+                >
+                  ⚖️
+                </span>
+                <h2 
+                  className="text-2xl font-bold text-gray-800 mb-2"
+                >
+                  Regulasi Belum Tersedia
+                </h2>
+                <p 
+                  className="text-gray-500"
+                >
+                  Pemerintah Desa belum mengunggah dokumen peraturan atau regulasi.
+                </p>
+              </div>
+            ) : (
+              <div 
+                className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden"
+              >
+                <div 
+                  className="p-6 md:p-8 border-b border-gray-100 bg-yellow-50/30 flex items-center gap-4"
+                >
+                  <div 
+                    className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center text-2xl shadow-sm flex-shrink-0"
+                  >
+                    ⚖️
+                  </div>
+                  <div>
+                    <h3 
+                      className="text-xl font-black text-gray-900"
+                    >
+                      Daftar Regulasi & Dokumen Hukum
+                    </h3>
+                    <p 
+                      className="text-gray-500 text-sm mt-1"
+                    >
+                      Silakan klik tombol unduh untuk membaca detail peraturan.
+                    </p>
+                  </div>
+                </div>
+                
+                <div 
+                  className="overflow-x-auto p-4 md:p-6"
+                >
+                  <table 
+                    className="min-w-full text-sm text-left"
+                  >
+                    <thead 
+                      className="bg-gray-50 border-b border-gray-200"
+                    >
+                      <tr>
+                        <th 
+                          className="py-4 px-4 font-bold text-gray-600 w-20 text-center"
+                        >
+                          Tahun
+                        </th>
+                        <th 
+                          className="py-4 px-4 font-bold text-gray-600 w-40"
+                        >
+                          Kategori
+                        </th>
+                        <th 
+                          className="py-4 px-4 font-bold text-gray-600"
+                        >
+                          Judul / Nomor Regulasi
+                        </th>
+                        <th 
+                          className="py-4 px-4 text-center font-bold text-gray-600 w-32"
+                        >
+                          Dokumen
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dataRegulasi.map((item) => (
+                        <tr 
+                          key={item.id} 
+                          className="border-b border-gray-100 hover:bg-yellow-50/50 transition-colors"
+                        >
+                          <td 
+                            className="py-4 px-4 text-center"
+                          >
+                            <span 
+                              className="bg-gray-100 text-gray-700 font-black px-3 py-1.5 rounded-lg border border-gray-200"
+                            >
+                              {item.tahun || "-"}
+                            </span>
+                          </td>
+                          <td 
+                            className="py-4 px-4"
+                          >
+                            <span 
+                              className="text-xs font-bold uppercase tracking-widest text-yellow-700 bg-yellow-100 px-2 py-1 rounded border border-yellow-200"
+                            >
+                              {item.kategori || "Regulasi"}
+                            </span>
+                          </td>
+                          <td 
+                            className="py-4 px-4"
+                          >
+                            <div 
+                              className="font-bold text-gray-900 text-base"
+                            >
+                              {item.judul}
+                            </div>
+                            {item.deskripsi && (
+                              <div 
+                                className="text-xs text-gray-500 mt-1 line-clamp-2"
+                              >
+                                {item.deskripsi}
+                              </div>
+                            )}
+                          </td>
+                          <td 
+                            className="py-4 px-4 text-center"
+                          >
+                            {item.file_url || item.link ? (
+                              <a 
+                                href={item.file_url || item.link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold px-4 py-2 rounded-xl transition-colors border border-blue-200 gap-2 shadow-sm text-xs"
+                              >
+                                <span>📄</span> 
+                                Buka
+                              </a>
+                            ) : (
+                              <span 
+                                className="text-gray-400 text-xs italic"
+                              >
+                                File Tidak Tersedia
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
-    </main>
+    </div>
+  );
+}
+
+// Wrapper Suspense yang Wajib Ada di Next.js (App Router) bila menggunakan useSearchParams
+export default function TransparansiPublik() {
+  return (
+    <Suspense 
+      fallback={
+        <div 
+          className="min-h-screen flex flex-col items-center justify-center bg-gray-50"
+        >
+          <div 
+            className="w-16 h-16 border-4 border-gray-200 border-t-yellow-500 rounded-full animate-spin mb-4"
+          ></div>
+          <p 
+            className="text-yellow-700 font-bold tracking-widest animate-pulse"
+          >
+            MENYIAPKAN HALAMAN...
+          </p>
+        </div>
+      }
+    >
+      <TransparansiContent />
+    </Suspense>
   );
 }
