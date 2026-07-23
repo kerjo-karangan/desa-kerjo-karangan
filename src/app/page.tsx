@@ -44,7 +44,7 @@ export default function Home() {
   const [isPaused, setIsPaused] = useState(false);
 
   // Ambil data Peta
-  const petaEmbedUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3950.457193231121!2d111.66699277413645!3d-8.054746480468972!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e791b0f512dc34b%3A0x5027a76e3565540!2sDesa%20Kerjo%2C%20Kec.%20Karangan%2C%20Kabupaten%20Trenggalek%2C%20Jawa%20Timur!5e0!3m2!1sid!2sid!4v1714441584852!5m2!1sid!2sid";
+  const petaEmbedUrl = "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3950.3963895278016!2d111.66164507373044!3d-8.060987680540897!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x2e791000c680611b%3A0x6a4b06525c9657c!2sKantor%20Kepala%20Desa%20Kerjo!5e0!3m2!1sid!2sid!4v1784769815814!5m2!1sid!2sid";
 
   useEffect(() => {
     const fetchHomeData = async () => {
