@@ -239,6 +239,20 @@ export default function PengaturanBeranda({
     }
   };
 
+  // ==========================================
+  // HANDLER HAPUS GAMBAR THUMBNAIL (SILANG)
+  // ==========================================
+  const handleHapusGambarHero = () => {
+    if (confirm("Yakin ingin menghapus gambar latar belakang ini?")) {
+      setBgHeroLama("");
+      setBgHeroList(null);
+      const input = document.getElementById("inputHeroBeranda") as HTMLInputElement;
+      if (input) {
+        input.value = "";
+      }
+    }
+  };
+
   return (
     <div 
       className="space-y-8 animate-fade-in pb-20 font-sans"
@@ -311,7 +325,7 @@ export default function PengaturanBeranda({
             >
               🖼️
             </span> 
-            Pengaturan Visual Beranda (Cloudinary)
+            Pengaturan Visual Beranda
           </h3>
           <p 
             className="text-gray-500 text-sm mb-8"
@@ -334,11 +348,11 @@ export default function PengaturanBeranda({
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-800"
                   >
-                    Judul Utama (Mendukung Multi-Baris)
+                    Judul Utama (Mendukung Multi-Baris Paragraf)
                   </label>
                   <textarea 
                     required 
-                    rows={3}
+                    rows={4}
                     value={judulHero} 
                     onChange={(e) => setJudulHero(e.target.value)} 
                     className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg whitespace-pre-wrap"
@@ -371,16 +385,27 @@ export default function PengaturanBeranda({
                   Gambar Background Beranda
                 </label>
                 
-                {/* VARIABEL TELAH DIPERBAIKI MENJADI bgHeroLama */}
-                {bgHeroLama && (
+                {(bgHeroLama || (bgHeroList && bgHeroList.length > 0)) && (
                   <div 
-                    className="relative w-full h-40 md:h-48 rounded-xl overflow-hidden shadow-inner border border-gray-200 group"
+                    className="relative w-full h-40 md:h-56 rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 group"
                   >
                     <img 
-                      src={getSafeImageUrl(bgHeroLama)} 
-                      alt="Hero Beranda"
+                      src={bgHeroList && bgHeroList.length > 0 ? URL.createObjectURL(bgHeroList[0]) : getSafeImageUrl(bgHeroLama)} 
+                      alt="Hero Beranda Preview"
                       className="w-full h-full object-cover" 
                     />
+                    {/* TOMBOL SILANG HAPUS GAMBAR SAAT HOVER */}
+                    <button 
+                      type="button"
+                      onClick={handleHapusGambarHero}
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <span 
+                        className="bg-red-600 text-white font-bold px-4 py-2 rounded-full text-sm shadow-lg flex items-center gap-2"
+                      >
+                        <span>❌</span> Hapus Gambar
+                      </span>
+                    </button>
                   </div>
                 )}
                 
@@ -395,8 +420,7 @@ export default function PengaturanBeranda({
                   <span 
                     className="font-bold text-yellow-800 text-sm"
                   >
-                    {/* VARIABEL TELAH DIPERBAIKI MENJADI bgHeroLama */}
-                    {bgHeroLama ? "Ganti Gambar Baru" : "Upload Background ke Cloudinary"}
+                    {bgHeroLama || bgHeroList ? "Pilih Gambar Pengganti" : "Upload Background ke Cloudinary"}
                   </span>
                   <input 
                     id="inputHeroBeranda"
@@ -411,7 +435,7 @@ export default function PengaturanBeranda({
                   <div 
                     className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200"
                   >
-                    ✅ Gambar siap diunggah.
+                    ✅ Gambar baru siap disimpan.
                   </div>
                 )}
               </div>
@@ -706,6 +730,7 @@ export default function PengaturanBeranda({
             >
               {beritaTampil.map((berita) => {
                 
+                // Cek format gambar (Array atau String)
                 let imgUrl = "";
                 if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
                   imgUrl = berita.gambar[0];
