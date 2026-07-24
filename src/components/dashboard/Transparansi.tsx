@@ -29,20 +29,21 @@ export default function Transparansi({
   activeSubMenu 
 }: TransparansiProps) {
   
-  const defaultTab = activeSubMenu === "trans-apbdes" ? "apbdes"
-                   : activeSubMenu === "trans-regulasi" ? "regulasi"
+  const defaultTab = activeSubMenu === "transparansi-apbdes" ? "apbdes"
+                   : activeSubMenu === "transparansi-regulasi" ? "regulasi"
                    : "hero";
 
   const [tabAktif, setTabAktif] = useState(defaultTab);
 
   useEffect(() => {
-    if (activeSubMenu === "trans-hero") setTabAktif("hero");
-    else if (activeSubMenu === "trans-apbdes") setTabAktif("apbdes");
-    else if (activeSubMenu === "trans-regulasi") setTabAktif("regulasi");
+    if (activeSubMenu === "transparansi-hero") setTabAktif("hero");
+    else if (activeSubMenu === "transparansi-apbdes") setTabAktif("apbdes");
+    else if (activeSubMenu === "transparansi-regulasi") setTabAktif("regulasi");
   }, [activeSubMenu]);
 
   const [statusProses, setStatusProses] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   // ==========================================
   // STATE: HERO
@@ -53,40 +54,50 @@ export default function Transparansi({
   const [heroBgList, setHeroBgList] = useState<FileList | null>(null);
 
   // ==========================================
-  // STATE: APBDES
+  // STATE: APBDES (DATABASE: transparansi_apbdes)
   // ==========================================
   const [dataApbdes, setDataApbdes] = useState<any[]>([]);
-  const [searchApbdes, setSearchApbdes] = useState("");
-  const [pageApbdes, setPageApbdes] = useState(1);
-  const perPageApbdes = 10;
-  
   const [isModalApbdesOpen, setIsModalApbdesOpen] = useState(false);
   const [editIdApbdes, setEditIdApbdes] = useState<string | null>(null);
+  
   const [formApbdes, setFormApbdes] = useState({
     judul: "",
-    tahun: new Date().getFullYear().toString(),
-    deskripsi: ""
+    tahun: new Date().getFullYear(),
+    deskripsi: "",
+    link_pdf: "", // Tambahan: Input File Dokumen APBDes
+    gambar: ""
   });
-  const [gambarApbdes, setGambarApbdes] = useState<FileList | null>(null);
-  const [gambarApbdesLama, setGambarApbdesLama] = useState("");
 
   // ==========================================
-  // STATE: REGULASI
+  // STATE: REGULASI (DATABASE: transparansi_regulasi)
   // ==========================================
   const [dataRegulasi, setDataRegulasi] = useState<any[]>([]);
-  const [searchRegulasi, setSearchRegulasi] = useState("");
-  const [pageRegulasi, setPageRegulasi] = useState(1);
-  const perPageRegulasi = 10;
-
   const [isModalRegulasiOpen, setIsModalRegulasiOpen] = useState(false);
   const [editIdRegulasi, setEditIdRegulasi] = useState<string | null>(null);
+  
   const [formRegulasi, setFormRegulasi] = useState({
     judul: "",
-    kategori: "", // Manual input sesuai permintaan
-    tahun: new Date().getFullYear().toString(),
+    kategori: "",
+    tahun: new Date().getFullYear(),
     deskripsi: "",
-    link: "" // Link GDrive / PDF eksternal
+    link: "", // Input File Dokumen Regulasi
+    foto: "" // Tambahan: Thumbnail Sampul Regulasi
   });
+
+  // ==========================================
+  // FUNGSI KONVERSI HEIC -> JPG (WSVR)
+  // ==========================================
+  const getSafeImageUrl = (url: string) => {
+    if (!url) return "";
+    let safeUrl = url;
+    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+    }
+    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+      return safeUrl;
+    }
+    return `https://wsrv.nl/?url=${safeUrl}`;
+  };
 
   // ==========================================
   // FUNGSI FETCH DATA
@@ -100,10 +111,12 @@ export default function Transparansi({
         setHeroBgLama(snapHero.data().bg || "");
       }
 
+      // Fetch APBDes
       const qApbdes = query(collection(db, "transparansi_apbdes"), orderBy("tahun", "desc"));
       const snapApbdes = await getDocs(qApbdes);
       setDataApbdes(snapApbdes.docs.map(d => ({ id: d.id, ...d.data() })));
 
+      // Fetch Regulasi
       const qRegulasi = query(collection(db, "transparansi_regulasi"), orderBy("tahun", "desc"));
       const snapRegulasi = await getDocs(qRegulasi);
       setDataRegulasi(snapRegulasi.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -116,18 +129,6 @@ export default function Transparansi({
   useEffect(() => {
     ambilData();
   }, []);
-
-  const getSafeImageUrl = (url: string) => {
-    if (!url) return "";
-    let safeUrl = url;
-    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
-      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
-    }
-    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
-      return safeUrl;
-    }
-    return `https://wsrv.nl/?url=${safeUrl}`;
-  };
 
   // ==========================================
   // CLOUDINARY UPLOADER
@@ -197,54 +198,56 @@ export default function Transparansi({
     if (item) {
       setEditIdApbdes(item.id);
       setFormApbdes({
-        judul: item.judul,
-        tahun: item.tahun?.toString() || new Date().getFullYear().toString(),
-        deskripsi: item.deskripsi || ""
+        judul: item.judul || "",
+        tahun: item.tahun || new Date().getFullYear(),
+        deskripsi: item.deskripsi || "",
+        link_pdf: item.link_pdf || item.file_url || "", // Mengakomodasi key lama
+        gambar: item.gambar || ""
       });
-      setGambarApbdesLama(item.gambar || item.foto || item.file_url || ""); // Mengakomodasi format lama
     } else {
       setEditIdApbdes(null);
       setFormApbdes({
         judul: "",
-        tahun: new Date().getFullYear().toString(),
-        deskripsi: ""
+        tahun: new Date().getFullYear(),
+        deskripsi: "",
+        link_pdf: "",
+        gambar: ""
       });
-      setGambarApbdesLama("");
     }
-    setGambarApbdes(null);
     setIsModalApbdesOpen(true);
+  };
+
+  const handleUploadFotoApbdes = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    const url = await uploadFotoKeCloudinary(file);
+    if (url) {
+      if (formApbdes.gambar) await hapusFotoDiCloudinary(formApbdes.gambar);
+      setFormApbdes(prev => ({ ...prev, gambar: url }));
+    }
+    setIsUploading(false);
   };
 
   const simpanApbdes = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setStatusProses("Menyimpan Info Grafis APBDes...");
+    setStatusProses("Menyimpan Laporan APBDes...");
     try {
-      let imageUrl = gambarApbdesLama;
-      if (gambarApbdes && gambarApbdes.length > 0) {
-        const newImg = await uploadFotoKeCloudinary(gambarApbdes[0]);
-        if (newImg) {
-          if (gambarApbdesLama) await hapusFotoDiCloudinary(gambarApbdesLama);
-          imageUrl = newImg;
-        }
-      }
-
       const payload = { 
-        ...formApbdes, 
-        gambar: imageUrl, // Standarisasi menggunakan field "gambar"
-        diperbarui_oleh: userEmail,
-        tanggal_update: new Date().toISOString()
+        ...formApbdes,
+        tahun: Number(formApbdes.tahun),
+        tanggal_update: new Date().toISOString(),
+        diperbarui_oleh: userEmail
       };
-
       if (editIdApbdes) {
         await updateDoc(doc(db, "transparansi_apbdes", editIdApbdes), payload);
       } else {
         await addDoc(collection(db, "transparansi_apbdes"), payload);
       }
-
       setIsModalApbdesOpen(false);
       ambilData();
-      setStatusProses("✅ APBDes berhasil disimpan!");
+      setStatusProses("✅ Laporan APBDes berhasil disimpan!");
       setTimeout(() => setStatusProses(""), 3000);
     } catch (error) {
       setStatusProses("❌ Gagal menyimpan APBDes.");
@@ -254,7 +257,7 @@ export default function Transparansi({
   };
 
   const hapusApbdes = async (id: string, urlFoto: string) => {
-    if (confirm("Hapus Info Grafis APBDes ini permanen?")) {
+    if (confirm("Hapus laporan APBDes ini permanen?")) {
       if (urlFoto) await hapusFotoDiCloudinary(urlFoto);
       await deleteDoc(doc(db, "transparansi_apbdes", id));
       ambilData();
@@ -262,51 +265,64 @@ export default function Transparansi({
   };
 
   // ==========================================
-  // HANDLER REGULASI
+  // HANDLER REGULASI & PERDES
   // ==========================================
   const bukaModalRegulasi = (item: any = null) => {
     if (item) {
       setEditIdRegulasi(item.id);
       setFormRegulasi({
-        judul: item.judul,
+        judul: item.judul || "",
         kategori: item.kategori || "",
-        tahun: item.tahun?.toString() || new Date().getFullYear().toString(),
+        tahun: item.tahun || new Date().getFullYear(),
         deskripsi: item.deskripsi || "",
-        link: item.link || item.file_url || "" // Standarisasi menggunakan field "link"
+        link: item.link || "",
+        foto: item.foto || item.gambar || "" // Mengakomodasi key gambar dari versi sebelumnya
       });
     } else {
       setEditIdRegulasi(null);
       setFormRegulasi({
         judul: "",
         kategori: "",
-        tahun: new Date().getFullYear().toString(),
+        tahun: new Date().getFullYear(),
         deskripsi: "",
-        link: ""
+        link: "",
+        foto: ""
       });
     }
     setIsModalRegulasiOpen(true);
   };
 
+  const handleUploadFotoRegulasi = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    const url = await uploadFotoKeCloudinary(file);
+    if (url) {
+      if (formRegulasi.foto) await hapusFotoDiCloudinary(formRegulasi.foto);
+      setFormRegulasi(prev => ({ ...prev, foto: url }));
+    }
+    setIsUploading(false);
+  };
+
   const simpanRegulasi = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setStatusProses("Menyimpan Regulasi...");
+    setStatusProses("Menyimpan Dokumen Regulasi...");
     try {
       const payload = { 
-        ...formRegulasi, 
-        diperbarui_oleh: userEmail,
-        tanggal_update: new Date().toISOString()
+        ...formRegulasi,
+        tahun: Number(formRegulasi.tahun),
+        tanggal_update: new Date().toISOString(),
+        diperbarui_oleh: userEmail
       };
-      
       if (editIdRegulasi) {
         await updateDoc(doc(db, "transparansi_regulasi", editIdRegulasi), payload);
       } else {
         await addDoc(collection(db, "transparansi_regulasi"), payload);
       }
-
       setIsModalRegulasiOpen(false);
       ambilData();
-      setStatusProses("✅ Regulasi berhasil disimpan!");
+      setStatusProses("✅ Dokumen Regulasi berhasil disimpan!");
       setTimeout(() => setStatusProses(""), 3000);
     } catch (error) {
       setStatusProses("❌ Gagal menyimpan regulasi.");
@@ -315,33 +331,13 @@ export default function Transparansi({
     }
   };
 
-  const hapusRegulasi = async (id: string) => {
+  const hapusRegulasi = async (id: string, urlFoto: string) => {
     if (confirm("Hapus dokumen regulasi ini permanen?")) {
+      if (urlFoto) await hapusFotoDiCloudinary(urlFoto);
       await deleteDoc(doc(db, "transparansi_regulasi", id));
       ambilData();
     }
   };
-
-  // ==========================================
-  // FILTER & PAGINASI APBDES
-  // ==========================================
-  const filteredApbdes = dataApbdes.filter((b) => 
-    b.judul?.toLowerCase().includes(searchApbdes.toLowerCase()) ||
-    b.tahun?.toString().includes(searchApbdes.toLowerCase())
-  );
-  const totalPageApbdes = Math.ceil(filteredApbdes.length / perPageApbdes);
-  const paginatedApbdes = filteredApbdes.slice((pageApbdes - 1) * perPageApbdes, pageApbdes * perPageApbdes);
-
-  // ==========================================
-  // FILTER & PAGINASI REGULASI
-  // ==========================================
-  const filteredRegulasi = dataRegulasi.filter((a) => 
-    a.judul?.toLowerCase().includes(searchRegulasi.toLowerCase()) ||
-    a.kategori?.toLowerCase().includes(searchRegulasi.toLowerCase()) ||
-    a.tahun?.toString().includes(searchRegulasi.toLowerCase())
-  );
-  const totalPageRegulasi = Math.ceil(filteredRegulasi.length / perPageRegulasi);
-  const paginatedRegulasi = filteredRegulasi.slice((pageRegulasi - 1) * perPageRegulasi, pageRegulasi * perPageRegulasi);
 
   return (
     <div 
@@ -354,7 +350,7 @@ export default function Transparansi({
       >
         <button 
           onClick={() => setTabAktif("hero")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[140px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
             tabAktif === "hero" ? "bg-yellow-500 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
           }`}
         >
@@ -362,7 +358,7 @@ export default function Transparansi({
         </button>
         <button 
           onClick={() => setTabAktif("apbdes")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[140px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
             tabAktif === "apbdes" ? "bg-blue-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
           }`}
         >
@@ -370,7 +366,7 @@ export default function Transparansi({
         </button>
         <button 
           onClick={() => setTabAktif("regulasi")} 
-          className={`flex-1 min-w-[150px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 min-w-[140px] py-3 px-4 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
             tabAktif === "regulasi" ? "bg-purple-600 text-white shadow-md" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
           }`}
         >
@@ -398,7 +394,7 @@ export default function Transparansi({
           <h3 
             className="text-2xl font-bold mb-6 flex items-center gap-2"
           >
-            <span>🖼️</span> Pengaturan Header Transparansi Publik
+            <span>🖼️</span> Pengaturan Header Transparansi
           </h3>
           <form 
             onSubmit={handleSimpanHero} 
@@ -414,15 +410,16 @@ export default function Transparansi({
                   <label 
                     className="block text-sm font-bold mb-2"
                   >
-                    Judul Header
+                    Judul Header (Mendukung Paragraf / Enter)
                   </label>
-                  <input 
-                    type="text" 
+                  {/* PERBAIKAN: Judul Header diubah menjadi Textarea */}
+                  <textarea 
                     required 
+                    rows={3}
                     value={heroJudul} 
                     onChange={(e) => setHeroJudul(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold" 
-                  />
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg whitespace-pre-wrap leading-tight" 
+                  ></textarea>
                 </div>
                 <div>
                   <label 
@@ -449,12 +446,20 @@ export default function Transparansi({
                 </label>
                 {heroBgLama && (
                   <div 
-                    className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200"
+                    className="relative w-full h-40 rounded-xl overflow-hidden shadow-sm border border-gray-200 group"
                   >
                     <img 
                       src={getSafeImageUrl(heroBgLama)} 
                       className="w-full h-full object-cover" 
                     />
+                    {/* TOMBOL X HAPUS HEADER */}
+                    <button 
+                      type="button" 
+                      onClick={() => { if(confirm("Hapus background?")) setHeroBgLama(""); }}
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-xs"
+                    >
+                      <span className="bg-red-600 px-3 py-1.5 rounded-full shadow-lg">❌ Hapus Gambar</span>
+                    </button>
                   </div>
                 )}
                 <label 
@@ -491,7 +496,7 @@ export default function Transparansi({
       )}
 
       {/* ==========================================
-          TAB 2: DATA APBDES
+          TAB 2: DATA APBDES (transparansi_apbdes)
       ========================================== */}
       {tabAktif === "apbdes" && (
         <div 
@@ -503,179 +508,100 @@ export default function Transparansi({
             <h3 
               className="text-2xl font-bold flex items-center gap-2"
             >
-              <span>📊</span> Manajemen APBDes
+              <span>📊</span> Laporan Realisasi APBDes
             </h3>
             <button 
               onClick={() => bukaModalApbdes()} 
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-colors text-sm shadow-sm w-full md:w-auto"
             >
-              + Tambah APBDes
+              + Buat Laporan Baru
             </button>
           </div>
 
           <div 
-            className="mb-6 relative"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            <input 
-              type="text" 
-              placeholder="Cari berdasarkan judul atau tahun..." 
-              value={searchApbdes}
-              onChange={(e) => { setSearchApbdes(e.target.value); setPageApbdes(1); }}
-              className="w-full p-4 pl-12 rounded-xl border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm text-sm font-bold"
-            />
-            <span 
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400"
-            >
-              🔍
-            </span>
-          </div>
-
-          <div 
-            className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm"
-          >
-            <table 
-              className="min-w-full text-sm text-left bg-white"
-            >
-              <thead 
-                className="bg-gray-50 border-b border-gray-200"
+            {dataApbdes.length === 0 ? (
+              <div 
+                className="col-span-full text-center py-10 bg-gray-50 rounded-2xl border border-gray-200"
               >
-                <tr>
-                  <th 
-                    className="py-3 px-4 font-bold text-gray-600 w-24 text-center"
+                <p 
+                  className="text-gray-500 font-bold"
+                >
+                  Belum ada data APBDes.
+                </p>
+              </div>
+            ) : (
+              dataApbdes.map((item) => (
+                <div 
+                  key={item.id} 
+                  className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col md:flex-row gap-5 hover:shadow-md transition-all"
+                >
+                  <div 
+                    className="w-full md:w-32 h-32 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0"
                   >
-                    Tahun
-                  </th>
-                  <th 
-                    className="py-3 px-4 font-bold text-gray-600"
+                    {item.gambar ? (
+                      <img 
+                        src={getSafeImageUrl(item.gambar)} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full flex items-center justify-center text-4xl text-gray-400"
+                      >
+                        📊
+                      </div>
+                    )}
+                  </div>
+                  <div 
+                    className="flex-1 flex flex-col"
                   >
-                    Detail Laporan APBDes
-                  </th>
-                  <th 
-                    className="py-3 px-4 text-center font-bold text-gray-600 w-32"
-                  >
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedApbdes.length === 0 ? (
-                  <tr>
-                    <td 
-                      colSpan={3} 
-                      className="text-center py-8 font-bold text-gray-400"
+                    <div>
+                      <span 
+                        className="text-[10px] font-black uppercase text-blue-700 bg-blue-100 px-2 py-0.5 rounded"
+                      >
+                        TAHUN {item.tahun}
+                      </span>
+                      <h4 
+                        className="text-lg font-black text-gray-900 mt-1 mb-2 leading-snug"
+                      >
+                        {item.judul}
+                      </h4>
+                      {/* Peringatan jika belum ada link PDF */}
+                      {(!item.link_pdf && !item.file_url) && (
+                        <p 
+                          className="text-[10px] text-red-600 font-bold mb-2 bg-red-50 p-1 rounded"
+                        >
+                          ⚠️ Link Dokumen PDF belum disematkan.
+                        </p>
+                      )}
+                    </div>
+                    <div 
+                      className="mt-auto flex gap-2 pt-3 border-t border-gray-200"
                     >
-                      Data APBDes tidak ditemukan.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedApbdes.map((item) => (
-                    <tr 
-                      key={item.id} 
-                      className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors"
-                    >
-                      <td 
-                        className="py-3 px-4 text-center align-top"
+                      <button 
+                        onClick={() => bukaModalApbdes(item)} 
+                        className="flex-1 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-300 transition-colors"
                       >
-                        <span 
-                          className="bg-blue-100 text-blue-800 font-black px-3 py-1.5 rounded border border-blue-200"
-                        >
-                          {item.tahun}
-                        </span>
-                      </td>
-                      <td 
-                        className="py-3 px-4 align-top"
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => hapusApbdes(item.id, item.gambar)} 
+                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2 rounded-lg border border-red-200 transition-colors"
                       >
-                        <div 
-                          className="flex items-start gap-4"
-                        >
-                          <div 
-                            className="w-16 h-16 rounded border border-gray-200 bg-gray-100 flex-shrink-0 overflow-hidden"
-                          >
-                            {(item.gambar || item.foto || item.file_url) ? (
-                              <img 
-                                src={getSafeImageUrl(item.gambar || item.foto || item.file_url)} 
-                                className="w-full h-full object-cover" 
-                              />
-                            ) : (
-                              <div 
-                                className="w-full h-full flex items-center justify-center text-xl text-gray-400"
-                              >
-                                📊
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <h4 
-                              className="font-black text-gray-900 text-base mb-1"
-                            >
-                              {item.judul}
-                            </h4>
-                            <p 
-                              className="text-xs text-gray-600 line-clamp-2 leading-relaxed"
-                            >
-                              {item.deskripsi}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td 
-                        className="py-3 px-4 align-top text-center"
-                      >
-                        <div 
-                          className="flex flex-col gap-2 items-center"
-                        >
-                          <button 
-                            onClick={() => bukaModalApbdes(item)} 
-                            className="w-[70px] bg-blue-50 hover:bg-blue-600 hover:text-white border border-blue-200 text-blue-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => hapusApbdes(item.id, item.gambar || item.foto || item.file_url)} 
-                            className="w-[70px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-
-          {/* Kontrol Paginasi APBDes */}
-          {totalPageApbdes > 1 && (
-            <div 
-              className="flex justify-between items-center mt-6 bg-gray-50 p-4 rounded-xl border border-gray-200"
-            >
-              <button 
-                onClick={() => setPageApbdes(prev => Math.max(prev - 1, 1))}
-                disabled={pageApbdes === 1}
-                className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors text-sm"
-              >
-                ◀ Sebelumnya
-              </button>
-              <span 
-                className="font-bold text-gray-600 text-sm"
-              >
-                Halaman {pageApbdes} dari {totalPageApbdes}
-              </span>
-              <button 
-                onClick={() => setPageApbdes(prev => Math.min(prev + 1, totalPageApbdes))}
-                disabled={pageApbdes === totalPageApbdes}
-                className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors text-sm"
-              >
-                Selanjutnya ▶
-              </button>
-            </div>
-          )}
         </div>
       )}
 
       {/* ==========================================
-          TAB 3: MANAJEMEN REGULASI
+          TAB 3: REGULASI & PERDES (transparansi_regulasi)
       ========================================== */}
       {tabAktif === "regulasi" && (
         <div 
@@ -687,203 +613,148 @@ export default function Transparansi({
             <h3 
               className="text-2xl font-bold flex items-center gap-2"
             >
-              <span>⚖️</span> Manajemen Regulasi
+              <span>⚖️</span> Dokumen Regulasi & Perdes
             </h3>
             <button 
               onClick={() => bukaModalRegulasi()} 
               className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 px-5 rounded-xl transition-colors text-sm shadow-sm w-full md:w-auto"
             >
-              + Tambah Regulasi
+              + Upload Regulasi Baru
             </button>
           </div>
 
           <div 
-            className="mb-6 relative"
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            <input 
-              type="text" 
-              placeholder="Cari regulasi berdasarkan judul, kategori, atau tahun..." 
-              value={searchRegulasi}
-              onChange={(e) => { setSearchRegulasi(e.target.value); setPageRegulasi(1); }}
-              className="w-full p-4 pl-12 rounded-xl border border-gray-300 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 shadow-sm text-sm font-bold"
-            />
-            <span 
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400"
-            >
-              🔍
-            </span>
-          </div>
-
-          <div 
-            className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm"
-          >
-            <table 
-              className="min-w-full text-sm text-left bg-white"
-            >
-              <thead 
-                className="bg-gray-50 border-b border-gray-200"
+            {dataRegulasi.length === 0 ? (
+              <div 
+                className="col-span-full text-center py-10 bg-gray-50 rounded-2xl border border-gray-200"
               >
-                <tr>
-                  <th 
-                    className="py-3 px-4 font-bold text-gray-600 w-24 text-center"
+                <p 
+                  className="text-gray-500 font-bold"
+                >
+                  Belum ada dokumen regulasi.
+                </p>
+              </div>
+            ) : (
+              dataRegulasi.map((item) => (
+                <div 
+                  key={item.id} 
+                  className="bg-gray-50 border border-gray-200 rounded-2xl p-5 flex flex-col md:flex-row gap-5 hover:shadow-md transition-all"
+                >
+                  {/* Penampil Thumbnail Regulasi (Jika Ada) */}
+                  <div 
+                    className="w-full md:w-32 h-32 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0"
                   >
-                    Tahun
-                  </th>
-                  <th 
-                    className="py-3 px-4 font-bold text-gray-600"
+                    {(item.foto || item.gambar) ? (
+                      <img 
+                        src={getSafeImageUrl(item.foto || item.gambar)} 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full flex items-center justify-center text-4xl text-gray-400"
+                      >
+                        ⚖️
+                      </div>
+                    )}
+                  </div>
+
+                  <div 
+                    className="flex-1 flex flex-col"
                   >
-                    Detail Dokumen Regulasi
-                  </th>
-                  <th 
-                    className="py-3 px-4 text-center font-bold text-gray-600 w-32"
-                  >
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedRegulasi.length === 0 ? (
-                  <tr>
-                    <td 
-                      colSpan={3} 
-                      className="text-center py-8 font-bold text-gray-400"
-                    >
-                      Data Regulasi tidak ditemukan.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedRegulasi.map((item) => (
-                    <tr 
-                      key={item.id} 
-                      className="border-b border-gray-100 hover:bg-purple-50/30 transition-colors"
-                    >
-                      <td 
-                        className="py-3 px-4 text-center align-top"
+                    <div>
+                      <div 
+                        className="flex items-center gap-2 mb-1"
                       >
                         <span 
-                          className="bg-purple-100 text-purple-800 font-black px-3 py-1.5 rounded border border-purple-200"
+                          className="bg-purple-100 text-purple-800 text-[10px] font-black uppercase px-2 py-0.5 rounded"
                         >
-                          {item.tahun}
+                          {item.kategori || "HUKUM"}
                         </span>
-                      </td>
-                      <td 
-                        className="py-3 px-4 align-top"
-                      >
-                        <h4 
-                          className="font-black text-gray-900 text-base mb-1"
-                        >
-                          {item.judul}
-                        </h4>
                         <span 
-                          className="text-[10px] font-bold uppercase tracking-widest text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 mb-2 inline-block"
+                          className="text-gray-500 text-[10px] font-bold"
                         >
-                          {item.kategori}
+                          TH: {item.tahun}
                         </span>
+                      </div>
+                      <h4 
+                        className="text-lg font-black text-gray-900 leading-snug mb-2 line-clamp-2"
+                      >
+                        {item.judul}
+                      </h4>
+                      {/* Peringatan jika link belum ada */}
+                      {!item.link && (
                         <p 
-                          className="text-xs text-gray-600 line-clamp-2 leading-relaxed"
+                          className="text-[10px] text-red-600 font-bold mb-2 bg-red-50 p-1 rounded"
                         >
-                          {item.deskripsi}
+                          ⚠️ Link Dokumen PDF belum diisi.
                         </p>
-                        {item.link || item.file_url ? (
-                          <a 
-                            href={item.link || item.file_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline mt-2"
-                          >
-                            <span>🔗</span> Buka Dokumen Eksternal
-                          </a>
-                        ) : (
-                          <p 
-                            className="text-[11px] font-bold text-red-500 mt-2"
-                          >
-                            Tautan Dokumen Tidak Tersedia
-                          </p>
-                        )}
-                      </td>
-                      <td 
-                        className="py-3 px-4 align-top text-center"
+                      )}
+                    </div>
+                    <div 
+                      className="mt-auto flex gap-2 pt-3 border-t border-gray-200"
+                    >
+                      <button 
+                        onClick={() => bukaModalRegulasi(item)} 
+                        className="flex-1 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold py-2 rounded-lg border border-gray-300 transition-colors"
                       >
-                        <div 
-                          className="flex flex-col gap-2 items-center"
-                        >
-                          <button 
-                            onClick={() => bukaModalRegulasi(item)} 
-                            className="w-[70px] bg-purple-50 hover:bg-purple-600 hover:text-white border border-purple-200 text-purple-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => hapusRegulasi(item.id)} 
-                            className="w-[70px] bg-red-50 hover:bg-red-600 hover:text-white border border-red-200 text-red-700 text-[11px] font-bold px-2 py-1.5 rounded-lg transition-colors"
-                          >
-                            Hapus
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        Edit
+                      </button>
+                      <button 
+                        onClick={() => hapusRegulasi(item.id, item.foto || item.gambar)} 
+                        className="flex-1 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold py-2 rounded-lg border border-red-200 transition-colors"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-
-          {/* Kontrol Paginasi Regulasi */}
-          {totalPageRegulasi > 1 && (
-            <div 
-              className="flex justify-between items-center mt-6 bg-gray-50 p-4 rounded-xl border border-gray-200"
-            >
-              <button 
-                onClick={() => setPageRegulasi(prev => Math.max(prev - 1, 1))}
-                disabled={pageRegulasi === 1}
-                className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors text-sm"
-              >
-                ◀ Sebelumnya
-              </button>
-              <span 
-                className="font-bold text-gray-600 text-sm"
-              >
-                Halaman {pageRegulasi} dari {totalPageRegulasi}
-              </span>
-              <button 
-                onClick={() => setPageRegulasi(prev => Math.min(prev + 1, totalPageRegulasi))}
-                disabled={pageRegulasi === totalPageRegulasi}
-                className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 disabled:opacity-50 transition-colors text-sm"
-              >
-                Selanjutnya ▶
-              </button>
-            </div>
-          )}
         </div>
       )}
 
       {/* ==========================================
-          MODAL APBDES
+          MODAL APBDES (LEGA & LUAS)
       ========================================== */}
       {isModalApbdesOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+          className="fixed inset-0 z-50 flex justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
         >
+          {/* PERBAIKAN: MAX-W-4XL AGAR LEGA */}
           <div 
-            className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 my-8 border-t-8 border-blue-600"
+            className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl p-6 sm:p-10 my-12 border-t-8 border-blue-600 h-fit"
           >
-            <h3 
-              className="text-2xl font-black mb-6 text-gray-900"
+            <div 
+              className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4"
             >
-              {editIdApbdes ? "Edit Info Grafis APBDes" : "Tambah Info Grafis APBDes"}
-            </h3>
+              <h3 
+                className="text-3xl font-black text-gray-900"
+              >
+                {editIdApbdes ? "Edit Laporan APBDes" : "Buat Laporan APBDes Baru"}
+              </h3>
+              <button 
+                onClick={() => setIsModalApbdesOpen(false)} 
+                className="text-gray-400 hover:text-red-500 font-black text-2xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+
             <form 
               onSubmit={simpanApbdes} 
-              className="space-y-5"
+              className="space-y-6"
             >
               <div 
-                className="grid grid-cols-1 md:grid-cols-2 gap-5"
+                className="grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-6"
               >
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Judul Laporan
+                    Judul Laporan / Informasi APBDes
                   </label>
                   <input 
                     type="text" 
@@ -891,6 +762,7 @@ export default function Transparansi({
                     value={formApbdes.judul} 
                     onChange={(e) => setFormApbdes({...formApbdes, judul: e.target.value})} 
                     className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg" 
+                    placeholder="Cth: Realisasi APBDes Desa Kerjo Tahun 2024"
                   />
                 </div>
                 <div>
@@ -903,62 +775,110 @@ export default function Transparansi({
                     type="number" 
                     required 
                     value={formApbdes.tahun} 
-                    onChange={(e) => setFormApbdes({...formApbdes, tahun: e.target.value})} 
-                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg text-center" 
+                    onChange={(e) => setFormApbdes({...formApbdes, tahun: Number(e.target.value)})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 font-black text-lg text-center" 
                   />
                 </div>
               </div>
-              
+
+              {/* FITUR BARU: INPUT LINK DOKUMEN PDF APBDES */}
+              <div 
+                className="bg-blue-50 p-6 rounded-2xl border border-blue-100"
+              >
+                <label 
+                  className="block text-sm font-black mb-2 text-blue-900 flex items-center gap-2"
+                >
+                  <span className="text-xl">📄</span> Link Tautan Dokumen PDF (Opsional)
+                </label>
+                <input 
+                  type="url" 
+                  value={formApbdes.link_pdf} 
+                  onChange={(e) => setFormApbdes({...formApbdes, link_pdf: e.target.value})} 
+                  className="w-full p-4 rounded-xl border border-blue-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm text-blue-700" 
+                  placeholder="https://drive.google.com/file/d/..."
+                />
+                <p 
+                  className="text-[10px] text-blue-600 mt-2 font-bold"
+                >
+                  *Sematkan link Google Drive / Link PDF disini. Warga akan bisa menekan tombol "Lihat Dokumen PDF" di halaman baca selengkapnya.
+                </p>
+              </div>
+
               <div>
                 <label 
                   className="block text-sm font-bold mb-2 text-gray-700"
                 >
-                  Deskripsi / Keterangan Singkat
+                  Penjelasan Singkat / Rincian
                 </label>
                 <textarea 
                   required 
-                  rows={4} 
+                  rows={6} 
                   value={formApbdes.deskripsi} 
                   onChange={(e) => setFormApbdes({...formApbdes, deskripsi: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed whitespace-pre-wrap text-sm"
                 ></textarea>
               </div>
 
-              <div>
+              <div 
+                className="bg-gray-50 p-6 rounded-2xl border border-gray-200"
+              >
                 <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
+                  className="block text-sm font-bold mb-3 text-gray-700"
                 >
-                  Upload Gambar Info Grafis APBDes
+                  Gambar Grafik / Infografis APBDes
                 </label>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={(e) => setGambarApbdes(e.target.files)} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50" 
-                />
-                {gambarApbdesLama && (
-                  <p 
-                    className="text-xs text-blue-600 mt-2 font-bold"
+                {formApbdes.gambar && (
+                  <div 
+                    className="relative w-48 h-32 rounded-xl overflow-hidden border-2 border-gray-300 mb-4 group shadow-sm"
                   >
-                    ✅ Gambar Info Grafis sudah terpasang. Biarkan kosong jika tidak ingin mengubahnya.
-                  </p>
+                    <img 
+                      src={getSafeImageUrl(formApbdes.gambar)} 
+                      className="w-full h-full object-cover" 
+                    />
+                    {/* TOMBOL X HAPUS THUMBNAIL (RESPONSIF) */}
+                    <button 
+                      type="button" 
+                      onClick={() => { hapusFotoDiCloudinary(formApbdes.gambar); setFormApbdes(prev => ({...prev, gambar: ""})); }}
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                    >
+                      <span className="bg-red-600 px-4 py-2 rounded-full shadow-lg">❌ Hapus Gambar</span>
+                    </button>
+                  </div>
                 )}
+                <div 
+                  className="flex items-center gap-4"
+                >
+                  <label 
+                    className={`cursor-pointer bg-white border border-gray-300 hover:bg-blue-50 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 transition-colors shadow-sm flex items-center gap-2 ${
+                      isUploading ? "opacity-50 pointer-events-none" : ""
+                    }`}
+                  >
+                    <span className="text-xl">📸</span>
+                    <span>{isUploading ? "Mengunggah..." : "Pilih Gambar Infografis"}</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleUploadFotoApbdes} 
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
               </div>
 
               <div 
-                className="flex gap-4 pt-4 border-t border-gray-100"
+                className="flex gap-4 pt-6 border-t border-gray-100 mt-8"
               >
                 <button 
                   type="button" 
                   onClick={() => setIsModalApbdesOpen(false)} 
-                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl text-gray-700 text-lg transition-colors"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isLoading} 
-                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                  disabled={isLoading || isUploading} 
+                  className="flex-1 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-colors text-lg"
                 >
                   {isLoading ? "Menyimpan..." : "Simpan APBDes"}
                 </button>
@@ -969,124 +889,193 @@ export default function Transparansi({
       )}
 
       {/* ==========================================
-          MODAL REGULASI
+          MODAL REGULASI & PERDES (LEGA & LUAS)
       ========================================== */}
       {isModalRegulasiOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+          className="fixed inset-0 z-50 flex justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
         >
+          {/* PERBAIKAN: MAX-W-4XL AGAR LEGA */}
           <div 
-            className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-6 md:p-8 my-8 border-t-8 border-purple-600"
+            className="bg-white rounded-3xl w-full max-w-4xl shadow-2xl p-6 sm:p-10 my-12 border-t-8 border-purple-600 h-fit"
           >
-            <h3 
-              className="text-2xl font-black mb-6 text-gray-900"
+            <div 
+              className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4"
             >
-              {editIdRegulasi ? "Edit Regulasi" : "Tambah Dokumen Regulasi Baru"}
-            </h3>
+              <h3 
+                className="text-3xl font-black text-gray-900"
+              >
+                {editIdRegulasi ? "Edit Regulasi Desa" : "Buat Regulasi Baru"}
+              </h3>
+              <button 
+                onClick={() => setIsModalRegulasiOpen(false)} 
+                className="text-gray-400 hover:text-red-500 font-black text-2xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+
             <form 
               onSubmit={simpanRegulasi} 
-              className="space-y-5"
+              className="space-y-6"
             >
-              <div>
-                <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
-                >
-                  Judul / Nomor Regulasi
-                </label>
-                <input 
-                  type="text" 
-                  required 
-                  value={formRegulasi.judul} 
-                  onChange={(e) => setFormRegulasi({...formRegulasi, judul: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-bold text-lg" 
-                  placeholder="Cth: Perdes No. 04 Tahun 2026..."
-                />
-              </div>
-
               <div 
-                className="grid grid-cols-1 md:grid-cols-2 gap-5"
+                className="grid grid-cols-1 md:grid-cols-2 gap-6"
               >
+                <div 
+                  className="md:col-span-2"
+                >
+                  <label 
+                    className="block text-sm font-bold mb-2 text-gray-700"
+                  >
+                    Judul Dokumen / Perdes
+                  </label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={formRegulasi.judul} 
+                    onChange={(e) => setFormRegulasi({...formRegulasi, judul: e.target.value})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-bold text-lg" 
+                    placeholder="Cth: Peraturan Desa No 02 Tahun 2024"
+                  />
+                </div>
+                
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Kategori Dokumen (Input Manual)
+                    Kategori Regulasi
                   </label>
                   <input 
                     type="text" 
                     required 
                     value={formRegulasi.kategori} 
                     onChange={(e) => setFormRegulasi({...formRegulasi, kategori: e.target.value})} 
-                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 uppercase font-bold" 
-                    placeholder="Cth: PERDES, SK KADES, LAPORAN..."
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-bold uppercase text-sm" 
+                    placeholder="Cth: SK Kades, Perdes, dsb"
                   />
                 </div>
                 <div>
                   <label 
                     className="block text-sm font-bold mb-2 text-gray-700"
                   >
-                    Tahun Terbit
+                    Tahun Pengesahan
                   </label>
                   <input 
                     type="number" 
                     required 
                     value={formRegulasi.tahun} 
-                    onChange={(e) => setFormRegulasi({...formRegulasi, tahun: e.target.value})} 
-                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-bold text-center" 
+                    onChange={(e) => setFormRegulasi({...formRegulasi, tahun: Number(e.target.value)})} 
+                    className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-black text-center text-sm" 
                   />
                 </div>
               </div>
-              
-              <div>
-                <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
-                >
-                  Deskripsi Singkat / Tentang
-                </label>
-                <textarea 
-                  required 
-                  rows={3} 
-                  value={formRegulasi.deskripsi} 
-                  onChange={(e) => setFormRegulasi({...formRegulasi, deskripsi: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed"
-                ></textarea>
-              </div>
 
-              <div>
+              {/* INPUT DOKUMEN PDF (Regulasi) */}
+              <div 
+                className="bg-purple-50 p-6 rounded-2xl border border-purple-100"
+              >
                 <label 
-                  className="block text-sm font-bold mb-2 text-gray-700"
+                  className="block text-sm font-black mb-2 text-purple-900 flex items-center gap-2"
                 >
-                  Link Dokumen Eksternal (Google Drive / PDF Link)
+                  <span className="text-xl">📄</span> Link Tautan Dokumen PDF (Penting)
                 </label>
                 <input 
                   type="url" 
                   required 
                   value={formRegulasi.link} 
                   onChange={(e) => setFormRegulasi({...formRegulasi, link: e.target.value})} 
-                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm text-blue-600" 
+                  className="w-full p-4 rounded-xl border border-purple-200 bg-white outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm text-purple-700" 
                   placeholder="https://drive.google.com/file/d/..."
                 />
                 <p 
-                  className="text-[10px] text-gray-500 mt-1 font-bold"
+                  className="text-[10px] text-purple-600 mt-2 font-bold"
                 >
-                  *Pastikan akses link Google Drive telah diatur menjadi "Siapa saja yang memiliki link (Viewer)".
+                  *Masukkan link dokumen (Misal link dari Google Drive). Akan tampil sebagai tombol "Lihat Dokumen PDF".
                 </p>
               </div>
 
+              <div>
+                <label 
+                  className="block text-sm font-bold mb-2 text-gray-700"
+                >
+                  Deskripsi / Isi Singkat Dokumen
+                </label>
+                <textarea 
+                  required 
+                  rows={6} 
+                  value={formRegulasi.deskripsi} 
+                  onChange={(e) => setFormRegulasi({...formRegulasi, deskripsi: e.target.value})} 
+                  className="w-full p-4 rounded-xl border border-gray-300 bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-purple-500 leading-relaxed whitespace-pre-wrap text-sm"
+                ></textarea>
+              </div>
+
+              {/* FITUR BARU: INPUT GAMBAR THUMBNAIL UNTUK REGULASI */}
               <div 
-                className="flex gap-4 pt-4 border-t border-gray-100"
+                className="bg-gray-50 p-6 rounded-2xl border border-gray-200"
+              >
+                <label 
+                  className="block text-sm font-bold mb-3 text-gray-700"
+                >
+                  Gambar Sampul / Thumbnail Dokumen (Opsional)
+                </label>
+                {formRegulasi.foto && (
+                  <div 
+                    className="relative w-48 h-32 rounded-xl overflow-hidden border-2 border-gray-300 mb-4 group shadow-sm"
+                  >
+                    <img 
+                      src={getSafeImageUrl(formRegulasi.foto)} 
+                      className="w-full h-full object-cover" 
+                    />
+                    {/* TOMBOL X HAPUS THUMBNAIL (RESPONSIF) */}
+                    <button 
+                      type="button" 
+                      onClick={() => { hapusFotoDiCloudinary(formRegulasi.foto); setFormRegulasi(prev => ({...prev, foto: ""})); }}
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold"
+                    >
+                      <span className="bg-red-600 px-4 py-2 rounded-full shadow-lg">❌ Hapus Gambar</span>
+                    </button>
+                  </div>
+                )}
+                <div 
+                  className="flex items-center gap-4"
+                >
+                  <label 
+                    className={`cursor-pointer bg-white border border-gray-300 hover:bg-purple-50 px-6 py-3 rounded-xl text-sm font-bold text-gray-700 transition-colors shadow-sm flex items-center gap-2 ${
+                      isUploading ? "opacity-50 pointer-events-none" : ""
+                    }`}
+                  >
+                    <span className="text-xl">📸</span>
+                    <span>{isUploading ? "Mengunggah..." : "Pilih Gambar Sampul"}</span>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleUploadFotoRegulasi} 
+                      className="hidden" 
+                    />
+                  </label>
+                  <p 
+                    className="text-[10px] text-gray-500 font-bold"
+                  >
+                    *Memberikan gambar sampul akan membuat tampilan Regulasi lebih menarik dan setara dengan APBDes.
+                  </p>
+                </div>
+              </div>
+
+              <div 
+                className="flex gap-4 pt-6 border-t border-gray-100 mt-8"
               >
                 <button 
                   type="button" 
                   onClick={() => setIsModalRegulasiOpen(false)} 
-                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                  className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 font-bold rounded-xl text-gray-700 text-lg transition-colors"
                 >
                   Batal
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isLoading} 
-                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-md transition-colors"
+                  disabled={isLoading || isUploading} 
+                  className="flex-1 py-4 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-md transition-colors text-lg"
                 >
                   {isLoading ? "Menyimpan..." : "Simpan Regulasi"}
                 </button>

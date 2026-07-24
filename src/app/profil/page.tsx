@@ -20,6 +20,249 @@ import {
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
+// ==========================================
+// FUNGSI KONVERSI HEIC
+// ==========================================
+const getSafeImageUrl = (url: string) => {
+  if (!url) return "";
+  let safeUrl = url;
+  if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
+    safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
+  }
+  if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
+    return safeUrl;
+  }
+  return `https://wsrv.nl/?url=${safeUrl}`;
+};
+
+// ==========================================
+// KOMPONEN: KARTU UMKM DENGAN SLIDER & JADWAL REAL-TIME
+// ==========================================
+function UmkmCard({ item }: { item: any }) {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+
+  // Mengambil Array Gambar
+  let images: string[] = [];
+  if (Array.isArray(item.gambar) && item.gambar.length > 0) {
+    images = item.gambar;
+  } else if (typeof item.foto === "string" && item.foto !== "") {
+    images = [item.foto];
+  }
+
+  // Logika Hari dan Jam Operasional Real-Time
+  const hariList = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  const dateNow = new Date();
+  const indexHariIni = dateNow.getDay();
+  const namaHariIni = hariList[indexHariIni];
+
+  // Menyusun Array Hari Dimulai dari Hari Ini
+  const orderedHari = [];
+  for (let i = 0; i < 7; i++) {
+    orderedHari.push(hariList[(indexHariIni + i) % 7]);
+  }
+
+  // Menentukan Status Buka/Tutup
+  let isOpen = false;
+  const jamOp = item.jam_operasional || {};
+  const infoHariIni = jamOp[namaHariIni];
+
+  if (infoHariIni && !infoHariIni.libur) {
+    const currentMinutes = dateNow.getHours() * 60 + dateNow.getMinutes();
+    const bukaParts = infoHariIni.buka?.split(":") || ["00", "00"];
+    const tutupParts = infoHariIni.tutup?.split(":") || ["00", "00"];
+    
+    const bukaMinutes = parseInt(bukaParts[0]) * 60 + parseInt(bukaParts[1]);
+    const tutupMinutes = parseInt(tutupParts[0]) * 60 + parseInt(tutupParts[1]);
+
+    if (currentMinutes >= bukaMinutes && currentMinutes <= tutupMinutes) {
+      isOpen = true;
+    }
+  }
+
+  return (
+    <div 
+      className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-2xl transition-all hover:-translate-y-2 flex flex-col"
+    >
+      {/* AREA SLIDER FOTO UMKM */}
+      <div 
+        className="h-56 md:h-64 relative overflow-hidden bg-gray-100"
+      >
+        {images.length > 0 ? (
+          <>
+            <img 
+              src={getSafeImageUrl(images[currentSlide])} 
+              alt={item.nama_produk} 
+              className="w-full h-full object-cover transition-transform duration-700"
+            />
+            {/* Indikator Slide */}
+            {images.length > 1 && (
+              <div 
+                className="absolute bottom-3 left-0 w-full flex justify-center gap-1.5 z-20"
+              >
+                {images.map((_, idx) => (
+                  <div 
+                    key={idx}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      idx === currentSlide ? "w-5 bg-blue-500" : "w-1.5 bg-white/60"
+                    }`}
+                  ></div>
+                ))}
+              </div>
+            )}
+            {/* Tombol Navigasi Slide (Hover di Laptop, Selalu di HP) */}
+            {images.length > 1 && (
+              <div 
+                className="absolute inset-0 flex items-center justify-between px-2 z-10 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              >
+                <button 
+                  onClick={(e) => { e.preventDefault(); setCurrentSlide(currentSlide === 0 ? images.length - 1 : currentSlide - 1); }}
+                  className="w-8 h-8 bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                >
+                  ◀
+                </button>
+                <button 
+                  onClick={(e) => { e.preventDefault(); setCurrentSlide((currentSlide + 1) % images.length); }}
+                  className="w-8 h-8 bg-black/40 hover:bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                >
+                  ▶
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div 
+            className="w-full h-full flex items-center justify-center text-5xl text-gray-300"
+          >
+            🏪
+          </div>
+        )}
+
+        {/* Badge Status Buka/Tutup Real Time */}
+        <div 
+          className="absolute top-4 right-4 flex flex-col gap-2 items-end z-20"
+        >
+          <div 
+            className="bg-white/95 backdrop-blur-sm text-blue-700 font-black px-3 py-1 rounded-lg text-[10px] md:text-xs shadow-sm border border-white uppercase tracking-widest"
+          >
+            {item.kategori || "UMKM"}
+          </div>
+          <div 
+            className={`font-black px-3 py-1 rounded-lg text-[10px] md:text-xs shadow-sm border uppercase tracking-widest flex items-center gap-1.5 ${
+              isOpen ? "bg-green-500/90 text-white border-green-400" : "bg-red-500/90 text-white border-red-400"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${isOpen ? "bg-green-200 animate-pulse" : "bg-red-200"}`}></span>
+            {isOpen ? "Sedang Buka" : "Tutup"}
+          </div>
+        </div>
+      </div>
+      
+      {/* AREA DESKRIPSI & INFO UMKM */}
+      <div 
+        className="p-6 flex-1 flex flex-col"
+      >
+        <h3 
+          className="text-2xl font-black text-gray-900 mb-1 leading-tight"
+        >
+          {item.nama_produk}
+        </h3>
+        <p 
+          className="text-blue-600 font-bold text-sm mb-3"
+        >
+          Pemilik: {item.pemilik}
+        </p>
+        
+        {item.harga_mulai > 0 && (
+          <div 
+            className="bg-green-50 text-green-800 font-black text-sm px-3 py-2 rounded-xl border border-green-200 inline-block mb-4 shadow-sm"
+          >
+            Rp {item.harga_mulai.toLocaleString('id-ID')} {item.harga_sampai > 0 && `- Rp ${item.harga_sampai.toLocaleString('id-ID')}`}
+          </div>
+        )}
+
+        <p 
+          className="text-gray-600 text-sm leading-relaxed mb-6 flex-1 whitespace-pre-wrap"
+        >
+          {item.deskripsi}
+        </p>
+        
+        {/* JADWAL OPERASIONAL (DROPDOWN) */}
+        <div 
+          className="mb-6 bg-gray-50 rounded-xl border border-gray-100 overflow-hidden"
+        >
+          <button 
+            onClick={() => setIsScheduleOpen(!isScheduleOpen)}
+            className="w-full px-4 py-3 flex items-center justify-between text-xs font-bold text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <span>🕒</span> 
+              Jam Operasional (Hari Ini: {isOpen ? "Buka" : "Tutup"})
+            </span>
+            <span className={`transform transition-transform ${isScheduleOpen ? "rotate-180" : ""}`}>
+              ▼
+            </span>
+          </button>
+          
+          {isScheduleOpen && (
+            <div 
+              className="p-4 border-t border-gray-100 space-y-2 bg-white"
+            >
+              {orderedHari.map((hari) => {
+                const jadwal = jamOp[hari];
+                if (!jadwal) return null;
+                const isToday = hari === namaHariIni;
+                
+                return (
+                  <div 
+                    key={hari} 
+                    className={`flex justify-between items-center py-1.5 text-xs ${isToday ? "font-black text-blue-700" : "font-medium text-gray-600"}`}
+                  >
+                    <span>{hari} {isToday && "(Hari Ini)"}</span>
+                    <span 
+                      className={jadwal.libur ? "text-red-500 font-bold" : "text-gray-800"}
+                    >
+                      {jadwal.libur ? "Tutup / Libur" : `${jadwal.buka} - ${jadwal.tutup} WIB`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* TOMBOL AKSI (WA & MAPS) */}
+        <div 
+          className="space-y-3 mt-auto"
+        >
+          {item.link_maps && (
+            <a 
+              href={item.link_maps} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold py-3 rounded-xl transition-colors text-sm border border-gray-200"
+            >
+              <span className="text-red-500">📍</span> Buka Lokasi di Google Maps
+            </a>
+          )}
+
+          {item.wa && (
+            <a 
+              href={`https://wa.me/${item.wa}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-black py-3.5 rounded-xl transition-all shadow-md text-sm border border-green-400"
+            >
+              <span>💬</span> Pesan Sekarang (WhatsApp)
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function ProfilContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -80,7 +323,7 @@ function ProfilContent() {
           });
         }
 
-        // 2. Fetch Teks Sejarah & Visi Misi (DATABASE: profil_desa -> utama)
+        // 2. Fetch Teks Sejarah & Visi Misi
         const snapTeks = await getDoc(doc(db, "profil_desa", "utama"));
         if (snapTeks.exists() && snapTeks.data()) {
           setTeksProfil({
@@ -89,24 +332,23 @@ function ProfilContent() {
           });
         }
 
-        // 3. Fetch SOTK (DATABASE: aparatur_desa)
+        // 3. Fetch SOTK 
         const snapAparatur = await getDocs(collection(db, "aparatur_desa"));
         const aparaturList = snapAparatur.docs.map(doc => ({ 
           id: doc.id, 
           ...(doc.data() as any) 
         }));
-        // Urutkan berdasarkan urutan
         aparaturList.sort((a, b) => (a.urutan || 0) - (b.urutan || 0));
         setDataAparatur(aparaturList);
 
-        // 4. Fetch Lembaga (DATABASE: lembaga_desa)
+        // 4. Fetch Lembaga 
         const snapLembaga = await getDocs(collection(db, "lembaga_desa"));
         setDataLembaga(snapLembaga.docs.map(doc => ({ 
           id: doc.id, 
           ...(doc.data() as any) 
         })));
 
-        // 5. Fetch UMKM / Potensi (DATABASE: potensi_desa)
+        // 5. Fetch UMKM / Potensi 
         const snapPotensi = await getDocs(collection(db, "potensi_desa"));
         setDataPotensi(snapPotensi.docs.map(doc => ({ 
           id: doc.id, 
@@ -123,19 +365,6 @@ function ProfilContent() {
     fetchProfilData();
   }, []);
 
-  const getSafeImageUrl = (url: string) => {
-    if (!url) return "";
-    let safeUrl = url;
-    if (safeUrl.includes("cloudinary.com") && safeUrl.toLowerCase().endsWith(".heic")) {
-      safeUrl = safeUrl.replace(/\.heic$/i, ".jpg");
-    }
-    if (safeUrl.includes("cloudinary.com") || safeUrl.startsWith("http")) {
-      return safeUrl;
-    }
-    return `https://wsrv.nl/?url=${safeUrl}`;
-  };
-
-  // Filter UMKM berdasarkan Search Bar
   const filteredPotensi = dataPotensi.filter((item) => 
     item.nama_produk?.toLowerCase().includes(searchUmkm.toLowerCase()) || 
     item.kategori?.toLowerCase().includes(searchUmkm.toLowerCase()) ||
@@ -143,16 +372,16 @@ function ProfilContent() {
   );
 
   // ==========================================
-  // RENDERER STRUKTUR ORGANISASI SOTK
+  // RENDERER STRUKTUR ORGANISASI (Bisa Dipakai SOTK & Anggota Lembaga)
   // ==========================================
-  const renderStrukturSOTK = (parentId: string | null = "") => {
+  const renderStruktur = (dataList: any[], parentId: string | null = "") => {
     // Ambil child yang jalurAtas-nya sama dengan parentId
-    const children = dataAparatur.filter(item => (item.jalurAtas || "") === parentId);
+    const children = dataList.filter(item => (item.jalurAtas || "") === parentId);
     if (children.length === 0) return null;
 
     return (
       <div 
-        className="flex flex-wrap justify-center gap-6 relative mt-8"
+        className="flex flex-wrap justify-center gap-6 md:gap-10 relative mt-8"
       >
         {children.map((child) => (
           <div 
@@ -170,12 +399,12 @@ function ProfilContent() {
               ></div>
             )}
 
-            {/* Kartu Aparatur */}
+            {/* Kartu Profil Struktur */}
             <div 
-              className="bg-white rounded-3xl shadow-md border border-gray-100 p-5 w-56 text-center z-10 hover:-translate-y-1 transition-transform relative group"
+              className="bg-white rounded-3xl shadow-md border border-gray-100 p-5 w-48 md:w-56 text-center z-10 hover:-translate-y-1 transition-transform relative group"
             >
               <div 
-                className="w-24 h-24 mx-auto rounded-full overflow-hidden border-4 border-blue-50 bg-gray-100 mb-3 shadow-inner"
+                className="w-20 h-20 md:w-24 md:h-24 mx-auto rounded-full overflow-hidden border-4 border-blue-50 bg-gray-100 mb-3 shadow-inner"
               >
                 {child.foto ? (
                   <img 
@@ -192,12 +421,12 @@ function ProfilContent() {
                 )}
               </div>
               <h3 
-                className="text-sm font-black text-gray-900 mb-1 leading-tight"
+                className="text-sm md:text-base font-black text-gray-900 mb-1 leading-tight"
               >
                 {child.nama}
               </h3>
               <div 
-                className="text-[10px] font-bold uppercase tracking-widest text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 inline-block"
+                className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100 inline-block"
               >
                 {child.jabatan}
               </div>
@@ -211,14 +440,14 @@ function ProfilContent() {
             </div>
 
             {/* Garis Vertikal ke Bawah (Jika Punya Anak) */}
-            {dataAparatur.some(d => d.jalurAtas === child.id) && (
+            {dataList.some(d => (d.jalurAtas || "") === child.id) && (
               <div 
                 className="w-[2px] h-8 bg-blue-600"
               ></div>
             )}
 
             {/* Render Rekursif Anak-anaknya */}
-            {renderStrukturSOTK(child.id)}
+            {renderStruktur(dataList, child.id)}
           </div>
         ))}
       </div>
@@ -263,9 +492,6 @@ function ProfilContent() {
               src={getSafeImageUrl(heroData.bg)} 
               alt="Profil Background" 
               className="w-full h-full object-cover opacity-30 mix-blend-overlay"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
             />
           )}
           <div 
@@ -469,24 +695,24 @@ function ProfilContent() {
                   </div>
                 </div>
 
-                {/* Render Root (Yang tidak punya jalurAtas) */}
-                {renderStrukturSOTK("")}
+                {/* Render Root SOTK (Yang tidak punya jalurAtas) */}
+                {renderStruktur(dataAparatur, "")}
               </div>
             )}
           </div>
         )}
 
         {/* ==========================================
-            TAB 3: LEMBAGA KEMASYARAKATAN (MASTER-DETAIL)
+            TAB 3: LEMBAGA KEMASYARAKATAN
         ========================================== */}
         {activeTab === "lembaga" && (
           <div 
             className="animate-fade-in"
           >
             {selectedLembaga ? (
-              // TAMPILAN DETAIL ANGGOTA LEMBAGA
+              // TAMPILAN DETAIL ANGGOTA LEMBAGA (DENGAN STRUKTUR SOTK)
               <div 
-                className="animate-fade-in"
+                className="animate-fade-in overflow-x-auto pb-10"
               >
                 <button 
                   onClick={() => setSelectedLembaga(null)}
@@ -496,7 +722,7 @@ function ProfilContent() {
                 </button>
 
                 <div 
-                  className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-8 text-center"
+                  className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 mb-8 text-center sticky left-0"
                 >
                   <h2 
                     className="text-3xl font-black text-gray-900 mb-2"
@@ -504,88 +730,73 @@ function ProfilContent() {
                     {selectedLembaga.nama || selectedLembaga.nama_lembaga || "Lembaga Desa"}
                   </h2>
                   <p 
-                    className="text-gray-500 max-w-2xl mx-auto"
+                    className="text-gray-500 max-w-2xl mx-auto leading-relaxed"
                   >
                     {selectedLembaga.deskripsi}
                   </p>
                 </div>
 
-                <div 
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
-                >
-                  {selectedLembaga.anggota_sotk && selectedLembaga.anggota_sotk.length > 0 ? (
-                    selectedLembaga.anggota_sotk.map((anggota: any, idx: number) => (
-                      <div 
-                        key={idx} 
-                        className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center hover:shadow-md transition-shadow"
-                      >
-                        <div 
-                          className="w-20 h-20 mx-auto rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 mb-3"
-                        >
-                          {anggota.foto ? (
-                            <img 
-                              src={getSafeImageUrl(anggota.foto)} 
-                              alt={anggota.nama} 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div 
-                              className="w-full h-full flex items-center justify-center text-3xl text-gray-400"
-                            >
-                              👤
-                            </div>
-                          )}
-                        </div>
-                        <h4 
-                          className="font-bold text-gray-900 mb-1"
-                        >
-                          {anggota.nama}
-                        </h4>
-                        <span 
-                          className="text-xs font-black uppercase tracking-widest text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100"
-                        >
-                          {anggota.jabatan}
-                        </span>
-                      </div>
-                    ))
-                  ) : selectedLembaga.anggota && selectedLembaga.anggota.length > 0 ? (
-                    selectedLembaga.anggota.map((anggota: any, idx: number) => (
-                      <div 
-                        key={idx} 
-                        className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 text-center hover:shadow-md transition-shadow"
-                      >
-                        <div 
-                          className="w-20 h-20 mx-auto rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 mb-3"
-                        >
+                {/* Cek apakah ada anggota di lembaga ini */}
+                {(!selectedLembaga.anggota_sotk && !selectedLembaga.anggota) || 
+                 (selectedLembaga.anggota_sotk || selectedLembaga.anggota).length === 0 ? (
+                  <div 
+                    className="col-span-full text-center py-10 text-gray-500 font-bold sticky left-0 bg-white rounded-3xl border border-gray-100"
+                  >
+                    Belum ada data anggota struktural untuk lembaga ini.
+                  </div>
+                ) : (
+                  <div 
+                    className="min-w-[800px] flex flex-col items-center pt-4"
+                  >
+                    {/* Render Struktur Anggota Lembaga berdasarkan jalurAtas */}
+                    {/* Jika tidak ada anggota yg jalurAtas-nya kosong (legacy data), kita buatkan root buatan atau render flat */}
+                    {(() => {
+                      const dataAnggota = selectedLembaga.anggota_sotk || selectedLembaga.anggota || [];
+                      const hasRoot = dataAnggota.some((a: any) => (a.jalurAtas || "") === "");
+                      
+                      if (hasRoot) {
+                        return renderStruktur(dataAnggota, "");
+                      } else {
+                        // Fallback jika data lama (flat, tidak ada hirarki)
+                        return (
                           <div 
-                            className="w-full h-full flex items-center justify-center text-3xl text-gray-400"
+                            className="flex flex-wrap justify-center gap-6"
                           >
-                            👤
+                            {dataAnggota.map((ang: any, idx: number) => (
+                              <div 
+                                key={idx} 
+                                className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 text-center w-48"
+                              >
+                                <div 
+                                  className="w-20 h-20 mx-auto rounded-full overflow-hidden border-4 border-blue-50 bg-gray-100 mb-3"
+                                >
+                                  {ang.foto ? (
+                                    <img src={getSafeImageUrl(ang.foto)} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-3xl text-gray-400">👤</div>
+                                  )}
+                                </div>
+                                <h4 
+                                  className="font-bold text-gray-900 mb-1"
+                                >
+                                  {ang.nama}
+                                </h4>
+                                <span 
+                                  className="text-[10px] font-black uppercase tracking-widest text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100"
+                                >
+                                  {ang.jabatan}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                        <h4 
-                          className="font-bold text-gray-900 mb-1"
-                        >
-                          {anggota.nama}
-                        </h4>
-                        <span 
-                          className="text-xs font-black uppercase tracking-widest text-green-700 bg-green-50 px-2 py-1 rounded border border-green-100"
-                        >
-                          {anggota.jabatan}
-                        </span>
-                      </div>
-                    ))
-                  ) : (
-                    <div 
-                      className="col-span-full text-center py-10 text-gray-500 font-bold"
-                    >
-                      Belum ada data anggota untuk lembaga ini.
-                    </div>
-                  )}
-                </div>
+                        );
+                      }
+                    })()}
+                  </div>
+                )}
               </div>
             ) : (
-              // TAMPILAN DAFTAR LEMBAGA
+              // TAMPILAN DAFTAR LEMBAGA UTAMA
               <div 
                 className="animate-fade-in"
               >
@@ -639,7 +850,7 @@ function ProfilContent() {
         )}
 
         {/* ==========================================
-            TAB 4: KATALOG UMKM & POTENSI (DENGAN SEARCH)
+            TAB 4: KATALOG UMKM & POTENSI 
         ========================================== */}
         {activeTab === "umkm" && (
           <div 
@@ -662,7 +873,6 @@ function ProfilContent() {
               </div>
             ) : (
               <>
-                {/* Fitur Search Bar */}
                 <div 
                   className="mb-8 max-w-2xl mx-auto relative"
                 >
@@ -690,128 +900,12 @@ function ProfilContent() {
                   <div 
                     className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
                   >
-                    {filteredPotensi.map((item) => {
-                      
-                      // Mengambil gambar pertama jika array, atau string biasa
-                      let imageUrl = "";
-                      if (Array.isArray(item.gambar) && item.gambar.length > 0) {
-                        imageUrl = item.gambar[0];
-                      } else if (typeof item.foto === "string" && item.foto !== "") {
-                        imageUrl = item.foto;
-                      }
-
-                      // Render Jam Operasional (Map Database Baru)
-                      const renderJamOperasional = () => {
-                        if (typeof item.jam_operasional === 'object' && item.jam_operasional !== null) {
-                          const hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-                          return (
-                            <div 
-                              className="text-[10px] text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-100 mt-2 font-mono"
-                            >
-                              <div className="font-bold border-b border-gray-200 pb-1 mb-1 text-gray-800">Jadwal Buka:</div>
-                              {hariList.map(hari => {
-                                const jadwal = item.jam_operasional[hari];
-                                if (!jadwal) return null;
-                                return (
-                                  <div key={hari} className="flex justify-between py-0.5">
-                                    <span>{hari}:</span>
-                                    <span className="font-bold">{jadwal.libur ? "TUTUP" : `${jadwal.buka} - ${jadwal.tutup}`}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        }
-                        return null;
-                      };
-
-                      return (
-                        <div 
-                          key={item.id} 
-                          className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden group hover:shadow-xl transition-all hover:-translate-y-1 flex flex-col"
-                        >
-                          <div 
-                            className="h-56 relative overflow-hidden bg-gray-100"
-                          >
-                            {imageUrl ? (
-                              <img 
-                                src={getSafeImageUrl(imageUrl)} 
-                                alt={item.nama_produk} 
-                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                              />
-                            ) : (
-                              <div 
-                                className="w-full h-full flex items-center justify-center text-5xl text-gray-300"
-                              >
-                                🏪
-                              </div>
-                            )}
-                            <div 
-                              className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm text-blue-700 font-black px-3 py-1 rounded-lg text-xs shadow-sm border border-white uppercase tracking-widest"
-                            >
-                              {item.kategori || "UMKM"}
-                            </div>
-                          </div>
-                          
-                          <div 
-                            className="p-6 flex-1 flex flex-col"
-                          >
-                            <h3 
-                              className="text-2xl font-black text-gray-900 mb-1 leading-tight"
-                            >
-                              {item.nama_produk}
-                            </h3>
-                            <p 
-                              className="text-blue-600 font-bold text-sm mb-3"
-                            >
-                              Pemilik: {item.pemilik}
-                            </p>
-                            
-                            {item.harga_mulai && item.harga_sampai && (
-                              <div 
-                                className="bg-green-50 text-green-800 font-black text-sm px-3 py-1.5 rounded-lg border border-green-200 inline-block mb-3"
-                              >
-                                Rp {item.harga_mulai.toLocaleString('id-ID')} - Rp {item.harga_sampai.toLocaleString('id-ID')}
-                              </div>
-                            )}
-
-                            <p 
-                              className="text-gray-600 text-sm leading-relaxed mb-4 flex-1 whitespace-pre-wrap"
-                            >
-                              {item.deskripsi}
-                            </p>
-                            
-                            <div 
-                              className="space-y-3 pt-4 border-t border-gray-100 mt-auto"
-                            >
-                              {renderJamOperasional()}
-
-                              {item.link_maps && (
-                                <a 
-                                  href={item.link_maps} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-blue-600 transition-colors mt-2"
-                                >
-                                  <span>📍</span> Lihat di Google Maps
-                                </a>
-                              )}
-
-                              {item.wa && (
-                                <a 
-                                  href={`https://wa.me/${item.wa}`} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="mt-4 block w-full bg-green-50 hover:bg-green-600 hover:text-white text-green-700 font-black py-3 rounded-xl text-center transition-colors border border-green-200"
-                                >
-                                  Hubungi Penjual (WA)
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                    {filteredPotensi.map((item) => (
+                      <UmkmCard 
+                        key={item.id} 
+                        item={item} 
+                      />
+                    ))}
                   </div>
                 )}
               </>

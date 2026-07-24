@@ -11,7 +11,8 @@ import {
   setDoc,
   collection,
   query,
-  where,
+  orderBy,
+  updateDoc,
   getDocs
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
@@ -72,7 +73,9 @@ export default function PengaturanBeranda({
   // ==========================================
   // STATE: BERITA SLIDE (DATABASE: kabar_desa)
   // ==========================================
-  const [beritaTampil, setBeritaTampil] = useState<any[]>([]);
+  const [semuaBerita, setSemuaBerita] = useState<any[]>([]);
+  const [searchBerita, setSearchBerita] = useState("");
+  const jumlahSlideTerpakai = semuaBerita.filter(b => b.is_pinned === true).length;
 
   // ==========================================
   // FUNGSI KONVERSI GAMBAR HEIC -> JPG (WSVR)
@@ -92,52 +95,52 @@ export default function PengaturanBeranda({
   // ==========================================
   // FETCH DATA AWAL
   // ==========================================
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // Ambil Data Header Beranda
-        const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda_hero"));
-        if (snapHero.exists() && snapHero.data()) {
-          setJudulHero(snapHero.data().judul || "");
-          setSubHero(snapHero.data().sub || "");
-          setBgHeroLama(snapHero.data().bg || "");
-        }
-
-        // Ambil Data Kontak & Maps
-        const snapKontak = await getDoc(doc(db, "pengaturan_web", "kontak"));
-        if (snapKontak.exists() && snapKontak.data()) {
-          setKontak({
-            alamat: snapKontak.data().alamat || "",
-            email: snapKontak.data().email || "",
-            jam_kerja: snapKontak.data().jam_kerja || "",
-            wa: snapKontak.data().wa || "",
-            ig: snapKontak.data().ig || "",
-            fb: snapKontak.data().fb || "",
-            yt: snapKontak.data().yt || "",
-            tiktok: snapKontak.data().tiktok || "",
-            peta_embed: snapKontak.data().peta_embed || ""
-          });
-        }
-
-        // Ambil Data Berita yang di-Pin (DATABASE: kabar_desa)
-        const qBerita = query(
-          collection(db, "kabar_desa"), 
-          where("is_pinned", "==", true)
-        );
-        const snapBerita = await getDocs(qBerita);
-        setBeritaTampil(snapBerita.docs.map(doc => ({ 
-          id: doc.id, 
-          ...(doc.data() as any) 
-        })));
-
-      } catch (error) {
-        console.error("Gagal memuat data:", error);
+  const fetchData = async () => {
+    try {
+      // 1. Ambil Data Header Beranda
+      const snapHero = await getDoc(doc(db, "pengaturan_web", "beranda_hero"));
+      if (snapHero.exists() && snapHero.data()) {
+        setJudulHero(snapHero.data().judul || "");
+        setSubHero(snapHero.data().sub || "");
+        setBgHeroLama(snapHero.data().bg || "");
       }
-    };
-    
+
+      // 2. Ambil Data Kontak & Maps
+      const snapKontak = await getDoc(doc(db, "pengaturan_web", "kontak"));
+      if (snapKontak.exists() && snapKontak.data()) {
+        setKontak({
+          alamat: snapKontak.data().alamat || "",
+          email: snapKontak.data().email || "",
+          jam_kerja: snapKontak.data().jam_kerja || "",
+          wa: snapKontak.data().wa || "",
+          ig: snapKontak.data().ig || "",
+          fb: snapKontak.data().fb || "",
+          yt: snapKontak.data().yt || "",
+          tiktok: snapKontak.data().tiktok || "",
+          peta_embed: snapKontak.data().peta_embed || ""
+        });
+      }
+
+      // 3. Ambil Seluruh Data Berita untuk Diatur Slide-nya (kabar_desa)
+      const qBerita = query(collection(db, "kabar_desa"), orderBy("tanggal_posting", "desc"));
+      const snapBerita = await getDocs(qBerita);
+      setSemuaBerita(snapBerita.docs.map(doc => ({ 
+        id: doc.id, 
+        ...(doc.data() as any) 
+      })));
+
+    } catch (error) {
+      console.error("Gagal memuat data:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
+  // ==========================================
+  // CLOUDINARY UPLOADER & DELETER
+  // ==========================================
   const uploadFotoKeCloudinary = async (file: File) => {
     try {
       const formData = new FormData();
@@ -172,7 +175,7 @@ export default function PengaturanBeranda({
   };
 
   // ==========================================
-  // HANDLER SIMPAN DATA
+  // HANDLER SIMPAN DATA HERO
   // ==========================================
   const handleSimpanHero = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,6 +221,32 @@ export default function PengaturanBeranda({
     }
   };
 
+  const handleHapusGambarHero = () => {
+    if (confirm("Yakin ingin menghapus gambar latar belakang ini?")) {
+      setBgHeroLama("");
+      setBgHeroList(null);
+      const input = document.getElementById("inputHeroBeranda") as HTMLInputElement;
+      if (input) {
+        input.value = "";
+      }
+    }
+  };
+
+  // ==========================================
+  // HANDLER SIMPAN DATA KONTAK & SMART IFRAME
+  // ==========================================
+  const handlePetaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    let val = e.target.value;
+    // Fitur Cerdas: Mengekstrak URL murni dari kode <iframe> Google Maps
+    if (val.includes("<iframe") && val.includes("src=")) {
+      const match = val.match(/src="([^"]+)"/);
+      if (match && match[1]) {
+        val = match[1];
+      }
+    }
+    setKontak({...kontak, peta_embed: val});
+  };
+
   const handleSimpanKontak = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoadingKontak(true);
@@ -240,18 +269,29 @@ export default function PengaturanBeranda({
   };
 
   // ==========================================
-  // HANDLER HAPUS GAMBAR THUMBNAIL (SILANG)
+  // HANDLER 2-ARAH BERITA SLIDE (PIN/UNPIN)
   // ==========================================
-  const handleHapusGambarHero = () => {
-    if (confirm("Yakin ingin menghapus gambar latar belakang ini?")) {
-      setBgHeroLama("");
-      setBgHeroList(null);
-      const input = document.getElementById("inputHeroBeranda") as HTMLInputElement;
-      if (input) {
-        input.value = "";
-      }
+  const toggleStatusSlideBerita = async (id: string, currentStatus: boolean) => {
+    if (!currentStatus && jumlahSlideTerpakai >= 15) {
+      alert("⚠️ BATAS MAKSIMAL TERCAPAI!\n\nAnda sudah memilih 15 berita untuk ditampilkan di Slide Beranda Utama.\n\nSilakan lepas pilihan (Pause/Hapus dari Slide) pada salah satu berita lain terlebih dahulu untuk menggantikannya.");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "kabar_desa", id), {
+        is_pinned: !currentStatus
+      });
+      // Segarkan daftar setelah update
+      fetchData();
+    } catch (error) {
+      console.error("Gagal update status slide:", error);
     }
   };
+
+  const filteredBerita = semuaBerita.filter(b => 
+    b.judul?.toLowerCase().includes(searchBerita.toLowerCase()) ||
+    b.kategori?.toLowerCase().includes(searchBerita.toLowerCase())
+  );
 
   return (
     <div 
@@ -306,7 +346,7 @@ export default function PengaturanBeranda({
           >
             📰
           </span> 
-          Berita Slide
+          Pengaturan Slide Berita
         </button>
       </div>
 
@@ -355,7 +395,7 @@ export default function PengaturanBeranda({
                     rows={4}
                     value={judulHero} 
                     onChange={(e) => setJudulHero(e.target.value)} 
-                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg whitespace-pre-wrap"
+                    className="w-full p-4 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-500 bg-gray-50 focus:bg-white transition-all font-bold text-lg whitespace-pre-wrap leading-tight"
                     placeholder="Contoh: Selamat Datang Di&#10;Desa Kerjo"
                   ></textarea>
                 </div>
@@ -387,14 +427,13 @@ export default function PengaturanBeranda({
                 
                 {(bgHeroLama || (bgHeroList && bgHeroList.length > 0)) && (
                   <div 
-                    className="relative w-full h-40 md:h-56 rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 group"
+                    className="relative w-full h-48 md:h-56 rounded-xl overflow-hidden shadow-inner border-2 border-gray-200 group"
                   >
                     <img 
                       src={bgHeroList && bgHeroList.length > 0 ? URL.createObjectURL(bgHeroList[0]) : getSafeImageUrl(bgHeroLama)} 
                       alt="Hero Beranda Preview"
                       className="w-full h-full object-cover" 
                     />
-                    {/* TOMBOL SILANG HAPUS GAMBAR SAAT HOVER */}
                     <button 
                       type="button"
                       onClick={handleHapusGambarHero}
@@ -526,19 +565,20 @@ export default function PengaturanBeranda({
                   <label 
                     className="block text-xs font-bold mb-2 text-purple-800"
                   >
-                    Link Peta Google Maps (Embed src)
+                    Link Peta Google Maps
                   </label>
+                  {/* TEXTAREA SMART MAPS EXTRACTOR */}
                   <textarea 
-                    rows={3} 
+                    rows={4} 
                     value={kontak.peta_embed} 
-                    onChange={(e) => setKontak({...kontak, peta_embed: e.target.value})} 
-                    placeholder="https://www.google.com/maps/embed?pb=..."
-                    className="w-full p-3 border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all text-sm font-mono text-gray-700"
+                    onChange={handlePetaChange} 
+                    placeholder='Bisa Paste langsung seluruh kode <iframe src="..."> di sini...'
+                    className="w-full p-3 border border-purple-200 rounded-xl outline-none focus:ring-2 focus:ring-purple-500 bg-white transition-all text-sm font-mono text-gray-700 leading-relaxed"
                   ></textarea>
                   <p 
-                    className="text-[9px] mt-1 text-purple-600 font-bold"
+                    className="text-[10px] mt-1 text-purple-600 font-bold"
                   >
-                    Hanya masukkan URL (link) yang ada di dalam atribut src="" pada kode embed Google Maps.
+                    ✨ Anda bisa langsung mem-paste (salin tempel) seluruh kode Embed Iframe dari Google Maps. Sistem akan otomatis mendeteksi dan mengambil tautan bersihnya saja.
                   </p>
                 </div>
                 
@@ -692,45 +732,76 @@ export default function PengaturanBeranda({
       )}
 
       {/* ==========================================
-          TAB 3: BERITA SLIDE (PREVIEW SINKRON KABAR_DESA)
+          TAB 3: PENGATURAN BERITA SLIDE (2-ARAH KABAR DESA)
       ========================================== */}
       {tabAktif === "slide" && (
         <div 
           className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border-t-4 border-blue-600 animate-fade-in"
         >
-          <h3 
-            className="text-2xl font-bold mb-2 flex items-center gap-2"
+          <div 
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6"
           >
-            <span 
-              className="text-3xl"
+            <div>
+              <h3 
+                className="text-2xl font-bold flex items-center gap-2 mb-1"
+              >
+                <span 
+                  className="text-3xl"
+                >
+                  📰
+                </span> 
+                Kontrol Slide Berita
+              </h3>
+              <p 
+                className="text-gray-500 text-sm"
+              >
+                Pilih maksimal 15 berita dari daftar `kabar_desa` untuk dijadikan slide di halaman beranda warga.
+              </p>
+            </div>
+            
+            <div 
+              className={`px-4 py-2 rounded-xl border font-black text-sm ${
+                jumlahSlideTerpakai >= 15 ? "bg-red-100 text-red-700 border-red-300" : "bg-blue-50 text-blue-700 border-blue-200"
+              }`}
             >
-              📰
-            </span> 
-            Pratinjau Berita Slide Beranda
-          </h3>
-          <p 
-            className="text-gray-500 text-sm mb-8"
-          >
-            Data di bawah ini ditarik otomatis dari menu <b>Kabar & Agenda</b> (Database: <code>kabar_desa</code>). Untuk mengubah daftar ini, silakan tandai (Pin) berita yang Anda inginkan di halaman manajemen berita.
-          </p>
+              {jumlahSlideTerpakai} / 15 Slide Terpakai
+            </div>
+          </div>
 
-          {beritaTampil.length === 0 ? (
+          <div 
+            className="mb-8 relative"
+          >
+            <input 
+              type="text" 
+              placeholder="Cari judul berita untuk dimasukkan ke slide..." 
+              value={searchBerita}
+              onChange={(e) => setSearchBerita(e.target.value)}
+              className="w-full p-4 pl-12 rounded-xl border border-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm text-sm"
+            />
+            <span 
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-gray-400"
+            >
+              🔍
+            </span>
+          </div>
+
+          {filteredBerita.length === 0 ? (
             <div 
               className="text-center py-12 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50"
             >
               <p 
                 className="text-gray-500 font-bold"
               >
-                Belum ada berita yang ditandai untuk tampil di Beranda.
+                Tidak ada data berita di temukan. Silakan tulis berita di menu "Kabar & Agenda".
               </p>
             </div>
           ) : (
             <div 
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+              className="grid grid-cols-1 md:grid-cols-2 gap-6"
             >
-              {beritaTampil.map((berita) => {
+              {filteredBerita.map((berita) => {
                 
-                // Cek format gambar (Array atau String)
+                // Ambil gambar pertama jika array
                 let imgUrl = "";
                 if (Array.isArray(berita.gambar) && berita.gambar.length > 0) {
                   imgUrl = berita.gambar[0];
@@ -741,45 +812,72 @@ export default function PengaturanBeranda({
                 return (
                   <div 
                     key={berita.id} 
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                    className={`bg-white rounded-2xl border-2 shadow-sm flex flex-col md:flex-row gap-4 p-4 transition-all ${
+                      berita.is_pinned ? "border-green-400 bg-green-50/20" : "border-gray-100 hover:border-blue-200"
+                    }`}
                   >
                     <div 
-                      className="h-32 bg-gray-200 relative"
+                      className="w-full md:w-32 h-32 bg-gray-200 relative rounded-xl overflow-hidden flex-shrink-0"
                     >
                       {imgUrl ? (
                         <img 
                           src={getSafeImageUrl(imgUrl)} 
-                          alt="Preview"
+                          alt="Thumbnail"
                           className="w-full h-full object-cover" 
                         />
                       ) : (
                         <div 
-                          className="w-full h-full flex items-center justify-center text-gray-400 text-2xl"
+                          className="w-full h-full flex items-center justify-center text-gray-400 text-3xl"
                         >
                           🖼️
                         </div>
                       )}
-                      <span 
-                        className="absolute top-2 right-2 bg-yellow-500 text-white text-[10px] font-black px-2 py-1 rounded shadow-sm uppercase"
-                      >
-                        PINNED
-                      </span>
                     </div>
+                    
                     <div 
-                      className="p-4"
+                      className="flex-1 flex flex-col justify-between"
                     >
-                      <h4 
-                        className="font-bold text-gray-900 text-sm line-clamp-2 mb-2"
+                      <div>
+                        <div 
+                          className="flex items-center gap-2 mb-1"
+                        >
+                          <span 
+                            className="bg-gray-200 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold"
+                          >
+                            {berita.kategori || "Umum"}
+                          </span>
+                          <span 
+                            className="text-[10px] text-gray-500 font-bold"
+                          >
+                            {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString('id-ID') : "-"}
+                          </span>
+                        </div>
+                        <h4 
+                          className="font-black text-gray-900 text-sm line-clamp-2 leading-snug"
+                        >
+                          {berita.judul}
+                        </h4>
+                      </div>
+                      
+                      <div 
+                        className="mt-4"
                       >
-                        {berita.judul}
-                      </h4>
-                      <p 
-                        className="text-xs text-gray-500 mb-2"
-                      >
-                        {berita.tanggal_posting ? new Date(berita.tanggal_posting).toLocaleDateString('id-ID', {
-                          day: 'numeric', month: 'long', year: 'numeric'
-                        }) : "-"}
-                      </p>
+                        {berita.is_pinned ? (
+                          <button 
+                            onClick={() => toggleStatusSlideBerita(berita.id, true)}
+                            className="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <span>⏸️</span> Hapus dari Slide Beranda
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => toggleStatusSlideBerita(berita.id, false)}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2"
+                          >
+                            <span>▶️</span> Tampilkan di Slide Beranda
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

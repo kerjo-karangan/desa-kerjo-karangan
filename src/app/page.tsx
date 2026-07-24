@@ -86,19 +86,21 @@ export default function Home() {
           perempuan: totalPerempuan
         });
 
-        // 3. Fetch Berita (DATABASE ASLI: kabar_desa) - Menampilkan 10 Terbaru / yang di-Pin
+        // 3. Fetch Berita (DATABASE ASLI: kabar_desa) - Menarik yg di Pin (Maks 15)
         const qBerita = query(
           collection(db, "kabar_desa"), 
-          orderBy("tanggal_posting", "desc"), 
-          limit(10)
+          where("is_pinned", "==", true)
         );
         const snapBerita = await getDocs(qBerita);
-        setBeritaSlide(snapBerita.docs.map(doc => ({ 
+        let beritaTerpilih = snapBerita.docs.map(doc => ({ 
           id: doc.id, 
           ...(doc.data() as any) 
-        })));
+        }));
+        // Mengurutkan berdasarkan tanggal terbaru dan batasi maksimal 15
+        beritaTerpilih.sort((a, b) => new Date(b.tanggal_posting).getTime() - new Date(a.tanggal_posting).getTime());
+        setBeritaSlide(beritaTerpilih.slice(0, 15));
 
-        // 4. Fetch Agenda (DATABASE ASLI: agenda_desa) - Menampilkan 3 Agenda Terbaru
+        // 4. Fetch Agenda (DATABASE ASLI: agenda_desa) - 3 Agenda Terbaru
         const qAgenda = query(
           collection(db, "agenda_desa"), 
           orderBy("tanggal", "asc"), 
@@ -120,16 +122,29 @@ export default function Home() {
     fetchHomeData();
   }, []);
 
-  // Slider Otomatis untuk 10 Berita
+  // Slider Otomatis (Akan terjeda jika isPaused true / kursor diarahkan ke area slide)
   useEffect(() => {
     if (beritaSlide.length <= 1 || isPaused) return;
     
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % beritaSlide.length);
-    }, 5000); // Ganti gambar tiap 5 detik
+    }, 5000); 
     
     return () => clearInterval(interval);
   }, [beritaSlide.length, isPaused]);
+
+  // Fungsi memanipulasi Link YouTube biasa menjadi Link Embed
+  const konversiLinkYouTube = (url: string) => {
+    if (!url) return "";
+    let embedUrl = url;
+    if (url.includes("watch?v=")) {
+      embedUrl = url.replace("watch?v=", "embed/");
+    } else if (url.includes("youtu.be/")) {
+      embedUrl = url.replace("youtu.be/", "youtube.com/embed/");
+    }
+    // Hapus parameter waktu jika ada agar bersih
+    return embedUrl.split("&")[0];
+  };
 
   const getSafeImageUrl = (url: string) => {
     if (!url) return "";
@@ -149,7 +164,7 @@ export default function Home() {
         className="min-h-screen flex items-center justify-center bg-gray-50"
       >
         <div 
-          className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin"
+          className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"
         ></div>
       </div>
     );
@@ -194,7 +209,7 @@ export default function Home() {
             />
           </div>
           <span 
-            className="text-yellow-400 font-black tracking-widest uppercase text-xs md:text-sm mb-4 bg-gray-900/50 px-4 py-1.5 rounded-full border border-gray-700"
+            className="text-blue-400 font-black tracking-widest uppercase text-xs md:text-sm mb-4 bg-gray-900/50 px-4 py-1.5 rounded-full border border-gray-700"
           >
             Portal Informasi Publik
           </span>
@@ -329,7 +344,7 @@ export default function Home() {
       </div>
 
       {/* ==========================================
-          3. STATISTIK RINGKAS DESA (DENGAN ANIMASI HOVER)
+          3. STATISTIK RINGKAS DESA (HOVER ANIMASI)
       ========================================== */}
       <section 
         className="py-16 md:py-24"
@@ -341,7 +356,7 @@ export default function Home() {
             className="text-center mb-12"
           >
             <span 
-              className="text-green-600 font-black tracking-widest uppercase text-xs"
+              className="text-blue-600 font-black tracking-widest uppercase text-xs"
             >
               Data Real-Time
             </span>
@@ -439,45 +454,51 @@ export default function Home() {
       </section>
 
       {/* ==========================================
-          4. SLIDER 10 BERITA DESA TERBARU
+          4. SLIDER BERITA DENGAN BINGKAI CERAH & YOUTUBE
       ========================================== */}
       {beritaSlide.length > 0 && (
         <section 
-          className="py-12 bg-gray-900 text-white"
+          className="py-12 bg-gray-50"
         >
           <div 
-            className="container mx-auto px-4"
+            className="container mx-auto px-4 max-w-6xl"
           >
             <div 
               className="flex justify-between items-end mb-8"
             >
               <div>
                 <span 
-                  className="text-green-400 font-bold tracking-widest uppercase text-xs"
+                  className="text-blue-600 font-bold tracking-widest uppercase text-xs"
                 >
                   Kabar Terbaru
                 </span>
                 <h2 
-                  className="text-3xl font-black mt-1"
+                  className="text-3xl font-black mt-1 text-gray-900"
                 >
-                  10 Berita Desa Terkini
+                  Informasi & Berita Desa Terkini
                 </h2>
               </div>
               <Link 
                 href="/kabar" 
-                className="hidden md:flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-white transition-colors"
+                className="hidden md:flex items-center gap-2 text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors"
               >
                 Lihat Semua Kabar <span>→</span>
               </Link>
             </div>
 
+            {/* Area Bingkai Kotak Membulat Untuk Slider */}
             <div 
-              className="relative w-full h-[400px] md:h-[500px] rounded-3xl overflow-hidden shadow-2xl bg-gray-800 group"
+              className="relative w-full h-[450px] md:h-[550px] rounded-3xl overflow-hidden shadow-2xl bg-white border border-gray-100 group"
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
             >
               {beritaSlide.map((slide, index) => {
-                // Menangani jika field gambar adalah array (seperti yang Anda sebut daftar foto) atau string biasa
+                
+                // Cek apakah ada link YouTube
+                const hasYoutube = slide.link_youtube && slide.link_youtube.trim() !== "";
+                const embedUrl = hasYoutube ? konversiLinkYouTube(slide.link_youtube) : "";
+
+                // Ambil gambar pertama jika array
                 let imageUrl = "";
                 if (Array.isArray(slide.gambar) && slide.gambar.length > 0) {
                   imageUrl = slide.gambar[0];
@@ -489,53 +510,87 @@ export default function Home() {
                   <div
                     key={slide.id}
                     className={`absolute inset-0 transition-opacity duration-1000 ${
-                      index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0"
+                      index === currentSlide ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
                     }`}
                   >
-                    {imageUrl && (
-                      <img
-                        src={getSafeImageUrl(imageUrl)}
-                        alt={slide.judul}
-                        className="w-full h-full object-cover"
-                      />
+                    {/* Render Video YouTube atau Gambar */}
+                    {hasYoutube ? (
+                      <div 
+                        className="w-full h-full"
+                      >
+                        <iframe 
+                          src={`${embedUrl}?rel=0&modestbranding=1`} 
+                          title="YouTube Video"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                          allowFullScreen 
+                          className="w-full h-full object-cover"
+                        ></iframe>
+                        {/* Overlay gradient di bawah agar teks tetap terbaca */}
+                        <div 
+                          className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent pointer-events-none"
+                        ></div>
+                      </div>
+                    ) : (
+                      imageUrl && (
+                        <>
+                          <img
+                            src={getSafeImageUrl(imageUrl)}
+                            alt={slide.judul}
+                            className="w-full h-full object-cover"
+                          />
+                          <div 
+                            className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent pointer-events-none"
+                          ></div>
+                        </>
+                      )
                     )}
-                    <div 
-                      className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/50 to-transparent"
-                    ></div>
                     
+                    {/* Konten Teks di Bawah (Dibuat mengambang dan rapi) */}
                     <div 
-                      className="absolute bottom-0 left-0 w-full p-6 md:p-12"
+                      className="absolute bottom-0 left-0 w-full p-6 md:p-12 pointer-events-none"
                     >
                       <div 
                         className="flex items-center gap-3 mb-4"
                       >
                         <span 
-                          className="bg-green-600 text-white text-[10px] md:text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest"
+                          className="bg-blue-600 text-white text-[10px] md:text-xs font-black px-3 py-1 rounded-full uppercase tracking-widest shadow-sm"
                         >
-                          Berita Terbaru
+                          {slide.kategori || "Berita"}
                         </span>
                         <span 
-                          className="text-gray-300 text-xs font-bold"
+                          className="text-gray-200 text-xs font-bold drop-shadow-md"
                         >
                           {slide.tanggal_posting ? new Date(slide.tanggal_posting).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ""}
                         </span>
                       </div>
                       <h3 
-                        className="text-2xl md:text-4xl font-black text-white leading-tight mb-3 drop-shadow-md"
+                        className="text-2xl md:text-4xl font-black text-white leading-tight mb-3 drop-shadow-lg"
                       >
                         {slide.judul}
                       </h3>
                       <p 
-                        className="text-gray-300 text-sm md:text-base line-clamp-2 md:line-clamp-3 max-w-3xl drop-shadow-sm"
+                        className="text-gray-200 text-sm md:text-base line-clamp-2 md:line-clamp-3 max-w-3xl drop-shadow-md mb-6"
                       >
                         {slide.isi}
                       </p>
+                      
+                      {/* Tombol Lihat Selengkapnya (Diaktifkan pointer-events-auto agar bisa diklik) */}
+                      <div 
+                        className="pointer-events-auto"
+                      >
+                        <Link 
+                          href={`/kabar?id=${slide.id}`} 
+                          className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-transform transform hover:-translate-y-1 text-sm border border-blue-500"
+                        >
+                          Lihat Selengkapnya
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })}
 
-              {/* Indikator Urutan Slide (Bisa Diklik) */}
+              {/* Indikator Titik Bawah Slide */}
               <div 
                 className="absolute bottom-4 right-4 md:bottom-8 md:right-8 z-20 flex gap-1.5"
               >
@@ -544,36 +599,38 @@ export default function Home() {
                     key={idx}
                     onClick={() => setCurrentSlide(idx)}
                     className={`h-2 rounded-full transition-all duration-300 ${
-                      idx === currentSlide ? "w-6 bg-green-500" : "w-2 bg-white/40 hover:bg-white/70"
+                      idx === currentSlide ? "w-6 bg-blue-500" : "w-2 bg-white/50 hover:bg-white/90"
                     }`}
                   ></button>
                 ))}
               </div>
 
+              {/* Tanda Pause (Muncul saat diarahkan kursor) */}
               {isPaused && (
                 <div 
-                  className="absolute top-4 right-4 z-20 bg-black/50 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 text-white"
+                  className="absolute top-4 right-4 z-20 bg-black/60 backdrop-blur-sm px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 text-white shadow-md"
                 >
                   <span 
                     className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"
                   ></span> 
-                  Pause Slide
+                  Slider Berhenti (Mode Video / Baca)
                 </div>
               )}
 
+              {/* Tombol Next & Prev (Panah Putih) */}
               {beritaSlide.length > 1 && (
                 <div 
-                  className="absolute top-1/2 -translate-y-1/2 left-4 right-4 z-20 flex justify-between pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute top-1/2 -translate-y-1/2 left-4 right-4 z-20 flex justify-between pointer-events-none"
                 >
                   <button 
                     onClick={() => setCurrentSlide(currentSlide === 0 ? beritaSlide.length - 1 : currentSlide - 1)}
-                    className="w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                    className="w-10 h-10 md:w-12 md:h-12 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-all opacity-100 md:opacity-0 group-hover:opacity-100 shadow-lg border border-white/20"
                   >
                     ◀
                   </button>
                   <button 
                     onClick={() => setCurrentSlide((currentSlide + 1) % beritaSlide.length)}
-                    className="w-10 h-10 md:w-12 md:h-12 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-colors"
+                    className="w-10 h-10 md:w-12 md:h-12 bg-black/40 hover:bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white pointer-events-auto transition-all opacity-100 md:opacity-0 group-hover:opacity-100 shadow-lg border border-white/20"
                   >
                     ▶
                   </button>
@@ -589,7 +646,7 @@ export default function Home() {
       ========================================== */}
       {agendaList.length > 0 && (
         <section 
-          className="py-16 md:py-24 bg-white"
+          className="py-16 bg-gray-50"
         >
           <div 
             className="container mx-auto px-4 max-w-5xl"
@@ -623,13 +680,13 @@ export default function Home() {
               {agendaList.map((agenda) => (
                 <div 
                   key={agenda.id}
-                  className="bg-gray-50 border border-gray-100 rounded-2xl p-6 hover:shadow-lg transition-shadow group cursor-default"
+                  className="bg-white border border-gray-100 rounded-2xl p-6 hover:shadow-xl hover:-translate-y-1 transition-all group cursor-default"
                 >
                   <div 
                     className="flex items-center gap-3 mb-4"
                   >
                     <div 
-                      className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex flex-col items-center justify-center font-black leading-none group-hover:bg-blue-600 group-hover:text-white transition-colors"
+                      className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex flex-col items-center justify-center font-black leading-none group-hover:bg-blue-600 group-hover:text-white transition-colors"
                     >
                       <span 
                         className="text-lg"
@@ -694,35 +751,44 @@ export default function Home() {
       )}
 
       {/* ==========================================
-          6. GOOGLE MAPS EMBED
+          6. GOOGLE MAPS EMBED (BINGKAI KOTAK MEMBULAT)
       ========================================== */}
       <section 
-        className="w-full h-96 md:h-[500px] bg-gray-200 relative"
+        className="py-12 bg-gray-50 pb-24"
       >
         <div 
-          className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-gray-900/50 to-transparent z-10 pointer-events-none flex justify-center"
+          className="container mx-auto px-4 max-w-6xl"
         >
-          <span 
-            className="bg-white text-gray-900 font-black px-6 py-2 rounded-full shadow-lg text-sm flex items-center gap-2"
+          <div 
+            className="w-full h-96 md:h-[500px] rounded-3xl overflow-hidden shadow-xl bg-white border border-gray-200 relative"
           >
-            <span 
-              className="text-red-500"
+            <div 
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none"
             >
-              📍
-            </span> 
-            Peta Lokasi Desa Kerjo
-          </span>
+              <span 
+                className="bg-white/90 backdrop-blur-sm text-gray-900 font-black px-6 py-2 rounded-full shadow-lg text-sm flex items-center gap-2 border border-gray-200"
+              >
+                <span 
+                  className="text-red-500 text-lg"
+                >
+                  📍
+                </span> 
+                Peta Lokasi Desa Kerjo
+              </span>
+            </div>
+            
+            <iframe 
+              src={petaEmbedUrl} 
+              width="100%" 
+              height="100%" 
+              style={{ border: 0 }} 
+              allowFullScreen={false} 
+              loading="lazy" 
+              referrerPolicy="no-referrer-when-downgrade"
+              className="w-full h-full"
+            ></iframe>
+          </div>
         </div>
-        <iframe 
-          src={petaEmbedUrl} 
-          width="100%" 
-          height="100%" 
-          style={{ border: 0 }} 
-          allowFullScreen={false} 
-          loading="lazy" 
-          referrerPolicy="no-referrer-when-downgrade"
-          className="w-full h-full"
-        ></iframe>
       </section>
 
     </div>
