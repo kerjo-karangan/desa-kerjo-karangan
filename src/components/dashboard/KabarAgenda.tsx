@@ -69,7 +69,7 @@ export default function KabarAgenda({
     kategori: "", 
     isi: "",
     tanggal_posting: "",
-    link_youtube: "", // Tambahan Link YouTube
+    link_youtube: "",
     gambar: [] as string[]
   });
 
@@ -88,7 +88,7 @@ export default function KabarAgenda({
     nama: "",
     tanggal: "",
     lokasi: "",
-    link_maps: "" // Tambahan Link Google Maps
+    link_maps: ""
   });
 
   // ==========================================
@@ -206,7 +206,6 @@ export default function KabarAgenda({
   // ==========================================
   // HANDLER BERITA (KABAR DESA)
   // ==========================================
-  // PERBAIKAN: Fungsi Toggle Play/Pause Berita ke Slider (Maks 15)
   const togglePlayBerita = async (id: string, currentStatus: boolean) => {
     if (!currentStatus) {
       const jumlahDiPlay = dataBerita.filter(b => b.is_pinned === true).length;
@@ -400,7 +399,6 @@ export default function KabarAgenda({
     }
   };
 
-  // PERBAIKAN: Fungsi Pembersihan Massal Agenda Kedaluwarsa
   const bersihkanAgendaLama = async (hariLewat: number) => {
     const batasWaktu = new Date();
     batasWaktu.setDate(batasWaktu.getDate() - hariLewat);
@@ -492,7 +490,7 @@ export default function KabarAgenda({
       )}
 
       {/* ==========================================
-          TAB 1: HEADER PUBLIK
+          TAB 1: HEADER PUBLIK (DENGAN PREVIEW AKTIF)
       ========================================== */}
       {tabAktif === "hero" && (
         <div 
@@ -519,7 +517,6 @@ export default function KabarAgenda({
                   >
                     Judul Utama Header (Paragraf)
                   </label>
-                  {/* PERBAIKAN: Judul menjadi Textarea */}
                   <textarea 
                     required 
                     rows={3}
@@ -532,7 +529,7 @@ export default function KabarAgenda({
                   <label 
                     className="block text-sm font-bold mb-2"
                   >
-                    Teks Sub-Judul
+                    Teks Sub-Judul (Deskripsi Singkat)
                   </label>
                   <textarea 
                     required 
@@ -551,16 +548,26 @@ export default function KabarAgenda({
                 >
                   Gambar Background
                 </label>
-                {heroBgLama && (
+                
+                {/* PREVIEW GAMBAR HEADER CERDAS */}
+                {(heroBgLama || (heroBgList && heroBgList.length > 0)) && (
                   <div 
-                    className="relative w-full h-40 rounded-xl overflow-hidden shadow-inner border border-gray-200"
+                    className="relative w-full h-48 rounded-xl overflow-hidden shadow-sm border border-gray-200 group"
                   >
                     <img 
-                      src={getSafeImageUrl(heroBgLama)} 
+                      src={heroBgList && heroBgList.length > 0 ? URL.createObjectURL(heroBgList[0]) : getSafeImageUrl(heroBgLama)} 
                       className="w-full h-full object-cover" 
                     />
+                    <button 
+                      type="button" 
+                      onClick={() => { if(confirm("Hapus background?")) { setHeroBgLama(""); setHeroBgList(null); } }}
+                      className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold text-xs"
+                    >
+                      <span className="bg-red-600 px-3 py-1.5 rounded-full shadow-lg">❌ Hapus Gambar</span>
+                    </button>
                   </div>
                 )}
+                
                 <label 
                   className="cursor-pointer flex flex-col items-center justify-center py-6 bg-yellow-50 border-2 border-dashed border-yellow-300 rounded-xl hover:bg-yellow-100 transition-all shadow-sm"
                 >
@@ -572,7 +579,7 @@ export default function KabarAgenda({
                   <span 
                     className="font-bold text-yellow-800 text-sm"
                   >
-                    Upload Background Baru
+                    {heroBgLama || (heroBgList && heroBgList.length > 0) ? "Pilih Gambar Pengganti" : "Upload Background Baru"}
                   </span>
                   <input 
                     type="file" 
@@ -581,6 +588,14 @@ export default function KabarAgenda({
                     className="hidden" 
                   />
                 </label>
+                
+                {heroBgList && heroBgList.length > 0 && (
+                  <div 
+                    className="text-xs font-bold text-green-700 p-3 bg-green-50 rounded-lg border border-green-200 mt-2"
+                  >
+                    ✅ Gambar baru telah dipilih. Tekan tombol simpan untuk menerapkan.
+                  </div>
+                )}
               </div>
             </div>
             <button 
@@ -637,7 +652,6 @@ export default function KabarAgenda({
               </span>
             </div>
             
-            {/* PERBAIKAN: Fitur Penampil Jumlah Data (Paginasi Fleksibel) */}
             <select 
               value={perPageBerita}
               onChange={(e) => { setPerPageBerita(Number(e.target.value)); setPageBerita(1); }}
@@ -715,7 +729,6 @@ export default function KabarAgenda({
                       <div 
                         className="flex flex-wrap items-center gap-2 mt-2 md:mt-0"
                       >
-                        {/* PERBAIKAN: Tombol Play & Pause untuk Slider */}
                         <button 
                           onClick={() => togglePlayBerita(item.id, item.is_pinned)}
                           className={`text-xs font-bold px-4 py-2 rounded-lg border shadow-sm transition-colors flex items-center gap-2 ${
@@ -805,7 +818,6 @@ export default function KabarAgenda({
             </button>
           </div>
 
-          {/* PERBAIKAN: Tombol Pembersih Otomatis (Auto-Delete) */}
           <div 
             className="flex flex-wrap gap-2 mb-6 bg-red-50 p-4 rounded-xl border border-red-100"
           >
@@ -854,7 +866,6 @@ export default function KabarAgenda({
               </span>
             </div>
             
-            {/* Paginasi Fleksibel */}
             <select 
               value={perPageAgenda}
               onChange={(e) => { setPerPageAgenda(Number(e.target.value)); setPageAgenda(1); }}
@@ -881,7 +892,6 @@ export default function KabarAgenda({
               </div>
             ) : (
               paginatedAgenda.map((item) => {
-                // PERBAIKAN: Logika Agenda Kedaluwarsa
                 const isExpired = new Date(item.tanggal) < new Date();
 
                 return (
@@ -1050,7 +1060,6 @@ export default function KabarAgenda({
                 </div>
               </div>
 
-              {/* PERBAIKAN: Input Link YouTube */}
               <div 
                 className="bg-red-50 p-6 rounded-2xl border border-red-100"
               >
@@ -1256,7 +1265,6 @@ export default function KabarAgenda({
                 </div>
               </div>
 
-              {/* PERBAIKAN: Input Link Google Maps */}
               <div 
                 className="bg-blue-50 p-6 rounded-2xl border border-blue-100"
               >
